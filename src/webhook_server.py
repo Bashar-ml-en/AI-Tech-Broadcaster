@@ -461,6 +461,20 @@ def update_post_content(post_id: int, payload: Dict[str, Any] = Body(...)):
         return {"status": "updated", "post_id": post_id}
 
 
+@app.post("/api/telegram/webhook")
+async def telegram_webhook(request: Request):
+    """Direct webhook endpoint for receiving Telegram updates in serverless Vercel environments."""
+    try:
+        data = await request.json()
+        cb = data.get("callback_query")
+        if cb:
+            process_telegram_callback(cb)
+        return {"ok": True}
+    except Exception as e:
+        logger.warning("Telegram webhook error: %s", e)
+        return {"ok": False, "error": str(e)}
+
+
 @app.post("/api/scan")
 def trigger_scan(background_tasks: BackgroundTasks):
     global last_scan_time, last_scan_result, pipeline_phase, phase_timestamp
