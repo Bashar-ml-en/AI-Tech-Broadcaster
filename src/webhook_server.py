@@ -182,39 +182,132 @@ def publish_to_ayrshare(post_record: Dict[str, Any]) -> Dict[str, Any]:
         return resp.json()
 
 
-# ---------------------------------------------------------------------------
-# Background Sidecar Worker Management
-# ---------------------------------------------------------------------------
+def process_telegram_callback(cb: Dict[str, Any]):
+    """Process callback query when user clicks an inline button on Telegram."""
+    query_id = cb.get("id")
+    data = cb.get("data", "")
+    from_user = cb.get("from", {}).get("first_name") or cb.get("from", {}).get("username", "Editor")
+    chat_id = cb.get("message", {}).get("chat", {}).get("id")
+    msg_id = cb.get("message", {}).get("message_id")
 
-def sidecar_worker():
-    global sidecar_running, last_scan_time, last_scan_result, pipeline_phase, phase_timestamp
-    from src.pipeline import execute_broadcast_cycle
+    parts = data.split(":")
+    if len(parts) != 3:
+        return
 
-    logger.info("Background sidecar worker thread started. Interval: %s hour(s)", SCHEDULE_INTERVAL_HOURS)
-    while sidecar_running:
+    action, token, post_id_str = parts[0], parts[1], parts[2]
+    try:
+        post_id = int(post_id_str)
+    except ValueError:
+        return
+
+    with get_db_connection() as conn:
+        row = conn.execute("SELECT * FROM posts WHERE id = ?", (post_id,)).fetchone()
+        if not row:
+            return
+        post_record = dict(row)
+
+        if not verify_hmac_token(post_record["source_url"], post_id, token):
+            logger.warning("HMAC validation failed for Telegram callback on post %s", post_id)
+            return
+
+        if post_record["approval_status"] != "pending":
+            answer_telegram_callback(query_id, f"Already {post_record['approval_status']}")
+            return
+
+        if action == "approve":
+            try:
+                pub_res = publish_to_ayrshare(post_record)
+                ayr_id = pub_res.get("id", str(int(time.time())))
+                conn.execute(
+                    "UPDATE posts SET approval_status = 'published', published_at = CURRENT_TIMESTAMP, ayrshare_post_id = ? WHERE id = ?",
+                    (ayr_id, post_id)
+                )
+                conn.commit()
+
+                answer_telegram_callback(query_id, "✅ Broadcast Approved & Published Globally!")
+                update_telegram_message(
+                    chat_id, msg_id,
+                    f"✅ *PUBLISHED GLOBALLY* by {from_user}\n\n*Headline:* {post_record['headline']}\n*Asset CDN:* {post_record['media_url']}\n*Dispatched to:* TikTok, Instagram Reels, Facebook Reels, X (Twitter)"
+                )
+                logger.info("Telegram approval callback processed successfully for post %s", post_id)
+            except Exception as e:
+                logger.exception("Error publishing via Telegram callback: %s", e)
+                answer_telegram_callback(query_id, f"Error: {str(e)[:80]}")
+
+        elif action == "discard":
+            conn.execute("UPDATE posts SET approval_status = 'discarded', notes = 'Discarded via Telegram' WHERE id = ?", (post_id,))
+            conn.commit()
+            answer_telegram_callback(query_id, "❌ Broadcast Discarded")
+            update_telegram_message(
+                chat_id, msg_id,
+                f"❌ *DISCARDED* by {from_user}\n\n*Headline:* {post_record['headline']}\nSession terminated cleanly."
+            )
+            logger.info("Telegram discard callback processed for post %s", post_id)
+
+
+def answer_telegram_callback(query_id: str, text: str):
+    if not TELEGRAM_BOT_TOKEN:
+        return
+    try:
+        httpx.post(
+            f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/answerCallbackQuery",
+            json={"callback_query_id": query_id, "text": text},
+            timeout=10.0
+        )
+    except Exception:
+        pass
+
+
+def update_telegram_message(chat_id: int, message_id: int, text: str):
+    if not TELEGRAM_BOT_TOKEN:
+        return
+    try:
+        httpx.post(
+            f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/editMessageText",
+            json={"chat_id": chat_id, "message_id": message_id, "text": text, "parse_mode": "Markdown"},
+            timeout=10.0
+        )
+    except Exception:
+        pass
+
+
+def telegram_polling_worker():
+    """Background polling worker for Telegram callback queries (instant mobile button handling without ngrok)."""
+    if not TELEGRAM_BOT_TOKEN or "Example" in TELEGRAM_BOT_TOKEN:
+        return
+    logger.info("Telegram background polling worker activated.")
+    last_offset = 0
+
+    # Catch up to latest updates first
+    try:
+        init_res = httpx.get(f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/getUpdates?offset=-1", timeout=10.0)
+        if init_res.status_code == 200:
+            results = init_res.json().get("result", [])
+            if results:
+                last_offset = results[-1].get("update_id", 0)
+    except Exception:
+        pass
+
+    while True:
         try:
-            last_scan_time = time.time()
-            pipeline_phase = "scraping"
-            phase_timestamp = time.time()
-            logger.info("Executing scheduled broadcast cycle...")
-            res = execute_broadcast_cycle()
-            last_scan_result = "New Story Staged" if res else "No New Qualified Stories"
-            pipeline_phase = "awaiting_hitl" if res else "idle"
-            phase_timestamp = time.time()
+            url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/getUpdates"
+            params = {"timeout": 15, "offset": last_offset + 1}
+            with httpx.Client(timeout=25.0) as client:
+                resp = client.get(url, params=params)
+                if resp.status_code == 200:
+                    updates = resp.json().get("result", [])
+                    for update in updates:
+                        last_offset = max(last_offset, update.get("update_id", 0))
+                        cb = update.get("callback_query")
+                        if cb:
+                            process_telegram_callback(cb)
         except Exception as e:
-            logger.exception("Scheduled broadcast cycle error: %s", e)
-            last_scan_result = f"Error: {str(e)[:50]}"
-            pipeline_phase = "error"
-            phase_timestamp = time.time()
+            time.sleep(2)
+        time.sleep(0.5)
 
-        interval_seconds = SCHEDULE_INTERVAL_HOURS * 3600
-        for _ in range(int(interval_seconds / 5)):
-            if not sidecar_running:
-                break
-            time.sleep(5)
 
-    pipeline_phase = "idle"
-    logger.info("Background sidecar worker thread stopped.")
+# Start Telegram background polling worker immediately
+threading.Thread(target=telegram_polling_worker, daemon=True).start()
 
 
 # ---------------------------------------------------------------------------
