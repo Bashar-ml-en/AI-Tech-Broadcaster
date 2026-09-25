@@ -379,26 +379,35 @@ Respond with ONLY a valid JSON object matching this EXACT schema:
 
 def stage_rendered_asset(directive: Dict[str, Any]) -> str:
     """
-    Render output media (output_clip.mp4, output_story.png, or output_graphic.png)
-    based on format and stage to Cloudflare R2 object storage.
+    Render output media (real 9:16 vertical MP4 video with neural voiceover,
+    or 4-slide sequential carousel deck with interactive CTA).
     """
-    fmt = directive["format"]
+    fmt = directive.get("format", "post")
     timestamp = int(time.time())
 
     if fmt in ["video", "reel"]:
-        filename = f"output_clip_{timestamp}.mp4"
-        file_path = STAGING_DIR / filename
-        file_path.write_bytes(b"\x00\x00\x00\x18ftypmp42\x00\x00\x00\x00isommp42\x00\x00\x00\x08free")
-    elif fmt == "story":
-        filename = f"output_story_{timestamp}.png"
-        file_path = STAGING_DIR / filename
-        file_path.write_bytes(b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01\x00\x00\x00\x01\x08\x06\x00\x00\x00\x1f\x15c4")
+        try:
+            import asyncio
+            from src.video_synthesizer import synthesize_broadcast_video
+            filename = f"output_clip_{timestamp}.mp4"
+            logger.info("Synthesizing real 9:16 vertical motion video for Reel: %s", filename)
+            rendered_path = asyncio.run(synthesize_broadcast_video(directive, f"output_clip_{timestamp}"))
+            file_path = Path(rendered_path)
+        except Exception as e:
+            logger.exception("Video synthesis error, falling back to carousel: %s", e)
+            from src.carousel_generator import generate_carousel_deck
+            slides = generate_carousel_deck(directive, f"output_reel_{timestamp}")
+            file_path = Path(slides[0])
+            filename = file_path.name
     else:
-        filename = f"output_graphic_{timestamp}.png"
-        file_path = STAGING_DIR / filename
-        file_path.write_bytes(b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01\x00\x00\x00\x01\x08\x06\x00\x00\x00\x1f\x15c4")
+        from src.carousel_generator import generate_carousel_deck
+        prefix = f"output_story_{timestamp}" if fmt == "story" else f"output_carousel_{timestamp}"
+        logger.info("Generating 4-Slide Sequential Carousel Deck for %s: %s", fmt, directive.get("title"))
+        slides = generate_carousel_deck(directive, prefix)
+        file_path = Path(slides[0])
+        filename = file_path.name
 
-    # Upload to Cloudflare R2
+    # Upload to Cloudflare R2 / Public CDN
     upload_res = tool_upload_media_to_r2(str(file_path), f"renders/{filename}")
     return upload_res["media_url"]
 

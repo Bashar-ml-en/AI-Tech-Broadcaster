@@ -21,6 +21,8 @@ storage/staging/*.mp4
 storage/staging/*.png
 storage/staging/*.jpg
 storage/staging/*.txt
+storage/staging/*.mp3
+storage/staging/*.wav
 !storage/staging/.gitkeep
 !storage/logs/.gitkeep
 
