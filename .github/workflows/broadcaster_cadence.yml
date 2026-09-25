@@ -1,0 +1,47 @@
+name: Autonomous Multi-Cadence Broadcaster Scheduler
+
+on:
+  schedule:
+    # Runs every 15 minutes: Story (15m), Reel (30m), Post (1h)
+    - cron: '*/15 * * * *'
+  workflow_dispatch:
+    inputs:
+      target_format:
+        description: 'Target format to trigger (story, reel, post, all)'
+        required: false
+        default: 'all'
+
+jobs:
+  broadcast-cadence:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger Multi-Cadence Autonomous Broadcaster
+        run: |
+          PROD_URL="https://ai-tech-broadcaster.vercel.app"
+          MINUTE=$(date +%-M)
+          echo "Current UTC minute: $MINUTE"
+
+          if [ "${{ github.event.inputs.target_format }}" = "story" ]; then
+            echo "⚡ Triggering Story Cycle (15m)..."
+            curl -s -X POST "$PROD_URL/api/cron/story"
+          elif [ "${{ github.event.inputs.target_format }}" = "reel" ]; then
+            echo "🎬 Triggering Reel Cycle (30m)..."
+            curl -s -X POST "$PROD_URL/api/cron/reel"
+          elif [ "${{ github.event.inputs.target_format }}" = "post" ]; then
+            echo "📰 Triggering Feed Post Cycle (1h)..."
+            curl -s -X POST "$PROD_URL/api/cron/post"
+          else
+            # Autonomous multi-cadence logic:
+            echo "⚡ Triggering Story (Every 15 mins)..."
+            curl -s -X POST "$PROD_URL/api/cron/story"
+
+            if [ "$MINUTE" -ge 25 ] && [ "$MINUTE" -le 35 ] || [ "$MINUTE" -ge 55 ] || [ "$MINUTE" -le 5 ]; then
+              echo "🎬 Triggering Reel (Every 30 mins)..."
+              curl -s -X POST "$PROD_URL/api/cron/reel"
+            fi
+
+            if [ "$MINUTE" -ge 55 ] || [ "$MINUTE" -le 5 ]; then
+              echo "📰 Triggering Feed Post (Every 1 hour)..."
+              curl -s -X POST "$PROD_URL/api/cron/post"
+            fi
+          fi
