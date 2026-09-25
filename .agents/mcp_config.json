@@ -1,0 +1,37 @@
+{
+  "mcpServers": {
+    "sqlite-history": {
+      "command": "python",
+      "args": [
+        "src/mcp_social_server.py",
+        "--service",
+        "sqlite-history"
+      ],
+      "env": {
+        "PYTHONUNBUFFERED": "1"
+      }
+    },
+    "web-fetcher": {
+      "command": "python",
+      "args": [
+        "src/mcp_social_server.py",
+        "--service",
+        "web-fetcher"
+      ],
+      "env": {
+        "PYTHONUNBUFFERED": "1"
+      }
+    },
+    "social-dispatcher": {
+      "command": "python",
+      "args": [
+        "src/mcp_social_server.py",
+        "--service",
+        "social-dispatcher"
+      ],
+      "env": {
+        "PYTHONUNBUFFERED": "1"
+      }
+    }
+  }
+}
