@@ -314,22 +314,27 @@ Respond with ONLY a valid JSON object matching this EXACT schema:
 """
 
     if GEMINI_API_KEY and "YOUR_GEMINI" not in GEMINI_API_KEY:
-        try:
-            logger.info("Calling Gemini 2.0 Flash for Director Synthesis...")
-            endpoint = f"https://generativelanguage.googleapis.com/v1beta/models/{DIRECTOR_MODEL}:generateContent?key={GEMINI_API_KEY}"
-            payload = {
-                "contents": [{"parts": [{"text": prompt}]}],
-                "generationConfig": {"temperature": 0.2, "response_mime_type": "application/json"}
-            }
-            with httpx.Client(timeout=30.0) as client:
-                res = client.post(endpoint, json=payload)
-                if res.status_code == 200:
-                    text_content = res.json()["candidates"][0]["content"]["parts"][0]["text"]
-                    return json.loads(text_content)
-                else:
-                    logger.warning("Gemini API error (%s): %s", res.status_code, res.text)
-        except Exception as e:
-            logger.warning("Gemini call exception: %s. Using constitutional synthesis fallback.", e)
+        candidate_models = [DIRECTOR_MODEL, "gemini-2.5-flash-lite", "gemini-3.1-flash-lite", "gemini-3-flash-preview", "gemini-3.8-flash"]
+        # Deduplicate while preserving order
+        candidate_models = list(dict.fromkeys(candidate_models))
+
+        for model_name in candidate_models:
+            try:
+                logger.info("Calling Gemini (%s) for Director Synthesis...", model_name)
+                endpoint = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent?key={GEMINI_API_KEY}"
+                payload = {
+                    "contents": [{"parts": [{"text": prompt}]}],
+                    "generationConfig": {"temperature": 0.2, "response_mime_type": "application/json"}
+                }
+                with httpx.Client(timeout=35.0) as client:
+                    res = client.post(endpoint, json=payload)
+                    if res.status_code == 200:
+                        text_content = res.json()["candidates"][0]["content"]["parts"][0]["text"]
+                        return json.loads(text_content)
+                    else:
+                        logger.warning("Gemini model %s returned status %s: %s", model_name, res.status_code, res.text[:120])
+            except Exception as e:
+                logger.warning("Gemini model %s call exception: %s", model_name, e)
 
     # Deterministic Constitutional Fallback when running offline or testing
     clean_title = " ".join(headline.split()[:7])
