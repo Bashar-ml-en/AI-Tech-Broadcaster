@@ -128,6 +128,57 @@ def cmd_studio(port: int = 8080):
     uvicorn.run(app, host="0.0.0.0", port=port)
 
 
+def cmd_telegram_detect():
+    """Poll Telegram getUpdates to automatically capture CHAT_ID and save to config/.env."""
+    import httpx, re
+    token = os.getenv("TELEGRAM_BOT_TOKEN")
+    if not token or "Example" in token:
+        print("[Error] Please configure TELEGRAM_BOT_TOKEN in config/.env first.")
+        return
+
+    print(f"\nListening for updates on bot @Gasprovbot (Token: {token[:12]}...)...")
+    print("Action required: Open Telegram, search for your bot, and send /start or any message!")
+    print("Waiting up to 45 seconds for your message...\n")
+
+    for i in range(15):
+        try:
+            res = httpx.get(f"https://api.telegram.org/bot{token}/getUpdates", timeout=10.0)
+            if res.status_code == 200:
+                data = res.json()
+                updates = data.get("result", [])
+                if updates:
+                    last_msg = updates[-1].get("message") or updates[-1].get("channel_post")
+                    if last_msg:
+                        chat = last_msg.get("chat", {})
+                        chat_id = str(chat.get("id"))
+                        chat_title = chat.get("title") or chat.get("username") or chat.get("first_name", "Unknown")
+                        print(f"[SUCCESS] Detected Telegram Chat ID: {chat_id} ({chat_title})")
+
+                        # Update config/.env
+                        env_file = root_dir / "config" / ".env"
+                        if env_file.exists():
+                            content = env_file.read_text(encoding="utf-8")
+                            content = re.sub(r"TELEGRAM_CHAT_ID=.*", f"TELEGRAM_CHAT_ID={chat_id}", content)
+                            env_file.write_text(content, encoding="utf-8")
+                            print(f"[UPDATED] Saved TELEGRAM_CHAT_ID={chat_id} to config/.env!")
+
+                        # Send a test confirmation message to Telegram
+                        httpx.post(
+                            f"https://api.telegram.org/bot{token}/sendMessage",
+                            json={"chat_id": chat_id, "text": "🤖 AI Tech Broadcaster HITL Gate connected successfully!"},
+                            timeout=10.0
+                        )
+                        print("[SENT] Sent test confirmation message to your Telegram!\n")
+                        return
+        except Exception as e:
+            pass
+        time.sleep(3)
+        sys.stdout.write(".")
+        sys.stdout.flush()
+
+    print("\n[TIMEOUT] No messages received yet. Please make sure to search for @Gasprovbot in Telegram and send a message, then run: python manage.py telegram-id")
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="AI Tech Broadcaster Management CLI")
     subparsers = parser.add_subparsers(dest="command", help="Available management commands")
@@ -136,6 +187,7 @@ if __name__ == "__main__":
     subparsers.add_parser("scan", help="Run immediate broadcast cycle")
     subparsers.add_parser("review", help="Review pending stories in terminal")
     subparsers.add_parser("sidecar", help="Run continuous hourly background sidecar loop")
+    subparsers.add_parser("telegram-id", help="Auto-detect Telegram Chat ID from incoming message")
 
     studio_parser = subparsers.add_parser("studio", help="Start Web Management Studio")
     studio_parser.add_argument("--port", type=int, default=8080, help="Port for Studio Web Server")
@@ -152,6 +204,9 @@ if __name__ == "__main__":
         run_scheduled_sidecar(1)
     elif args.command == "studio":
         cmd_studio(args.port)
+    elif args.command == "telegram-id":
+        cmd_telegram_detect()
     else:
         cmd_status()
         print("Tip: Run 'python manage.py studio' to launch the web dashboard, or 'python manage.py --help'.")
+
