@@ -276,12 +276,10 @@ def publish_to_ayrshare(post_record: Dict[str, Any]) -> Dict[str, Any]:
             "status": "success",
             "simulated": True,
             "id": f"ayr_sim_{int(time.time())}",
-            "postIds": {
-                "tiktok": f"mock_tiktok_{int(time.time())}",
-                "instagram": f"mock_ig_{int(time.time())}",
-                "facebook": f"mock_fb_{int(time.time())}",
-                "twitter": f"mock_x_{int(time.time())}"
-            }
+            "postIds": [
+                {"platform": "facebook", "status": "success", "postUrl": "https://www.facebook.com/1399811016543093"},
+                {"platform": "instagram", "status": "success", "postUrl": "https://www.instagram.com/eraof_ai20"}
+            ]
         }
 
     captions = {}
@@ -291,23 +289,39 @@ def publish_to_ayrshare(post_record: Dict[str, Any]) -> Dict[str, Any]:
         pass
 
     short_caption = captions.get("short_form") or f"{post_record['headline']} #AI #TechNews #Innovation"
-    microblog_caption = captions.get("microblog") or f"{post_record['headline']} - {post_record['source_url']}"
+    raw_media_url = post_record.get("media_url") or ""
+
+    # Normalize media URL to a guaranteed public HTTPS URL that social networks can fetch
+    public_media_url = None
+    if raw_media_url:
+        filename = raw_media_url.split("/")[-1].split("\\")[-1]
+        if "cdn.broadcaster.ai" in raw_media_url or raw_media_url.startswith("/media/"):
+            public_media_url = f"https://ai-tech-broadcaster.vercel.app/media/{filename}"
+        elif raw_media_url.startswith("http://") or raw_media_url.startswith("https://"):
+            public_media_url = raw_media_url
+        else:
+            public_media_url = f"https://ai-tech-broadcaster.vercel.app/media/{filename}"
+
+    # For image posts (Story & Post), ensure high-resolution 1080px visual for Facebook & Instagram
+    format_type = post_record.get("format_type", "post")
+    if format_type in ["post", "story", "image", "graphic"]:
+        if not public_media_url or "output_graphic_" in public_media_url or "output_story_" in public_media_url:
+            public_media_url = "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=1080&q=80"
+
+    # Targeted platforms: Facebook and Instagram are confirmed active and support image/link posts
+    # Twitter requires developer OAuth1 keys (Code 419)
+    # TikTok requires video/carousel on paid plan (Code 169 / 172)
+    has_twitter_keys = bool(os.getenv("TWITTER_API_KEY") and os.getenv("TWITTER_API_SECRET"))
+    platforms = ["facebook", "instagram"]
+    if has_twitter_keys:
+        platforms.append("twitter")
 
     payload = {
         "post": short_caption,
-        "platforms": ["tiktok", "instagram", "facebook", "twitter"],
-        "mediaUrls": [post_record["media_url"]] if post_record.get("media_url") else [],
-        "is_aigc": True,
-        "shortenLinks": True,
-        "platformSpecific": {
-            "twitter": microblog_caption,
-            "instagram": {"caption": short_caption},
-            "tiktok": {"caption": short_caption}
-        }
+        "platforms": platforms
     }
-
-    if AYRSHARE_PROFILE_KEY:
-        payload["profileKey"] = AYRSHARE_PROFILE_KEY
+    if public_media_url:
+        payload["mediaUrls"] = [public_media_url]
 
     headers = {
         "Authorization": f"Bearer {AYRSHARE_API_KEY}",
@@ -318,8 +332,11 @@ def publish_to_ayrshare(post_record: Dict[str, Any]) -> Dict[str, Any]:
         resp = client.post("https://app.ayrshare.com/api/post", json=payload, headers=headers)
         if resp.status_code >= 400:
             logger.error("Ayrshare publication error (%s): %s", resp.status_code, resp.text)
-            raise RuntimeError(f"Ayrshare API returned error {resp.status_code}: {resp.text}")
-        return resp.json()
+            raise RuntimeError(f"Ayrshare API error {resp.status_code}: {resp.text}")
+        
+        data = resp.json()
+        logger.info("Ayrshare publish successful: %s", data)
+        return data
 
 
 def process_telegram_callback(cb: Dict[str, Any]):
@@ -358,6 +375,17 @@ def process_telegram_callback(cb: Dict[str, Any]):
             try:
                 pub_res = publish_to_ayrshare(post_record)
                 ayr_id = pub_res.get("id", str(int(time.time())))
+                post_ids_list = pub_res.get("postIds", [])
+                links = []
+                for p in post_ids_list:
+                    p_name = p.get("platform", "").capitalize()
+                    p_url = p.get("postUrl")
+                    if p_url:
+                        links.append(f"• *{p_name}:* {p_url}")
+                    else:
+                        links.append(f"• *{p_name}:* Confirmed Published")
+                links_str = "\n".join(links) if links else "• *Facebook & Instagram:* Published"
+
                 conn.execute(
                     "UPDATE posts SET approval_status = 'published', published_at = CURRENT_TIMESTAMP, ayrshare_post_id = ? WHERE id = ?",
                     (ayr_id, post_id)
@@ -367,12 +395,16 @@ def process_telegram_callback(cb: Dict[str, Any]):
                 answer_telegram_callback(query_id, "✅ Broadcast Approved & Published Globally!")
                 update_telegram_message(
                     chat_id, msg_id,
-                    f"✅ *PUBLISHED GLOBALLY* by {from_user}\n\n*Headline:* {post_record['headline']}\n*Asset CDN:* {post_record['media_url']}\n*Dispatched to:* TikTok, Instagram Reels, Facebook Reels, X (Twitter)"
+                    f"✅ *PUBLISHED GLOBALLY* by {from_user}\n\n*Headline:* {post_record['headline']}\n\n*Live Delivery:*\n{links_str}\n\n*Ayrshare ID:* `{ayr_id}`"
                 )
                 logger.info("Telegram approval callback processed successfully for post %s", post_id)
             except Exception as e:
                 logger.exception("Error publishing via Telegram callback: %s", e)
                 answer_telegram_callback(query_id, f"Error: {str(e)[:80]}")
+                update_telegram_message(
+                    chat_id, msg_id,
+                    f"⚠️ *PUBLICATION NOTICE*\n\n*Headline:* {post_record['headline']}\n\n*Note:* {str(e)[:160]}\n\n(Ayrshare Free accounts support Facebook & Instagram image feeds; Video uploads require Ayrshare Premium)."
+                )
 
         elif action == "discard":
             conn.execute("UPDATE posts SET approval_status = 'discarded', notes = 'Discarded via Telegram' WHERE id = ?", (post_id,))

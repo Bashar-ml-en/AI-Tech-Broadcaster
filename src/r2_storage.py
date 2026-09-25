@@ -23,7 +23,7 @@ ACCOUNT_ID = os.getenv("CLOUDFLARE_R2_ACCOUNT_ID", "")
 ACCESS_KEY_ID = os.getenv("CLOUDFLARE_R2_ACCESS_KEY_ID", "")
 SECRET_ACCESS_KEY = os.getenv("CLOUDFLARE_R2_SECRET_ACCESS_KEY", "")
 BUCKET_NAME = os.getenv("CLOUDFLARE_R2_BUCKET_NAME", "broadcaster-staging")
-PUBLIC_URL = os.getenv("CLOUDFLARE_R2_PUBLIC_URL", "https://cdn.broadcaster.ai").rstrip("/")
+PUBLIC_URL = os.getenv("CLOUDFLARE_R2_PUBLIC_URL", "https://ai-tech-broadcaster.vercel.app").rstrip("/")
 STAGING_DIR = Path(__file__).resolve().parent.parent / "storage" / "staging"
 
 
