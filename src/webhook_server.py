@@ -33,9 +33,15 @@ sys.path.insert(0, str(root_dir))
 env_path = root_dir / "config" / ".env"
 load_dotenv(dotenv_path=env_path)
 
-LOGS_DIR = root_dir / "storage" / "logs"
-STAGING_DIR = root_dir / "storage" / "staging"
-DATABASE_PATH = root_dir / os.getenv("DATABASE_PATH", "storage/published_history.db")
+if os.getenv("VERCEL"):
+    LOGS_DIR = Path("/tmp/logs")
+    STAGING_DIR = Path("/tmp/staging")
+    DATABASE_PATH = Path("/tmp/published_history.db")
+else:
+    LOGS_DIR = root_dir / "storage" / "logs"
+    STAGING_DIR = root_dir / "storage" / "staging"
+    DATABASE_PATH = root_dir / os.getenv("DATABASE_PATH", "storage/published_history.db")
+
 LOGS_DIR.mkdir(parents=True, exist_ok=True)
 STAGING_DIR.mkdir(parents=True, exist_ok=True)
 
@@ -306,8 +312,9 @@ def telegram_polling_worker():
         time.sleep(0.5)
 
 
-# Start Telegram background polling worker immediately
-threading.Thread(target=telegram_polling_worker, daemon=True).start()
+# Start Telegram background polling worker immediately when running as persistent server
+if not os.getenv("VERCEL"):
+    threading.Thread(target=telegram_polling_worker, daemon=True).start()
 
 
 # ---------------------------------------------------------------------------
@@ -906,8 +913,19 @@ def executive_studio_dashboard():
                     const isPublished = post.approval_status === 'published';
                     const isVideo = post.format_type === 'video';
 
-                    const filename = post.media_url ? post.media_url.split('/').pop() : '';
-                    const streamUrl = filename ? `/media/${filename}` : '';
+                    let streamUrl = '';
+                    if (post.media_url) {
+                        const filename = post.media_url.split(/[\/\\]/).pop();
+                        if (post.media_url.startsWith('http://') || post.media_url.startsWith('https://')) {
+                            if (post.media_url.includes('cdn.broadcaster.ai') || post.media_url.includes('localhost') || post.media_url.includes('127.0.0.1')) {
+                                streamUrl = `/media/${filename}`;
+                            } else {
+                                streamUrl = post.media_url;
+                            }
+                        } else {
+                            streamUrl = filename ? `/media/${filename}` : '';
+                        }
+                    }
 
                     return `
                         <div class="rounded-3xl glass-panel ${isPending ? 'border-amber-500/50 shadow-2xl shadow-amber-500/10' : 'border-slate-800'} p-6 space-y-6">
