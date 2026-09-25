@@ -258,26 +258,36 @@ def qualify_candidate_story(candidate: Dict[str, Any]) -> Optional[Dict[str, Any
 # Step 4: Director Synthesis (Gemini 2.0 Flash) & Strict JSON Output
 # ---------------------------------------------------------------------------
 
-def generate_director_directive(qualified: Dict[str, Any]) -> Dict[str, Any]:
+def generate_director_directive(qualified: Dict[str, Any], target_format: Optional[str] = None) -> Dict[str, Any]:
     """
     Produce strictly valid JSON Director Output matching Section 5 schema.
     Uses Gemini 2.0 Flash or deterministic fallback if API key is in mock mode.
+    Supports target_format: 'story' (15m), 'reel' (30m), 'post' (1h).
     """
     candidate = qualified["candidate"]
     url = candidate["url"]
     headline = candidate["headline"]
     raw_content = qualified["raw_content"][:6000]
 
-    # Content format routing according to Section 3:
-    # 'video' for demos, robotics, code execution, multimodal capabilities
-    # 'text_image' for benchmark charts, schematics, safety papers, pricing
-    content_lower = raw_content.lower()
-    if any(k in content_lower for k in ["robotics", "video", "multimodal", "code execution", "interactive demo", "vision-language", "agent run"]):
-        format_type = "video"
-    elif any(k in content_lower for k in ["pricing", "cost reduction", "policy", "safety report", "survey", "table 1"]):
-        format_type = "text_image"
+    # Explicit format assignment or content-based heuristic routing
+    if target_format:
+        tf = target_format.lower().strip()
+        if tf in ["story", "stories"]:
+            format_type = "story"
+        elif tf in ["reel", "reels", "video"]:
+            format_type = "reel"
+        elif tf in ["post", "posts", "text_image", "image", "graphic"]:
+            format_type = "post"
+        else:
+            format_type = tf
     else:
-        format_type = "video"  # Default short-form priority
+        content_lower = raw_content.lower()
+        if any(k in content_lower for k in ["robotics", "video", "multimodal", "code execution", "interactive demo", "vision-language", "agent run"]):
+            format_type = "reel"
+        elif any(k in content_lower for k in ["pricing", "cost reduction", "policy", "safety report", "survey", "table 1"]):
+            format_type = "post"
+        else:
+            format_type = "reel"
 
     prompt = f"""You are the Executive Producer & Media Director for AI Tech Broadcaster.
 Based STRICTLY on the primary source documentation below, synthesize a high-impact broadcast directive.
@@ -290,8 +300,9 @@ CONSTITUTIONAL RULES:
   * Practical Application (19-30s): Specific engineer/user capability unlocked today.
   * Debate CTA (Final 5s): High-velocity polarizing technical question.
 - Visual Prompt:
-  * For Veo 3.1: 9:16 vertical, cinematic volumetric lighting, dynamic tracking camera motion, photorealistic tech render, NO typography.
-  * For Imagen 3.0: 1:1 square, clean vector/isometric schematic, high contrast, dark mode.
+  * For Veo 3.1 Reel: 9:16 vertical, cinematic volumetric lighting, dynamic tracking camera motion, photorealistic tech render, NO typography.
+  * For Story: 9:16 vertical, modern neon-lit glassmorphic tech card showing breaking alert visual with sapphire and amber neon gradients.
+  * For Imagen 3.0 Post: 1:1 square, clean vector/isometric schematic, high contrast, dark mode.
 
 SOURCE URL: {url}
 PRIMARY TEXT:
@@ -305,7 +316,7 @@ Respond with ONLY a valid JSON object matching this EXACT schema:
   "hook_narration": "First 3 seconds of spoken audio designed to stop scrolling.",
   "body_narration": "Remaining spoken audio covering the core release and practical developer implications (40-60 words).",
   "call_to_action": "High-velocity polarizing question to trigger comments.",
-  "visual_prompt": "Cinematic visual prompt for Veo 3 (9:16 vertical, dynamic lighting) or Imagen 3 (1:1 clean tech graphic).",
+  "visual_prompt": "Cinematic visual prompt for Veo 3 (9:16 vertical) or Imagen 3 (1:1 clean tech graphic).",
   "platform_captions": {{
     "short_form": "Hook-first caption optimized for TikTok, Instagram Reels, and Facebook Reels with 4-5 hashtags.",
     "microblog": "Dense, insight-rich summary optimized for X and Threads under 280 characters, including the source link."
@@ -330,7 +341,9 @@ Respond with ONLY a valid JSON object matching this EXACT schema:
                     res = client.post(endpoint, json=payload)
                     if res.status_code == 200:
                         text_content = res.json()["candidates"][0]["content"]["parts"][0]["text"]
-                        return json.loads(text_content)
+                        parsed = json.loads(text_content)
+                        parsed["format"] = format_type
+                        return parsed
                     else:
                         logger.warning("Gemini model %s returned status %s: %s", model_name, res.status_code, res.text[:120])
             except Exception as e:
@@ -338,8 +351,10 @@ Respond with ONLY a valid JSON object matching this EXACT schema:
 
     # Deterministic Constitutional Fallback when running offline or testing
     clean_title = " ".join(headline.split()[:7])
-    if format_type == "video":
+    if format_type in ["video", "reel"]:
         visual_prompt = "9:16 vertical aspect ratio, ultra-photorealistic cinematic render of a neural network compute cluster glowing with deep sapphire and amber volumetric beams, rapid macro tracking zoom into silicon wafer, zero baked-in typography, 8k resolution"
+    elif format_type == "story":
+        visual_prompt = "9:16 vertical aspect ratio, modern neon-lit glassmorphic tech card showing breaking alert visual with sapphire and amber neon gradients, 8k resolution"
     else:
         visual_prompt = "1:1 square aspect ratio, clean isometric dark-mode technical diagram showing algorithmic latency pipelines, deep obsidian background with neon cyan data vectors, high contrast"
 
@@ -364,21 +379,23 @@ Respond with ONLY a valid JSON object matching this EXACT schema:
 
 def stage_rendered_asset(directive: Dict[str, Any]) -> str:
     """
-    Render output media (output_clip.mp4 or output_graphic.png) based on format
-    and stage to Cloudflare R2 object storage.
+    Render output media (output_clip.mp4, output_story.png, or output_graphic.png)
+    based on format and stage to Cloudflare R2 object storage.
     """
     fmt = directive["format"]
     timestamp = int(time.time())
 
-    if fmt == "video":
+    if fmt in ["video", "reel"]:
         filename = f"output_clip_{timestamp}.mp4"
         file_path = STAGING_DIR / filename
-        # Create valid MP4 container header
         file_path.write_bytes(b"\x00\x00\x00\x18ftypmp42\x00\x00\x00\x00isommp42\x00\x00\x00\x08free")
+    elif fmt == "story":
+        filename = f"output_story_{timestamp}.png"
+        file_path = STAGING_DIR / filename
+        file_path.write_bytes(b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01\x00\x00\x00\x01\x08\x06\x00\x00\x00\x1f\x15c4")
     else:
         filename = f"output_graphic_{timestamp}.png"
         file_path = STAGING_DIR / filename
-        # 1x1 PNG header
         file_path.write_bytes(b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01\x00\x00\x00\x01\x08\x06\x00\x00\x00\x1f\x15c4")
 
     # Upload to Cloudflare R2
@@ -390,12 +407,14 @@ def stage_rendered_asset(directive: Dict[str, Any]) -> str:
 # Step 6: Full Broadcast Lifecycle Execution
 # ---------------------------------------------------------------------------
 
-def execute_broadcast_cycle() -> Optional[Dict[str, Any]]:
+def execute_broadcast_cycle(target_format: Optional[str] = None) -> Optional[Dict[str, Any]]:
     """
-    Run one complete autonomous broadcast cycle:
-    Harvest -> Deduplicate -> Qualify -> Direct -> Stage Asset -> Dispatch Telegram HITL Approval.
+    Run one autonomous broadcast cycle tailored to the target format:
+    - Story (15m cadence)
+    - Reel (30m cadence)
+    - Feed Post (60m / 1h cadence)
     """
-    logger.info("=== STARTING AUTONOMOUS BROADCAST CYCLE ===")
+    logger.info("=== STARTING AUTONOMOUS BROADCAST CYCLE (Format: %s) ===", target_format or "auto")
     candidates = harvest_candidate_stories()
 
     # If live scraping found few/none due to firewall or offline state, inject canonical Tier 1 candidate
@@ -428,8 +447,8 @@ def execute_broadcast_cycle() -> Optional[Dict[str, Any]]:
             else:
                 continue
 
-        logger.info("Synthesizing broadcast directive for: %s", cand["headline"])
-        directive = generate_director_directive(qualified)
+        logger.info("Synthesizing broadcast directive (Format: %s) for: %s", target_format or "auto", cand["headline"])
+        directive = generate_director_directive(qualified, target_format=target_format)
 
         # Stage media asset to R2
         media_url = stage_rendered_asset(directive)

@@ -65,12 +65,18 @@ TELEGRAM_WEBHOOK_SECRET = os.getenv("TELEGRAM_WEBHOOK_SECRET", "antigravity_hitl
 AYRSHARE_API_KEY = os.getenv("AYRSHARE_API_KEY", "")
 AYRSHARE_PROFILE_KEY = os.getenv("AYRSHARE_PROFILE_KEY", "")
 SCHEDULE_INTERVAL_HOURS = int(os.getenv("SCHEDULE_INTERVAL_HOURS", "1"))
+SCHEDULE_STORY_MINUTES = int(os.getenv("SCHEDULE_STORY_MINUTES", "15"))
+SCHEDULE_REEL_MINUTES = int(os.getenv("SCHEDULE_REEL_MINUTES", "30"))
+SCHEDULE_POST_MINUTES = int(os.getenv("SCHEDULE_POST_MINUTES", "60"))
 
-# Global Sidecar Thread & Performance State
+# Global Sidecar Thread & Multi-Cadence State
 sidecar_running = False
 sidecar_thread: Optional[threading.Thread] = None
 last_scan_time: Optional[float] = None
 last_scan_result: Optional[str] = None
+last_story_time: Optional[float] = None
+last_reel_time: Optional[float] = None
+last_post_time: Optional[float] = None
 pipeline_phase = "idle"  # idle | scraping | qualifying | directing | rendering | awaiting_hitl | broadcasting
 phase_timestamp = time.time()
 
@@ -445,6 +451,79 @@ if not os.getenv("VERCEL"):
     threading.Thread(target=telegram_polling_worker, daemon=True).start()
 
 
+def sidecar_worker():
+    """
+    Multi-Cadence Autonomous Broadcaster Sidecar Loop.
+    Executes tiered autonomous generation cycles:
+    - ⚡ Stories: every 15 minutes (SCHEDULE_STORY_MINUTES)
+    - 🎬 Reels: every 30 minutes / half hour (SCHEDULE_REEL_MINUTES)
+    - 📰 Feed Posts: every 60 minutes / 1 hour (SCHEDULE_POST_MINUTES)
+    """
+    global sidecar_running, last_story_time, last_reel_time, last_post_time
+    global pipeline_phase, phase_timestamp, last_scan_time, last_scan_result
+    from src.pipeline import execute_broadcast_cycle
+
+    logger.info(
+        "Autonomous Multi-Cadence Sidecar activated: Story (%sm), Reel (%sm), Post (%sm)",
+        SCHEDULE_STORY_MINUTES, SCHEDULE_REEL_MINUTES, SCHEDULE_POST_MINUTES
+    )
+
+    while sidecar_running:
+        now = time.time()
+
+        # 1. Check Story Cadence (every 15 mins)
+        if last_story_time is None or (now - last_story_time >= SCHEDULE_STORY_MINUTES * 60):
+            try:
+                logger.info("Executing scheduled Story cycle (every %s mins)...", SCHEDULE_STORY_MINUTES)
+                pipeline_phase = "directing"
+                phase_timestamp = time.time()
+                execute_broadcast_cycle(target_format="story")
+                last_story_time = time.time()
+                last_scan_time = last_story_time
+                last_scan_result = "Story generated"
+                pipeline_phase = "idle"
+            except Exception as e:
+                logger.exception("Story cycle error: %s", e)
+                last_scan_result = f"Story error: {str(e)[:40]}"
+                pipeline_phase = "idle"
+
+        # 2. Check Reel Cadence (every 30 mins)
+        now = time.time()
+        if last_reel_time is None or (now - last_reel_time >= SCHEDULE_REEL_MINUTES * 60):
+            try:
+                logger.info("Executing scheduled Reel cycle (every %s mins)...", SCHEDULE_REEL_MINUTES)
+                pipeline_phase = "directing"
+                phase_timestamp = time.time()
+                execute_broadcast_cycle(target_format="reel")
+                last_reel_time = time.time()
+                last_scan_time = last_reel_time
+                last_scan_result = "Reel generated"
+                pipeline_phase = "idle"
+            except Exception as e:
+                logger.exception("Reel cycle error: %s", e)
+                last_scan_result = f"Reel error: {str(e)[:40]}"
+                pipeline_phase = "idle"
+
+        # 3. Check Post Cadence (every 60 mins)
+        now = time.time()
+        if last_post_time is None or (now - last_post_time >= SCHEDULE_POST_MINUTES * 60):
+            try:
+                logger.info("Executing scheduled Feed Post cycle (every %s mins)...", SCHEDULE_POST_MINUTES)
+                pipeline_phase = "directing"
+                phase_timestamp = time.time()
+                execute_broadcast_cycle(target_format="post")
+                last_post_time = time.time()
+                last_scan_time = last_post_time
+                last_scan_result = "Feed Post generated"
+                pipeline_phase = "idle"
+            except Exception as e:
+                logger.exception("Feed Post cycle error: %s", e)
+                last_scan_result = f"Post error: {str(e)[:40]}"
+                pipeline_phase = "idle"
+
+        time.sleep(10)
+
+
 # ---------------------------------------------------------------------------
 # API Endpoints
 # ---------------------------------------------------------------------------
@@ -485,12 +564,36 @@ def get_system_status():
     ayrshare_ready = bool(os.getenv("AYRSHARE_API_KEY") and "AYRSHARE" not in os.getenv("AYRSHARE_API_KEY", ""))
     r2_ready = bool(os.getenv("CLOUDFLARE_R2_ACCOUNT_ID") and "your_" not in os.getenv("CLOUDFLARE_R2_ACCOUNT_ID", ""))
 
+    now = time.time()
+    def calc_next_sec(last_t: Optional[float], interval_min: int) -> int:
+        if last_t is None:
+            return 0
+        elapsed = now - last_t
+        rem = (interval_min * 60) - elapsed
+        return max(0, int(rem))
+
+    cadence = {
+        "story_interval_min": SCHEDULE_STORY_MINUTES,
+        "reel_interval_min": SCHEDULE_REEL_MINUTES,
+        "post_interval_min": SCHEDULE_POST_MINUTES,
+        "last_story_time": last_story_time,
+        "last_reel_time": last_reel_time,
+        "last_post_time": last_post_time,
+        "next_story_sec": calc_next_sec(last_story_time, SCHEDULE_STORY_MINUTES),
+        "next_reel_sec": calc_next_sec(last_reel_time, SCHEDULE_REEL_MINUTES),
+        "next_post_sec": calc_next_sec(last_post_time, SCHEDULE_POST_MINUTES),
+    }
+
     return {
         "metrics": counts,
         "categories": categories,
+        "cadence": cadence,
         "sidecar": {
             "running": sidecar_running,
             "interval_hours": SCHEDULE_INTERVAL_HOURS,
+            "story_interval_min": SCHEDULE_STORY_MINUTES,
+            "reel_interval_min": SCHEDULE_REEL_MINUTES,
+            "post_interval_min": SCHEDULE_POST_MINUTES,
             "last_scan_time": last_scan_time,
             "last_scan_result": last_scan_result,
             "pipeline_phase": pipeline_phase,
@@ -705,20 +808,30 @@ async def telegram_webhook(request: Request):
 
 
 @app.post("/api/scan")
-def trigger_scan(background_tasks: BackgroundTasks):
+def trigger_scan(background_tasks: BackgroundTasks, format_type: Optional[str] = Query(None)):
     global last_scan_time, last_scan_result, pipeline_phase, phase_timestamp
+    global last_story_time, last_reel_time, last_post_time
     from src.pipeline import execute_broadcast_cycle
 
     def run_cycle():
         global last_scan_time, last_scan_result, pipeline_phase, phase_timestamp
+        global last_story_time, last_reel_time, last_post_time
         last_scan_time = time.time()
         pipeline_phase = "scraping"
         phase_timestamp = time.time()
         try:
-            res = execute_broadcast_cycle()
-            last_scan_result = "New Story Staged" if res else "No New Qualified Stories"
+            res = execute_broadcast_cycle(target_format=format_type)
+            fmt_label = f"{format_type.capitalize()} " if format_type else ""
+            last_scan_result = f"New {fmt_label}Staged" if res else "No New Qualified Stories"
             pipeline_phase = "awaiting_hitl" if res else "idle"
             phase_timestamp = time.time()
+            now_ts = time.time()
+            if format_type == "story":
+                last_story_time = now_ts
+            elif format_type == "reel":
+                last_reel_time = now_ts
+            elif format_type == "post":
+                last_post_time = now_ts
         except Exception as e:
             logger.exception("Manual scan error: %s", e)
             last_scan_result = f"Error: {str(e)[:50]}"
@@ -726,7 +839,29 @@ def trigger_scan(background_tasks: BackgroundTasks):
             phase_timestamp = time.time()
 
     background_tasks.add_task(run_cycle)
-    return {"status": "scan_started", "message": "Broadcast cycle launched in background"}
+    target_str = f" for format '{format_type}'" if format_type else ""
+    return {"status": "scan_started", "message": f"Broadcast cycle launched in background{target_str}", "target_format": format_type}
+
+
+@app.api_route("/api/cron/story", methods=["GET", "POST"])
+def cron_story(background_tasks: BackgroundTasks):
+    """Triggered every 15 minutes by Vercel Cron or external scheduler."""
+    logger.info("Cron trigger received: Story cycle (15m)")
+    return trigger_scan(background_tasks, format_type="story")
+
+
+@app.api_route("/api/cron/reel", methods=["GET", "POST"])
+def cron_reel(background_tasks: BackgroundTasks):
+    """Triggered every 30 minutes (half hour) by Vercel Cron or external scheduler."""
+    logger.info("Cron trigger received: Reel cycle (30m)")
+    return trigger_scan(background_tasks, format_type="reel")
+
+
+@app.api_route("/api/cron/post", methods=["GET", "POST"])
+def cron_post(background_tasks: BackgroundTasks):
+    """Triggered every 1 hour (60m) by Vercel Cron or external scheduler."""
+    logger.info("Cron trigger received: Feed Post cycle (1h)")
+    return trigger_scan(background_tasks, format_type="post")
 
 
 @app.post("/api/sidecar/toggle")
@@ -849,12 +984,24 @@ def executive_studio_dashboard():
         </div>
 
         <!-- Header Actions -->
-        <div class="flex items-center space-x-3">
-            <button onclick="triggerScan()" id="btnScan" class="px-4 py-2 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white font-bold text-xs flex items-center gap-2 transition shadow-lg shadow-cyan-500/20 active:scale-95">
-                <i class="fa-solid fa-bolt"></i> Scan & Direct Now
-            </button>
+        <div class="flex items-center flex-wrap gap-2.5">
+            <!-- Format Quick Generate Group -->
+            <div class="flex items-center bg-slate-900/90 border border-slate-800 rounded-xl p-1 gap-1 text-xs">
+                <button onclick="triggerScan()" id="btnScanAll" title="Run broad auto-detection scan" class="px-3 py-1.5 rounded-lg bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white font-bold flex items-center gap-1.5 transition active:scale-95 shadow-sm shadow-cyan-500/20">
+                    <i class="fa-solid fa-bolt"></i> Scan All
+                </button>
+                <button onclick="triggerScan('story')" id="btnScanStory" title="Generate 9:16 Story (15-min Cadence)" class="px-2.5 py-1.5 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/30 font-bold flex items-center gap-1 transition active:scale-95">
+                    <i class="fa-solid fa-bolt"></i> + Story (15m)
+                </button>
+                <button onclick="triggerScan('reel')" id="btnScanReel" title="Generate 9:16 Reel (30-min Cadence)" class="px-2.5 py-1.5 rounded-lg bg-blue-500/20 hover:bg-blue-500/30 text-blue-300 border border-blue-500/30 font-bold flex items-center gap-1 transition active:scale-95">
+                    <i class="fa-solid fa-video"></i> + Reel (30m)
+                </button>
+                <button onclick="triggerScan('post')" id="btnScanPost" title="Generate 1:1 Feed Post (1-hour Cadence)" class="px-2.5 py-1.5 rounded-lg bg-purple-500/20 hover:bg-purple-500/30 text-purple-300 border border-purple-500/30 font-bold flex items-center gap-1 transition active:scale-95">
+                    <i class="fa-solid fa-image"></i> + Post (1h)
+                </button>
+            </div>
 
-            <button onclick="toggleSidecar()" id="btnSidecar" class="px-4 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-200 font-bold text-xs border border-slate-700 flex items-center gap-2 transition active:scale-95">
+            <button onclick="toggleSidecar()" id="btnSidecar" class="px-3.5 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-200 font-bold text-xs border border-slate-700 flex items-center gap-2 transition active:scale-95">
                 <i class="fa-solid fa-clock"></i> <span id="sidecarText">Sidecar: Idle</span>
             </button>
         </div>
@@ -917,13 +1064,26 @@ def executive_studio_dashboard():
                     <div class="text-[11px] text-slate-500 mt-0.5">14-day deduplicated</div>
                 </div>
 
-                <div class="p-4 rounded-2xl glass-panel">
-                    <div class="text-xs font-bold text-slate-400 uppercase tracking-wider flex justify-between">
-                        <span>Cadence Interval</span>
+                <div class="p-4 rounded-2xl glass-panel border-purple-500/20">
+                    <div class="text-xs font-bold text-slate-400 uppercase tracking-wider flex justify-between items-center">
+                        <span>Multi-Cadence</span>
                         <i class="fa-solid fa-stopwatch text-purple-400"></i>
                     </div>
-                    <div class="text-2xl font-extrabold text-purple-400 mt-2">Every 1 Hour</div>
-                    <div class="text-[11px] text-slate-500 mt-0.5">Autonomous Scheduled Sidecar</div>
+                    <div class="mt-2 space-y-1.5 font-mono text-[11px]">
+                        <div class="flex items-center justify-between text-amber-300">
+                            <span class="font-bold flex items-center gap-1"><i class="fa-solid fa-bolt text-[10px]"></i> Story (15m):</span>
+                            <span id="timerStory" class="bg-amber-500/20 px-1.5 py-0.5 rounded text-[10px] font-bold">--:--</span>
+                        </div>
+                        <div class="flex items-center justify-between text-blue-300">
+                            <span class="font-bold flex items-center gap-1"><i class="fa-solid fa-video text-[10px]"></i> Reel (30m):</span>
+                            <span id="timerReel" class="bg-blue-500/20 px-1.5 py-0.5 rounded text-[10px] font-bold">--:--</span>
+                        </div>
+                        <div class="flex items-center justify-between text-purple-300">
+                            <span class="font-bold flex items-center gap-1"><i class="fa-solid fa-image text-[10px]"></i> Post (1h):</span>
+                            <span id="timerPost" class="bg-purple-500/20 px-1.5 py-0.5 rounded text-[10px] font-bold">--:--</span>
+                        </div>
+                    </div>
+                    <div class="text-[10px] text-slate-500 mt-1 font-sans">Autonomous Loop Timers</div>
                 </div>
 
                 <div class="p-4 rounded-2xl glass-panel">
@@ -1208,6 +1368,15 @@ def executive_studio_dashboard():
                     if (document.getElementById('badgeCat_reel')) document.getElementById('badgeCat_reel').innerText = data.categories.reel;
                     if (document.getElementById('badgeCat_story')) document.getElementById('badgeCat_story').innerText = data.categories.story;
                     if (document.getElementById('badgeCat_post')) document.getElementById('badgeCat_post').innerText = data.categories.post;
+                }
+
+                if (data.cadence) {
+                    window.cadenceCountdown = {
+                        story: data.cadence.next_story_sec,
+                        reel: data.cadence.next_reel_sec,
+                        post: data.cadence.next_post_sec
+                    };
+                    renderCadenceTimers();
                 }
 
                 const sidecarBtn = document.getElementById('btnSidecar');
@@ -1717,23 +1886,31 @@ def executive_studio_dashboard():
             }
         }
 
-        async function triggerScan() {
-            const btn = document.getElementById('btnScan');
-            btn.disabled = true;
-            btn.classList.add('opacity-50');
+        async function triggerScan(format = null) {
+            const btnId = format === 'story' ? 'btnScanStory' : format === 'reel' ? 'btnScanReel' : format === 'post' ? 'btnScanPost' : 'btnScanAll';
+            const btn = document.getElementById(btnId) || document.getElementById('btnScanAll');
+            if (btn) {
+                btn.disabled = true;
+                btn.classList.add('opacity-50');
+            }
 
             try {
-                await fetch('/api/scan', { method: 'POST' });
+                const url = format ? `/api/scan?format_type=${format}` : '/api/scan';
+                await fetch(url, { method: 'POST' });
                 setTimeout(() => {
                     fetchStatus();
                     loadStudioPosts();
                     loadLogs();
+                    if (btn) {
+                        btn.disabled = false;
+                        btn.classList.remove('opacity-50');
+                    }
+                }, 3500);
+            } catch (err) {
+                if (btn) {
                     btn.disabled = false;
                     btn.classList.remove('opacity-50');
-                }, 4000);
-            } catch (err) {
-                btn.disabled = false;
-                btn.classList.remove('opacity-50');
+                }
             }
         }
 
@@ -1810,6 +1987,34 @@ def executive_studio_dashboard():
             if (!str) return '';
             return str.replace(/'/g, "\\'").replace(/"/g, '\\"').replace(/\\n/g, ' ');
         }
+
+        function formatSec(sec) {
+            if (sec === null || sec === undefined) return '--:--';
+            if (sec <= 0) return 'Ready';
+            const m = Math.floor(sec / 60);
+            const s = Math.floor(sec % 60);
+            return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+        }
+
+        function renderCadenceTimers() {
+            if (!window.cadenceCountdown) return;
+            const tStory = document.getElementById('timerStory');
+            const tReel = document.getElementById('timerReel');
+            const tPost = document.getElementById('timerPost');
+            if (tStory) tStory.innerText = formatSec(window.cadenceCountdown.story);
+            if (tReel) tReel.innerText = formatSec(window.cadenceCountdown.reel);
+            if (tPost) tPost.innerText = formatSec(window.cadenceCountdown.post);
+        }
+
+        // Live smooth ticker every second
+        setInterval(() => {
+            if (window.cadenceCountdown) {
+                if (window.cadenceCountdown.story > 0) window.cadenceCountdown.story--;
+                if (window.cadenceCountdown.reel > 0) window.cadenceCountdown.reel--;
+                if (window.cadenceCountdown.post > 0) window.cadenceCountdown.post--;
+                renderCadenceTimers();
+            }
+        }, 1000);
 
         function refreshAll() {
             fetchStatus();
