@@ -1,0 +1,92 @@
+# ==============================================================================
+# POSTIZ SELF-HOSTED DOCKER COMPOSE CONFIGURATION (100% FREE FOREVER)
+# Run with: docker compose -f docker-compose.postiz.yml up -d
+# Access Postiz Studio at: http://localhost:4007
+# ==============================================================================
+
+version: '3.8'
+
+services:
+  postiz:
+    image: ghcr.io/gitroomhq/postiz-app:latest
+    container_name: postiz
+    restart: always
+    ports:
+      - "4007:4007"
+    environment:
+      MAIN_URL: 'http://localhost:4007'
+      FRONTEND_URL: 'http://localhost:4007'
+      NEXT_PUBLIC_BACKEND_URL: 'http://localhost:4007/api'
+      JWT_SECRET: 'ai_tech_broadcaster_secret_jwt_random_key_2026'
+      DATABASE_URL: 'postgresql://postiz-user:postiz-password@postiz-postgres:5432/postiz-db-local'
+      REDIS_URL: 'redis://postiz-redis:6379'
+      BACKEND_INTERNAL_URL: 'http://localhost:3000'
+      TEMPORAL_ADDRESS: "temporal:7233"
+      IS_GENERAL: 'true'
+      DISABLE_REGISTRATION: 'false'
+      RUN_CRON: 'true'
+      STORAGE_PROVIDER: 'local'
+      UPLOAD_DIRECTORY: '/uploads'
+      NEXT_PUBLIC_UPLOAD_DIRECTORY: '/uploads'
+
+      # Developer API Credentials (Add your apps when connecting channels)
+      # Meta (Instagram & Facebook):
+      FACEBOOK_APP_ID: ''
+      FACEBOOK_APP_SECRET: ''
+      # YouTube / Google:
+      YOUTUBE_CLIENT_ID: ''
+      YOUTUBE_CLIENT_SECRET: ''
+      # TikTok:
+      TIKTOK_CLIENT_ID: ''
+      TIKTOK_CLIENT_SECRET: ''
+      # X (Twitter):
+      X_API_KEY: ''
+      X_API_SECRET: ''
+      # LinkedIn:
+      LINKEDIN_CLIENT_ID: ''
+      LINKEDIN_CLIENT_SECRET: ''
+    volumes:
+      - postiz_uploads:/uploads
+      - postiz_config:/config
+    depends_on:
+      - postiz-postgres
+      - postiz-redis
+      - temporal
+
+  postiz-postgres:
+    image: postgres:16-alpine
+    container_name: postiz-postgres
+    restart: always
+    environment:
+      POSTGRES_USER: postiz-user
+      POSTGRES_PASSWORD: postiz-password
+      POSTGRES_DB: postiz-db-local
+    volumes:
+      - postiz_postgres_data:/var/lib/postgresql/data
+
+  postiz-redis:
+    image: redis:7-alpine
+    container_name: postiz-redis
+    restart: always
+    volumes:
+      - postiz_redis_data:/data
+
+  temporal:
+    image: temporalio/auto-setup:1.24.2
+    container_name: temporal
+    restart: always
+    environment:
+      - DB=postgresql
+      - DB_PORT=5432
+      - POSTGRES_USER=postiz-user
+      - POSTGRES_PWD=postiz-password
+      - POSTGRES_SEEDS=postiz-postgres
+      - DYNAMIC_CONFIG_FILE_PATH=config/dynamicconfig/development-sql.yaml
+    depends_on:
+      - postiz-postgres
+
+volumes:
+  postiz_uploads:
+  postiz_config:
+  postiz_postgres_data:
+  postiz_redis_data:

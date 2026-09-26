@@ -33,6 +33,8 @@ sys.path.insert(0, str(root_dir))
 env_path = root_dir / "config" / ".env"
 load_dotenv(dotenv_path=env_path)
 
+from src.publisher_postiz import is_postiz_configured, publish_to_postiz, get_connected_integrations
+
 if os.getenv("VERCEL"):
     LOGS_DIR = Path("/tmp/logs")
     STAGING_DIR = Path("/tmp/staging")
@@ -355,6 +357,23 @@ def publish_to_ayrshare(post_record: Dict[str, Any]) -> Dict[str, Any]:
         return data
 
 
+def publish_dispatcher(post_record: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Unified multi-channel publisher dispatcher.
+    Routes to Postiz if POSTIZ_API_KEY is configured.
+    Falls back to Ayrshare if Postiz is not configured.
+    """
+    try:
+        from src.publisher_postiz import is_postiz_configured, publish_to_postiz
+        if is_postiz_configured():
+            logger.info("Routing broadcast for post %s via Postiz...", post_record.get("id"))
+            return publish_to_postiz(post_record)
+    except Exception as e:
+        logger.warning("Postiz dispatch attempt failed (%s). Falling back to Ayrshare...", e)
+
+    return publish_to_ayrshare(post_record)
+
+
 def process_telegram_callback(cb: Dict[str, Any]):
     """Process callback query when user clicks an inline button on Telegram."""
     query_id = cb.get("id")
@@ -389,8 +408,9 @@ def process_telegram_callback(cb: Dict[str, Any]):
 
         if action == "approve":
             try:
-                pub_res = publish_to_ayrshare(post_record)
-                ayr_id = pub_res.get("id", str(int(time.time())))
+                pub_res = publish_dispatcher(post_record)
+                pub_id = pub_res.get("id", str(int(time.time())))
+                provider = pub_res.get("provider", "ayrshare").capitalize()
                 post_ids_list = pub_res.get("postIds", [])
                 links = []
                 for p in post_ids_list:
@@ -400,26 +420,26 @@ def process_telegram_callback(cb: Dict[str, Any]):
                         links.append(f"• *{p_name}:* {p_url}")
                     else:
                         links.append(f"• *{p_name}:* Confirmed Published")
-                links_str = "\n".join(links) if links else "• *Facebook & Instagram:* Published"
+                links_str = "\n".join(links) if links else f"• *{provider}:* Confirmed Published"
 
                 conn.execute(
                     "UPDATE posts SET approval_status = 'published', published_at = CURRENT_TIMESTAMP, ayrshare_post_id = ? WHERE id = ?",
-                    (ayr_id, post_id)
+                    (pub_id, post_id)
                 )
                 conn.commit()
 
-                answer_telegram_callback(query_id, "✅ Broadcast Approved & Published Globally!")
+                answer_telegram_callback(query_id, f"✅ Broadcast Approved & Published via {provider}!")
                 update_telegram_message(
                     chat_id, msg_id,
-                    f"✅ *PUBLISHED GLOBALLY* by {from_user}\n\n*Headline:* {post_record['headline']}\n\n*Live Delivery:*\n{links_str}\n\n*Ayrshare ID:* `{ayr_id}`"
+                    f"✅ *PUBLISHED GLOBALLY* by {from_user}\n\n*Headline:* {post_record['headline']}\n\n*Live Delivery ({provider}):*\n{links_str}\n\n*Broadcast ID:* `{pub_id}`"
                 )
-                logger.info("Telegram approval callback processed successfully for post %s", post_id)
+                logger.info("Telegram approval callback processed successfully for post %s via %s", post_id, provider)
             except Exception as e:
                 logger.exception("Error publishing via Telegram callback: %s", e)
                 answer_telegram_callback(query_id, f"Error: {str(e)[:80]}")
                 update_telegram_message(
                     chat_id, msg_id,
-                    f"⚠️ *PUBLICATION NOTICE*\n\n*Headline:* {post_record['headline']}\n\n*Note:* {str(e)[:160]}\n\n(Ayrshare Free accounts support Facebook & Instagram image feeds; Video uploads require Ayrshare Premium)."
+                    f"⚠️ *PUBLICATION NOTICE*\n\n*Headline:* {post_record['headline']}\n\n*Note:* {str(e)[:160]}"
                 )
 
         elif action == "discard":
@@ -675,6 +695,8 @@ def get_system_status():
             "gemini_director": "live" if gemini_ready else "simulated",
             "telegram_gate": "live" if telegram_ready else "local_web",
             "ayrshare_publisher": "live" if ayrshare_ready else "simulated",
+            "postiz_publisher": "live" if is_postiz_configured() else "standby",
+            "active_publisher": "postiz" if is_postiz_configured() else ("ayrshare" if ayrshare_ready else "simulated"),
             "cloudflare_r2": "live" if r2_ready else "local_staging"
         }
     }
@@ -961,18 +983,35 @@ def api_approve_post(post_id: int):
             raise HTTPException(status_code=400, detail=f"Post status is already '{post['approval_status']}'")
 
         try:
-            pub_res = publish_to_ayrshare(post)
-            ayr_id = pub_res.get("id", str(int(time.time())))
+            pub_res = publish_dispatcher(post)
+            pub_id = pub_res.get("id", str(int(time.time())))
+            provider = pub_res.get("provider", "ayrshare")
             conn.execute(
                 "UPDATE posts SET approval_status = 'published', published_at = CURRENT_TIMESTAMP, ayrshare_post_id = ? WHERE id = ?",
-                (ayr_id, post_id)
+                (pub_id, post_id)
             )
             conn.commit()
-            logger.info("Post %s approved and published successfully.", post_id)
-            return {"status": "published", "post_id": post_id, "ayrshare_id": ayr_id, "details": pub_res}
+            logger.info("Post %s approved and published successfully via %s.", post_id, provider)
+            return {"status": "published", "post_id": post_id, "id": pub_id, "provider": provider, "details": pub_res}
         except Exception as e:
             logger.exception("Failed to publish post %s: %s", post_id, e)
             raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/postiz/status")
+def get_postiz_status():
+    """Retrieve Postiz configuration and active social integrations."""
+    from src.publisher_postiz import is_postiz_configured, get_connected_integrations, POSTIZ_API_URL
+    configured = is_postiz_configured()
+    integrations = []
+    if configured:
+        integrations = get_connected_integrations()
+    return {
+        "configured": configured,
+        "api_url": POSTIZ_API_URL,
+        "integrations_count": len(integrations),
+        "integrations": integrations
+    }
 
 
 @app.post("/api/posts/{post_id}/discard")

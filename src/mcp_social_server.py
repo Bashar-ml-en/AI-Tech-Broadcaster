@@ -26,6 +26,7 @@ from src.r2_storage import upload_media_to_r2, is_r2_configured
 from src.webhook_server import (
     generate_hmac_token,
     publish_to_ayrshare,
+    publish_dispatcher,
     DATABASE_PATH,
     TELEGRAM_BOT_TOKEN,
     TELEGRAM_CHAT_ID,
@@ -234,19 +235,21 @@ def tool_publish_to_networks(post_id: int) -> Dict[str, Any]:
     if post["approval_status"] not in ("approved", "pending"):
         raise ValueError(f"Cannot publish post with status '{post['approval_status']}'. Must be approved.")
 
-    publish_result = publish_to_ayrshare(post)
-    ayr_id = publish_result.get("id", "simulated")
+    publish_result = publish_dispatcher(post)
+    pub_id = publish_result.get("id", "simulated")
+    provider = publish_result.get("provider", "ayrshare")
     with sqlite3.connect(DATABASE_PATH) as conn:
         conn.execute(
             "UPDATE posts SET approval_status = 'published', published_at = CURRENT_TIMESTAMP, ayrshare_post_id = ? WHERE id = ?",
-            (ayr_id, post_id)
+            (pub_id, post_id)
         )
         conn.commit()
 
     return {
         "status": "published",
         "post_id": post_id,
-        "ayrshare_id": ayr_id,
+        "broadcast_id": pub_id,
+        "provider": provider,
         "details": publish_result
     }
 
