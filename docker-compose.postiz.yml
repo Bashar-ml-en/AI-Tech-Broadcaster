@@ -79,6 +79,7 @@ services:
       - POSTGRES_USER=postiz-user
       - POSTGRES_PWD=postiz-password
       - POSTGRES_SEEDS=postiz-postgres
+      - SKIP_ADD_CUSTOM_SEARCH_ATTRIBUTES=true
     depends_on:
       - postiz-postgres
 
