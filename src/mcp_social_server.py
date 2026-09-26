@@ -178,39 +178,120 @@ def tool_send_telegram_approval(
     message_id = None
     if TELEGRAM_BOT_TOKEN and "Example" not in TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID:
         try:
-            tg_url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
-            resp = httpx.post(
-                tg_url,
-                json={
-                    "chat_id": TELEGRAM_CHAT_ID,
-                    "text": card_text,
-                    "parse_mode": "Markdown",
-                    "reply_markup": inline_keyboard
-                },
-                timeout=15.0
-            )
-            if resp.status_code == 400:
-                logger.warning("Telegram Markdown parse error, retrying with raw plain text fallback...")
-                clean_text = card_text.replace("*", "").replace("`", "")
+            # Check if there is an actual local video or graphic file to attach directly
+            media_file = None
+            if media_url:
+                filename = Path(media_url.split("?")[0]).name
+                candidate = root_dir / "storage" / "staging" / filename
+                if candidate.exists() and candidate.is_file() and candidate.stat().st_size > 200:
+                    media_file = candidate
+
+            sent = False
+            # 1. Try sending as playable video if it's an MP4 file
+            if media_file and media_file.suffix.lower() == ".mp4":
+                try:
+                    with open(media_file, "rb") as vf:
+                        files = {"video": (media_file.name, vf, "video/mp4")}
+                        data = {
+                            "chat_id": TELEGRAM_CHAT_ID,
+                            "caption": card_text[:1024],
+                            "parse_mode": "Markdown",
+                            "reply_markup": json.dumps(inline_keyboard)
+                        }
+                        resp = httpx.post(
+                            f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendVideo",
+                            data=data,
+                            files=files,
+                            timeout=60.0
+                        )
+                        if resp.status_code == 400:
+                            vf.seek(0)
+                            data["caption"] = card_text.replace("*", "").replace("`", "")[:1024]
+                            data.pop("parse_mode", None)
+                            resp = httpx.post(
+                                f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendVideo",
+                                data=data,
+                                files=files,
+                                timeout=60.0
+                            )
+                        if resp.status_code == 200:
+                            resp_data = resp.json()
+                            message_id = resp_data.get("result", {}).get("message_id")
+                            sent = True
+                            logger.info("Playable video dispatched to Telegram for preview (message_id=%s)", message_id)
+                except Exception as vid_err:
+                    logger.warning("Failed to send video directly to Telegram: %s", vid_err)
+
+            # 2. Try sending as high-res photo if it's an image file
+            elif media_file and media_file.suffix.lower() in (".png", ".jpg", ".jpeg"):
+                try:
+                    with open(media_file, "rb") as pf:
+                        files = {"photo": (media_file.name, pf, "image/png")}
+                        data = {
+                            "chat_id": TELEGRAM_CHAT_ID,
+                            "caption": card_text[:1024],
+                            "parse_mode": "Markdown",
+                            "reply_markup": json.dumps(inline_keyboard)
+                        }
+                        resp = httpx.post(
+                            f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendPhoto",
+                            data=data,
+                            files=files,
+                            timeout=45.0
+                        )
+                        if resp.status_code == 400:
+                            pf.seek(0)
+                            data["caption"] = card_text.replace("*", "").replace("`", "")[:1024]
+                            data.pop("parse_mode", None)
+                            resp = httpx.post(
+                                f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendPhoto",
+                                data=data,
+                                files=files,
+                                timeout=45.0
+                            )
+                        if resp.status_code == 200:
+                            resp_data = resp.json()
+                            message_id = resp_data.get("result", {}).get("message_id")
+                            sent = True
+                            logger.info("Graphic image dispatched to Telegram for preview (message_id=%s)", message_id)
+                except Exception as img_err:
+                    logger.warning("Failed to send photo directly to Telegram: %s", img_err)
+
+            # 3. Fallback to rich text sendMessage if media could not be sent directly
+            if not sent:
+                tg_url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
                 resp = httpx.post(
                     tg_url,
                     json={
                         "chat_id": TELEGRAM_CHAT_ID,
-                        "text": clean_text,
+                        "text": card_text,
+                        "parse_mode": "Markdown",
                         "reply_markup": inline_keyboard
                     },
                     timeout=15.0
                 )
+                if resp.status_code == 400:
+                    clean_text = card_text.replace("*", "").replace("`", "")
+                    resp = httpx.post(
+                        tg_url,
+                        json={
+                            "chat_id": TELEGRAM_CHAT_ID,
+                            "text": clean_text,
+                            "reply_markup": inline_keyboard
+                        },
+                        timeout=15.0
+                    )
+                if resp.status_code == 200:
+                    resp_data = resp.json()
+                    message_id = resp_data.get("result", {}).get("message_id")
+                    logger.info("Telegram text approval card sent successfully (message_id=%s)", message_id)
+                else:
+                    logger.warning("Telegram API error (%s): %s", resp.status_code, resp.text)
 
-            if resp.status_code == 200:
-                resp_data = resp.json()
-                message_id = resp_data.get("result", {}).get("message_id")
+            if message_id:
                 with sqlite3.connect(DATABASE_PATH) as conn:
                     conn.execute("UPDATE posts SET telegram_message_id = ? WHERE id = ?", (message_id, post_id))
                     conn.commit()
-                logger.info("Telegram approval card sent successfully (message_id=%s)", message_id)
-            else:
-                logger.warning("Telegram API error (%s): %s", resp.status_code, resp.text)
         except Exception as e:
             logger.error("Failed to dispatch Telegram message: %s", e)
 
