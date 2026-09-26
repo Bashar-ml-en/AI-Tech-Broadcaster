@@ -330,6 +330,23 @@ def publish_to_ayrshare(post_record: Dict[str, Any]) -> Dict[str, Any]:
     with httpx.Client(timeout=45.0) as client:
         resp = client.post("https://app.ayrshare.com/api/post", json=payload, headers=headers)
         if resp.status_code >= 400:
+            logger.warning("Ayrshare initial post attempt returned %s: %s. Initiating self-healing visual fallback...", resp.status_code, resp.text)
+            fallback_payload = {
+                "post": short_caption,
+                "platforms": ["facebook", "instagram"],
+                "mediaUrls": ["https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=1080&q=80"]
+            }
+            resp = client.post("https://app.ayrshare.com/api/post", json=fallback_payload, headers=headers)
+
+        if resp.status_code >= 400:
+            logger.warning("Ayrshare media attempt returned %s: %s. Executing text-link broadcast fallback...", resp.status_code, resp.text)
+            text_payload = {
+                "post": f"{short_caption}\n\nPrimary Source: {post_record.get('source_url', '')}",
+                "platforms": ["facebook"]
+            }
+            resp = client.post("https://app.ayrshare.com/api/post", json=text_payload, headers=headers)
+
+        if resp.status_code >= 400:
             logger.error("Ayrshare publication error (%s): %s", resp.status_code, resp.text)
             raise RuntimeError(f"Ayrshare API error {resp.status_code}: {resp.text}")
         
@@ -433,11 +450,18 @@ def update_telegram_message(chat_id: int, message_id: int, text: str):
     if not TELEGRAM_BOT_TOKEN:
         return
     try:
-        httpx.post(
+        resp = httpx.post(
             f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/editMessageText",
             json={"chat_id": chat_id, "message_id": message_id, "text": text, "parse_mode": "Markdown"},
             timeout=10.0
         )
+        if resp.status_code == 400:
+            clean_text = text.replace("*", "").replace("`", "")
+            httpx.post(
+                f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/editMessageText",
+                json={"chat_id": chat_id, "message_id": message_id, "text": clean_text},
+                timeout=10.0
+            )
     except Exception:
         pass
 
