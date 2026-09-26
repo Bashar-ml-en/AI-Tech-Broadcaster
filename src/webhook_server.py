@@ -1754,6 +1754,11 @@ def executive_studio_dashboard():
                                     <!-- Actions & Social Confirmation Button -->
                                     ${isPending ? `
                                         <div class="border-t border-slate-800/80 pt-4 flex flex-wrap items-center justify-end gap-3">
+                                            ${streamUrl ? `
+                                                <a href="${streamUrl}" download="${isReel ? 'reel_' + post.id + '.mp4' : 'graphic_' + post.id + '.png'}" target="_blank" class="px-5 py-2.5 rounded-xl bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-400 font-bold text-xs border border-cyan-500/30 transition active:scale-95 flex items-center gap-2">
+                                                    <i class="fa-solid fa-download"></i> Download ${isReel ? 'MP4 Video' : 'Graphic'}
+                                                </a>
+                                            ` : ''}
                                             <button onclick="discardPost(${post.id})" class="px-5 py-2.5 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 font-bold text-xs border border-rose-500/30 transition active:scale-95 flex items-center gap-2">
                                                 <i class="fa-solid fa-xmark"></i> Discard
                                             </button>
