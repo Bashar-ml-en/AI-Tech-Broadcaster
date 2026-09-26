@@ -188,6 +188,19 @@ def tool_send_telegram_approval(
                 },
                 timeout=15.0
             )
+            if resp.status_code == 400:
+                logger.warning("Telegram Markdown parse error, retrying with raw plain text fallback...")
+                clean_text = card_text.replace("*", "").replace("`", "")
+                resp = httpx.post(
+                    tg_url,
+                    json={
+                        "chat_id": TELEGRAM_CHAT_ID,
+                        "text": clean_text,
+                        "reply_markup": inline_keyboard
+                    },
+                    timeout=15.0
+                )
+
             if resp.status_code == 200:
                 resp_data = resp.json()
                 message_id = resp_data.get("result", {}).get("message_id")

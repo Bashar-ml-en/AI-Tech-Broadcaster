@@ -5,5 +5,19 @@
       "source": "/(.*)",
       "destination": "/api/index.py"
     }
+  ],
+  "crons": [
+    {
+      "path": "/api/cron/story",
+      "schedule": "*/15 * * * *"
+    },
+    {
+      "path": "/api/cron/reel",
+      "schedule": "*/30 * * * *"
+    },
+    {
+      "path": "/api/cron/post",
+      "schedule": "0 * * * *"
+    }
   ]
 }

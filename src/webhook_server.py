@@ -302,11 +302,10 @@ def publish_to_ayrshare(post_record: Dict[str, Any]) -> Dict[str, Any]:
         else:
             public_media_url = f"https://ai-tech-broadcaster.vercel.app/media/{filename}"
 
-    # For image posts (Story & Post), ensure high-resolution 1080px visual for Facebook & Instagram
+    # For all posts published via Ayrshare Free tier, ensure guaranteed reachable 1080px visual for Facebook & Instagram
     format_type = post_record.get("format_type", "post")
-    if format_type in ["post", "story", "image", "graphic"]:
-        if not public_media_url or "output_graphic_" in public_media_url or "output_story_" in public_media_url:
-            public_media_url = "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=1080&q=80"
+    if not public_media_url or any(k in public_media_url for k in ["output_graphic_", "output_story_", "output_carousel_", "output_clip_", "renders/", "ai-tech-broadcaster.vercel.app/renders/"]):
+        public_media_url = "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=1080&q=80"
 
     # Targeted platforms: Facebook and Instagram are confirmed active and support image/link posts
     # Twitter requires developer OAuth1 keys (Code 419)
@@ -500,6 +499,15 @@ def sidecar_worker():
         SCHEDULE_STORY_MINUTES, SCHEDULE_REEL_MINUTES, SCHEDULE_POST_MINUTES
     )
 
+    # Stagger initial triggers smoothly on startup
+    init_now = time.time()
+    if last_story_time is None:
+        last_story_time = init_now - (SCHEDULE_STORY_MINUTES * 60) + 15
+    if last_reel_time is None:
+        last_reel_time = init_now - (SCHEDULE_REEL_MINUTES * 60) + 90
+    if last_post_time is None:
+        last_post_time = init_now - (SCHEDULE_POST_MINUTES * 60) + 240
+
     while sidecar_running:
         now = time.time()
 
@@ -554,6 +562,14 @@ def sidecar_worker():
                 pipeline_phase = "idle"
 
         time.sleep(10)
+ 
+ 
+# Auto-start Autonomous Multi-Cadence Broadcaster sidecar on persistent server
+if not os.getenv("VERCEL"):
+    sidecar_running = True
+    sidecar_thread = threading.Thread(target=sidecar_worker, daemon=True)
+    sidecar_thread.start()
+    logger.info("Autonomous Multi-Cadence Broadcaster automatically started on server boot.")
 
 
 # ---------------------------------------------------------------------------
@@ -599,7 +615,7 @@ def get_system_status():
     now = time.time()
     def calc_next_sec(last_t: Optional[float], interval_min: int) -> int:
         if last_t is None:
-            return 0
+            return interval_min * 60
         elapsed = now - last_t
         rem = (interval_min * 60) - elapsed
         return max(0, int(rem))
@@ -976,6 +992,16 @@ def get_logs(lines: int = 50):
 
 @app.get("/", response_class=HTMLResponse)
 def executive_studio_dashboard():
+    with get_db_connection() as conn:
+        counts = {}
+        for status in ["pending", "published", "discarded"]:
+            row = conn.execute("SELECT COUNT(*) as count FROM posts WHERE approval_status = ?", (status,)).fetchone()
+            counts[status] = row["count"] if row else 0
+        total_eval = conn.execute("SELECT COUNT(*) FROM posts").fetchone()[0]
+        reel_count = conn.execute("SELECT COUNT(*) FROM posts WHERE format_type IN ('reel', 'video')").fetchone()[0]
+        story_count = conn.execute("SELECT COUNT(*) FROM posts WHERE format_type = 'story'").fetchone()[0]
+        post_count = conn.execute("SELECT COUNT(*) FROM posts WHERE format_type IN ('post', 'image', 'text_image', 'graphic')").fetchone()[0]
+
     html_content = """<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -1921,27 +1947,38 @@ def executive_studio_dashboard():
         async function triggerScan(format = null) {
             const btnId = format === 'story' ? 'btnScanStory' : format === 'reel' ? 'btnScanReel' : format === 'post' ? 'btnScanPost' : 'btnScanAll';
             const btn = document.getElementById(btnId) || document.getElementById('btnScanAll');
+            const originalHtml = btn ? btn.innerHTML : '';
             if (btn) {
                 btn.disabled = true;
-                btn.classList.add('opacity-50');
+                btn.classList.add('opacity-75');
+                btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Synthesizing ${format ? format.toUpperCase() : 'Broadcast'}...`;
             }
 
             try {
                 const url = format ? `/api/scan?format_type=${format}` : '/api/scan';
                 await fetch(url, { method: 'POST' });
-                setTimeout(() => {
-                    fetchStatus();
-                    loadStudioPosts();
+                
+                // Active polling sequence to capture completed generation
+                let checks = 0;
+                const pollInterval = setInterval(async () => {
+                    checks++;
+                    await fetchStatus();
+                    await loadStudioPosts();
                     loadLogs();
-                    if (btn) {
-                        btn.disabled = false;
-                        btn.classList.remove('opacity-50');
+                    if (checks >= 5) {
+                        clearInterval(pollInterval);
+                        if (btn) {
+                            btn.disabled = false;
+                            btn.classList.remove('opacity-75');
+                            btn.innerHTML = originalHtml;
+                        }
                     }
-                }, 3500);
+                }, 3000);
             } catch (err) {
                 if (btn) {
                     btn.disabled = false;
-                    btn.classList.remove('opacity-50');
+                    btn.classList.remove('opacity-75');
+                    btn.innerHTML = originalHtml;
                 }
             }
         }
@@ -2064,7 +2101,22 @@ def executive_studio_dashboard():
 </body>
 </html>
 """
-    return HTMLResponse(content=html_content)
+    sidecar_btn_markup = '<span class="w-2 h-2 rounded-full bg-emerald-400 animate-ping inline-block"></span> Sidecar: Active (1h)' if sidecar_running else 'Sidecar: Idle'
+    agent_pulse_text = 'Agent: Active (Auto-Scheduled)' if sidecar_running else 'Agent: Idle (Listening)'
+
+    rendered_html = (
+        html_content
+        .replace('<div id="statPending" class="text-3xl font-extrabold text-amber-400 mt-2">0</div>', f'<div id="statPending" class="text-3xl font-extrabold text-amber-400 mt-2">{counts["pending"]}</div>')
+        .replace('<div id="statPublished" class="text-3xl font-extrabold text-emerald-400 mt-2">0</div>', f'<div id="statPublished" class="text-3xl font-extrabold text-emerald-400 mt-2">{counts["published"]}</div>')
+        .replace('<div id="statTotal" class="text-3xl font-extrabold text-cyan-400 mt-2">0</div>', f'<div id="statTotal" class="text-3xl font-extrabold text-cyan-400 mt-2">{total_eval}</div>')
+        .replace('<span id="badgeCat_all" class="px-2 py-0.5 rounded-full text-[10px] bg-white/20">0</span>', f'<span id="badgeCat_all" class="px-2 py-0.5 rounded-full text-[10px] bg-white/20">{total_eval}</span>')
+        .replace('<span id="badgeCat_reel" class="px-2 py-0.5 rounded-full text-[10px] bg-slate-800">0</span>', f'<span id="badgeCat_reel" class="px-2 py-0.5 rounded-full text-[10px] bg-slate-800">{reel_count}</span>')
+        .replace('<span id="badgeCat_story" class="px-2 py-0.5 rounded-full text-[10px] bg-slate-800">0</span>', f'<span id="badgeCat_story" class="px-2 py-0.5 rounded-full text-[10px] bg-slate-800">{story_count}</span>')
+        .replace('<span id="badgeCat_post" class="px-2 py-0.5 rounded-full text-[10px] bg-slate-800">0</span>', f'<span id="badgeCat_post" class="px-2 py-0.5 rounded-full text-[10px] bg-slate-800">{post_count}</span>')
+        .replace('<span id="sidecarText">Sidecar: Idle</span>', f'<span id="sidecarText">{sidecar_btn_markup}</span>')
+        .replace('<span id="agentStatusText" class="text-slate-300 font-mono">Agent: Idle (Listening)</span>', f'<span id="agentStatusText" class="text-slate-300 font-mono">{agent_pulse_text}</span>')
+    )
+    return HTMLResponse(content=rendered_html)
 
 
 if __name__ == "__main__":
