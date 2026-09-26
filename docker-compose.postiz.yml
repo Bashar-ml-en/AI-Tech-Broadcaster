@@ -4,15 +4,13 @@
 # Access Postiz Studio at: http://localhost:4007
 # ==============================================================================
 
-version: '3.8'
-
 services:
   postiz:
     image: ghcr.io/gitroomhq/postiz-app:latest
     container_name: postiz
     restart: always
     ports:
-      - "4007:4007"
+      - "4007:5000"
     environment:
       MAIN_URL: 'http://localhost:4007'
       FRONTEND_URL: 'http://localhost:4007'
@@ -76,12 +74,11 @@ services:
     container_name: temporal
     restart: always
     environment:
-      - DB=postgresql
+      - DB=postgres12
       - DB_PORT=5432
       - POSTGRES_USER=postiz-user
       - POSTGRES_PWD=postiz-password
       - POSTGRES_SEEDS=postiz-postgres
-      - DYNAMIC_CONFIG_FILE_PATH=config/dynamicconfig/development-sql.yaml
     depends_on:
       - postiz-postgres
 
