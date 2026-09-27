@@ -61,6 +61,18 @@ if not logger.handlers:
     logger.addHandler(file_handler)
     logger.addHandler(stream_handler)
 
+# Also attach file handler to root logger so all module logs go to broadcaster.log
+root_logger = logging.getLogger()
+if file_handler not in root_logger.handlers:
+    root_logger.addHandler(file_handler)
+
+if sys.platform == "win32":
+    try:
+        sys.stdout.reconfigure(encoding="utf-8")
+        sys.stderr.reconfigure(encoding="utf-8")
+    except Exception:
+        pass
+
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "")
 TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID", "")
 TELEGRAM_CHANNEL_ID = os.getenv("TELEGRAM_CHANNEL_ID", "").strip()
@@ -623,11 +635,6 @@ def telegram_polling_worker():
         time.sleep(0.5)
 
 
-# Start Telegram background polling worker immediately when running as persistent server
-if not os.getenv("VERCEL"):
-    threading.Thread(target=telegram_polling_worker, daemon=True).start()
-
-
 def sidecar_worker():
     """
     Multi-Cadence Autonomous Broadcaster Sidecar Loop.
@@ -663,10 +670,10 @@ def sidecar_worker():
                 logger.info("Executing scheduled Story cycle (every %s mins)...", SCHEDULE_STORY_MINUTES)
                 pipeline_phase = "directing"
                 phase_timestamp = time.time()
-                execute_broadcast_cycle(target_format="story")
+                story_res = execute_broadcast_cycle(target_format="story")
                 last_story_time = time.time()
                 last_scan_time = last_story_time
-                last_scan_result = "Story generated"
+                last_scan_result = f"Story #{story_res.get('post_id')} staged" if story_res else "Story: no new stories"
                 pipeline_phase = "idle"
             except Exception as e:
                 logger.exception("Story cycle error: %s", e)
@@ -680,10 +687,10 @@ def sidecar_worker():
                 logger.info("Executing scheduled Reel cycle (every %s mins)...", SCHEDULE_REEL_MINUTES)
                 pipeline_phase = "directing"
                 phase_timestamp = time.time()
-                execute_broadcast_cycle(target_format="reel")
+                reel_res = execute_broadcast_cycle(target_format="reel")
                 last_reel_time = time.time()
                 last_scan_time = last_reel_time
-                last_scan_result = "Reel generated"
+                last_scan_result = f"Reel #{reel_res.get('post_id')} staged" if reel_res else "Reel: no new stories"
                 pipeline_phase = "idle"
             except Exception as e:
                 logger.exception("Reel cycle error: %s", e)
@@ -697,10 +704,10 @@ def sidecar_worker():
                 logger.info("Executing scheduled Feed Post cycle (every %s mins)...", SCHEDULE_POST_MINUTES)
                 pipeline_phase = "directing"
                 phase_timestamp = time.time()
-                execute_broadcast_cycle(target_format="post")
+                post_res = execute_broadcast_cycle(target_format="post")
                 last_post_time = time.time()
                 last_scan_time = last_post_time
-                last_scan_result = "Feed Post generated"
+                last_scan_result = f"Feed Post #{post_res.get('post_id')} staged" if post_res else "Post: no new stories"
                 pipeline_phase = "idle"
             except Exception as e:
                 logger.exception("Feed Post cycle error: %s", e)
@@ -708,14 +715,21 @@ def sidecar_worker():
                 pipeline_phase = "idle"
 
         time.sleep(10)
- 
- 
-# Auto-start Autonomous Multi-Cadence Broadcaster sidecar on persistent server
-if not os.getenv("VERCEL"):
-    sidecar_running = True
-    sidecar_thread = threading.Thread(target=sidecar_worker, daemon=True)
-    sidecar_thread.start()
-    logger.info("Autonomous Multi-Cadence Broadcaster automatically started on server boot.")
+
+
+@app.on_event("startup")
+def server_startup_event():
+    """Start background workers cleanly on FastAPI startup, never on module import."""
+    global sidecar_running, sidecar_thread
+    if not os.getenv("VERCEL"):
+        # Start Telegram polling worker in background
+        threading.Thread(target=telegram_polling_worker, daemon=True).start()
+        # Start sidecar worker if not already running
+        if not sidecar_running:
+            sidecar_running = True
+            sidecar_thread = threading.Thread(target=sidecar_worker, daemon=True)
+            sidecar_thread.start()
+            logger.info("Autonomous Multi-Cadence Broadcaster automatically started on server boot.")
 
 
 # ---------------------------------------------------------------------------

@@ -43,10 +43,22 @@ from src.mcp_social_server import (
     tool_send_telegram_approval
 )
 
+if sys.platform == "win32":
+    try:
+        sys.stdout.reconfigure(encoding="utf-8")
+        sys.stderr.reconfigure(encoding="utf-8")
+    except Exception:
+        pass
+
 env_path = root_dir / "config" / ".env"
 load_dotenv(dotenv_path=env_path)
 
 logger = logging.getLogger("broadcast_pipeline")
+log_file = root_dir / "storage" / "logs" / "broadcaster.log"
+log_file.parent.mkdir(parents=True, exist_ok=True)
+file_handler = logging.FileHandler(str(log_file), encoding="utf-8")
+file_handler.setFormatter(logging.Formatter("%(asctime)s [%(levelname)s] %(name)s: %(message)s"))
+logger.addHandler(file_handler)
 logging.basicConfig(
     level=os.getenv("LOG_LEVEL", "INFO"),
     format="%(asctime)s [%(levelname)s] %(name)s: %(message)s"
@@ -65,11 +77,15 @@ FEED_SOURCES = [
     {"tier": 1, "name": "Anthropic Research", "url": "https://www.anthropic.com/research", "type": "html"},
     {"tier": 1, "name": "Meta AI Blog", "url": "https://ai.meta.com/blog/", "type": "html"},
     {"tier": 1, "name": "Hugging Face Blog", "url": "https://huggingface.co/blog", "type": "html"},
+    # Real-Time Dynamic AI Intelligence Feeds
+    {"tier": 1, "name": "Google News AI", "url": "https://news.google.com/rss/search?q=Artificial+Intelligence+LLM+OR+DeepSeek+OR+OpenAI+when:1d&hl=en-US&gl=US&ceid=US:en", "type": "rss"},
+    {"tier": 1, "name": "HackerNews AI", "url": "https://hn.algolia.com/api/v1/search_by_date?tags=story&query=AI+OR+LLM+OR+DeepSeek+OR+Gemini&hitsPerPage=15", "type": "json_hn"},
     # Tier 2: Academic Preprints & Code Releases
     {"tier": 2, "name": "ArXiv cs.AI Recent", "url": "https://rss.arxiv.org/rss/cs.AI", "type": "rss"},
     {"tier": 2, "name": "GitHub Trending AI", "url": "https://github.com/trending?since=daily", "type": "html"},
     # Tier 3: Tier-1 Tech Publications
     {"tier": 3, "name": "TechCrunch AI", "url": "https://techcrunch.com/category/artificial-intelligence/", "type": "html"},
+    {"tier": 3, "name": "VentureBeat AI", "url": "https://venturebeat.com/category/ai/feed/", "type": "rss"},
     {"tier": 3, "name": "Ars Technica AI", "url": "https://arstechnica.com/tag/ai/", "type": "html"}
 ]
 
@@ -149,13 +165,30 @@ def harvest_candidate_stories() -> List[Dict[str, Any]]:
                 if resp.status_code != 200:
                     continue
 
-                soup = BeautifulSoup(resp.text, "html.parser")
                 found_links = set()
 
-                if feed["type"] == "rss":
-                    # RSS parsing for ArXiv
+                if feed["type"] == "json_hn":
+                    try:
+                        data = resp.json()
+                        for hit in data.get("hits", [])[:6]:
+                            title = hit.get("title", "").strip()
+                            url = hit.get("url") or f"https://news.ycombinator.com/item?id={hit.get('objectID')}"
+                            if title and url and url not in found_links:
+                                found_links.add(url)
+                                candidates.append({
+                                    "tier": feed["tier"],
+                                    "source_name": feed["name"],
+                                    "headline": title,
+                                    "url": url,
+                                    "summary": title
+                                })
+                    except Exception:
+                        pass
+                elif feed["type"] == "rss":
+                    soup = BeautifulSoup(resp.text, "html.parser")
+                    # RSS parsing for ArXiv & Google News AI
                     items = soup.find_all("item")
-                    for item in items[:5]:
+                    for item in items[:6]:
                         title = item.title.text.strip() if item.title else ""
                         link = item.link.text.strip() if item.link else ""
                         description = item.description.text.strip() if item.description else ""
@@ -169,6 +202,7 @@ def harvest_candidate_stories() -> List[Dict[str, Any]]:
                                 "summary": description[:500]
                             })
                 else:
+                    soup = BeautifulSoup(resp.text, "html.parser")
                     # HTML link parsing
                     for a in soup.find_all("a", href=True):
                         href = a["href"]
@@ -484,33 +518,40 @@ def execute_broadcast_cycle(target_format: Optional[str] = None) -> Optional[Dic
         logger.info("Synthesizing broadcast directive (Format: %s) for: %s", target_format or "auto", cand["headline"])
         directive = generate_director_directive(qualified, target_format=target_format)
 
+        directive["source_url"] = cand["url"]
+
         # Stage media asset to R2
         media_url = stage_rendered_asset(directive)
 
         # Insert pending record in SQLite database
-        write_res = tool_sqlite_write_query(
-            """INSERT INTO posts (
-                source_url, headline, format_type, media_url, approval_status,
-                hook_narration, body_narration, call_to_action, visual_prompt,
-                captions_json, post_payload
-            ) VALUES (
-                :source_url, :headline, :format_type, :media_url, 'pending',
-                :hook, :body, :cta, :visual, :captions, :payload
-            )""",
-            {
-                "source_url": directive["source_url"],
-                "headline": directive["title"],
-                "format_type": directive["format"],
-                "media_url": media_url,
-                "hook": directive["hook_narration"],
-                "body": directive["body_narration"],
-                "cta": directive["call_to_action"],
-                "visual": directive["visual_prompt"],
-                "captions": json.dumps(directive["platform_captions"]),
-                "payload": json.dumps(directive)
-            }
-        )
-        post_id = write_res["last_row_id"]
+        try:
+            write_res = tool_sqlite_write_query(
+                """INSERT INTO posts (
+                    source_url, headline, format_type, media_url, approval_status,
+                    hook_narration, body_narration, call_to_action, visual_prompt,
+                    captions_json, post_payload
+                ) VALUES (
+                    :source_url, :headline, :format_type, :media_url, 'pending',
+                    :hook, :body, :cta, :visual, :captions, :payload
+                )""",
+                {
+                    "source_url": directive["source_url"],
+                    "headline": directive["title"],
+                    "format_type": directive["format"],
+                    "media_url": media_url,
+                    "hook": directive["hook_narration"],
+                    "body": directive["body_narration"],
+                    "cta": directive["call_to_action"],
+                    "visual": directive["visual_prompt"],
+                    "captions": json.dumps(directive["platform_captions"]),
+                    "payload": json.dumps(directive)
+                }
+            )
+            post_id = write_res["last_row_id"]
+        except Exception as write_err:
+            logger.warning("Database insert failed for candidate %s: %s. Continuing to next candidate.", cand["url"], write_err)
+            continue
+
         logger.info("Saved pending story to database (ID=%s)", post_id)
 
         # Dispatch Telegram HITL interactive card
@@ -526,10 +567,13 @@ def execute_broadcast_cycle(target_format: Optional[str] = None) -> Optional[Dic
         )
 
         logger.info("HITL Approval Card Dispatched. Manual Review: %s", approval_res["review_url"])
-        print("\n" + "=" * 60)
-        print("DIRECTOR BROADCAST PAYLOAD (Strict JSON Schema):")
-        print(json.dumps(directive, indent=2))
-        print("=" * 60 + "\n")
+        try:
+            print("\n" + "=" * 60)
+            print("DIRECTOR BROADCAST PAYLOAD (Strict JSON Schema):")
+            print(json.dumps(directive, indent=2))
+            print("=" * 60 + "\n")
+        except Exception:
+            pass
 
         # Optional Autonomous Channel Broadcasting:
         auto_pub = os.getenv("AUTO_PUBLISH_TO_TELEGRAM", "false").strip().lower()
