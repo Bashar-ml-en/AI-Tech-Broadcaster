@@ -531,6 +531,37 @@ def execute_broadcast_cycle(target_format: Optional[str] = None) -> Optional[Dic
         print(json.dumps(directive, indent=2))
         print("=" * 60 + "\n")
 
+        # Optional Autonomous Channel Broadcasting:
+        auto_pub = os.getenv("AUTO_PUBLISH_TO_TELEGRAM", "false").strip().lower()
+        if auto_pub in ("true", "1", "yes"):
+            try:
+                from src.webhook_server import publish_dispatcher
+                logger.info("AUTO_PUBLISH_TO_TELEGRAM is enabled. Broadcasting post %s to Telegram channel...", post_id)
+                pub_res = publish_dispatcher({
+                    "id": post_id,
+                    "headline": directive["title"],
+                    "format_type": directive["format"],
+                    "media_url": media_url,
+                    "source_url": directive["source_url"],
+                    "captions_json": json.dumps(directive["platform_captions"])
+                })
+                with sqlite3.connect(DATABASE_PATH) as conn:
+                    conn.execute(
+                        "UPDATE posts SET approval_status = 'published', published_at = CURRENT_TIMESTAMP, ayrshare_post_id = ? WHERE id = ?",
+                        (pub_res.get("id", str(int(time.time()))), post_id)
+                    )
+                    conn.commit()
+                logger.info("Post %s auto-published successfully to Telegram channel.", post_id)
+                return {
+                    "status": "auto_published",
+                    "post_id": post_id,
+                    "directive": directive,
+                    "approval": approval_res,
+                    "publish_result": pub_res
+                }
+            except Exception as pub_err:
+                logger.warning("Auto-publish to Telegram channel failed: %s", pub_err)
+
         return {
             "status": "staged_for_approval",
             "post_id": post_id,
