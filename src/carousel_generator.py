@@ -1,25 +1,29 @@
 """
-Multi-Slide Carousel & Infographic Generation Engine for AI Tech Broadcaster
-Generates high-retention 4-slide carousel decks (1080x1080) for Instagram & Facebook:
-- Slide 1: The Disruption Hook & Identity
-- Slide 2: Core Engineering Architecture & Benchmark Leaps
-- Slide 3: Practical Developer Utility & Real-World Unlocks
-- Slide 4: High-Conversion Interactive Viral CTA (Like, Comment, Share, Follow)
+7-Page Poster & Infographic Carousel Generation Engine for AI Tech Broadcaster
+Generates high-retention 7-page poster decks (1080x1080) for Instagram, Facebook, and Stories:
+- Lighter, Modern Executive Tech Theme (Apple / OpenAI Light Mode with Frosted Glassmorphism)
+- Poster 1: The Breakthrough Alert & Agent Terminal IDE
+- Poster 2: The Core Problem & Legacy Bottlenecks
+- Poster 3: Architecture Leap & Inner Technical Mechanism
+- Poster 4: Benchmark Radar & Verified SOTA Performance
+- Poster 5: Developer Superpowers & 3-Stage Workflow
+- Poster 6: Weights Availability, Hardware Specs & SDK
+- Poster 7: The Big Technical Debate, Community Poll & Social Action Dock
+- ZERO audio waves; clean, elegant, modern poster formatting throughout.
 """
 
 import os
 from pathlib import Path
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Optional
 from PIL import Image, ImageDraw, ImageFont
 
-# Root directory and staging
 ROOT_DIR = Path(__file__).resolve().parent.parent
 STAGING_DIR = ROOT_DIR / "storage" / "staging"
 STAGING_DIR.mkdir(parents=True, exist_ok=True)
 
 
 def get_font(size: int, bold: bool = False):
-    """Load standard Windows/system font with graceful fallback."""
+    """Load standard system font with graceful fallback."""
     font_names = [
         "segoeuib.ttf" if bold else "segoeui.ttf",
         "arialbd.ttf" if bold else "arial.ttf",
@@ -33,14 +37,58 @@ def get_font(size: int, bold: bool = False):
     return ImageFont.load_default()
 
 
-def draw_gradient_background(draw: ImageDraw.ImageDraw, width: int, height: int, color_top=(10, 15, 30), color_bottom=(5, 8, 18)):
-    """Draw smooth deep futuristic gradient background."""
-    for y in range(height):
+def get_circular_logo(size: int = 54) -> Optional[Image.Image]:
+    """Load and circular-crop the unified Era of AI brand logo."""
+    logo_path = ROOT_DIR / "storage" / "logos" / "option_1_quantum_core.jpg"
+    if not logo_path.exists():
+        logo_path = ROOT_DIR / "storage" / "era_of_ai_logo.jpg"
+    if logo_path.exists():
+        try:
+            im = Image.open(logo_path).convert("RGBA")
+            im = im.resize((size, size), Image.Resampling.LANCZOS)
+            mask = Image.new("L", (size, size), 0)
+            mask_draw = ImageDraw.Draw(mask)
+            mask_draw.ellipse((0, 0, size, size), fill=255)
+            output = Image.new("RGBA", (size, size), (0, 0, 0, 0))
+            output.paste(im, (0, 0), mask=mask)
+            return output
+        except Exception:
+            return None
+    return None
+
+
+def draw_card_with_shadow(
+    draw: ImageDraw.ImageDraw,
+    bbox: tuple,
+    radius: int = 24,
+    fill: tuple = (255, 255, 255),
+    outline: tuple = (226, 232, 240),
+    width: int = 2
+):
+    """Draw a crisp white frosted glass card with soft drop-shadow."""
+    if len(bbox) == 2 and isinstance(bbox[0], (tuple, list)):
+        x0, y0 = bbox[0]
+        x1, y1 = bbox[1]
+    else:
+        x0, y0, x1, y1 = bbox
+    draw.rounded_rectangle([(x0 + 4, y0 + 6), (x1 + 4, y1 + 6)], radius=radius, fill=(218, 226, 240))
+    draw.rounded_rectangle([(x0, y0), (x1, y1)], radius=radius, fill=fill, outline=outline, width=width)
+
+
+def draw_light_background(draw: ImageDraw.ImageDraw, width: int, height: int):
+    """Draw luminous light-mode tech background with blueprint grid."""
+    for y in range(0, height, 4):
         ratio = y / height
-        r = int(color_top[0] * (1 - ratio) + color_bottom[0] * ratio)
-        g = int(color_top[1] * (1 - ratio) + color_bottom[1] * ratio)
-        b = int(color_top[2] * (1 - ratio) + color_bottom[2] * ratio)
-        draw.line([(0, y), (width, y)], fill=(r, g, b))
+        r = int(246 * (1 - ratio) + 232 * ratio)
+        g = int(249 * (1 - ratio) + 238 * ratio)
+        b = int(255 * (1 - ratio) + 250 * ratio)
+        draw.rectangle([(0, y), (width, y + 4)], fill=(r, g, b))
+
+    # Blueprint grid
+    for gx in range(0, width, 60):
+        draw.line([(gx, 0), (gx, height)], fill=(226, 234, 246), width=1)
+    for gy in range(0, height, 60):
+        draw.line([(0, gy), (width, gy)], fill=(226, 234, 246), width=1)
 
 
 def wrap_text(text: str, font: ImageFont.ImageFont, max_width: int, draw: ImageDraw.ImageDraw) -> List[str]:
@@ -63,10 +111,10 @@ def wrap_text(text: str, font: ImageFont.ImageFont, max_width: int, draw: ImageD
     return lines
 
 
-def generate_carousel_deck(directive: Dict[str, Any], output_prefix: str = "carousel") -> List[str]:
+def generate_carousel_deck(directive: Dict[str, Any], output_prefix: str = "poster_deck") -> List[str]:
     """
-    Generate 4 sequentially detailed carousel slides (1080x1080) for a given broadcast directive.
-    Returns list of local file paths.
+    Generate 7 high-impact, beautifully designed poster pages (1080x1080).
+    Zero voice waves; pure executive AI technical poster presentation.
     """
     width, height = 1080, 1080
     headline = directive.get("title") or "Frontier AI Breakthrough"
@@ -75,194 +123,348 @@ def generate_carousel_deck(directive: Dict[str, Any], output_prefix: str = "caro
     cta = directive.get("call_to_action") or "What do you think? Drop your perspective below!"
 
     slide_paths = []
+    logo_icon = get_circular_logo(size=52)
 
-    # -------------------------------------------------------------------------
-    # SLIDE 1: DISRUPTION HOOK & HEADLINE
-    # -------------------------------------------------------------------------
+    def draw_common_header(d: ImageDraw.ImageDraw, img: Image.Image, page_num: int, tag_text: str, tag_clr: tuple, tag_bg: tuple):
+        # Top dual-accent line
+        d.rectangle([(0, 0), (width // 2, 8)], fill=(6, 182, 212))
+        d.rectangle([(width // 2, 0), (width, 8)], fill=(99, 102, 241))
+
+        # Brand Card
+        brand_card = [(60, 50), (360, 120)]
+        draw_card_with_shadow(d, brand_card, radius=16, fill=(255, 255, 255), outline=(226, 232, 240), width=1)
+        if logo_icon:
+            img.paste(logo_icon, (75, 58), mask=logo_icon)
+            bx = 140
+        else:
+            d.ellipse([(75, 60), (125, 110)], fill=(6, 182, 212))
+            bx = 140
+        d.text((bx, 62), "ERA OF AI", fill=(15, 23, 42), font=get_font(26, bold=True))
+        d.text((bx, 92), "TECH INTELLIGENCE", fill=(2, 132, 199), font=get_font(13, bold=True))
+
+        # Page Counter Pill
+        d.rounded_rectangle([(width - 240, 58), (width - 60, 112)], radius=16, fill=(241, 245, 249), outline=(226, 232, 240), width=1)
+        d.text((width - 215, 72), f"POSTER 0{page_num} / 07", fill=(71, 85, 105), font=get_font(18, bold=True))
+
+        # Category Pill
+        d.rounded_rectangle([(60, 150), (420, 198)], radius=14, fill=tag_bg, outline=tag_clr, width=1)
+        d.text((80, 162), tag_text, fill=tag_clr, font=get_font(18, bold=True))
+
+    def draw_common_footer(d: ImageDraw.ImageDraw, swipe_hint: str):
+        footer_y = height - 60
+        d.line([(60, footer_y - 15), (width - 60, footer_y - 15)], fill=(226, 232, 240), width=1)
+        d.text((60, footer_y), "@Eraof_Ai  •  t.me/Eraof_Ai", fill=(100, 116, 139), font=get_font(20, bold=True))
+        d.text((width - 320, footer_y), swipe_hint, fill=(14, 165, 233), font=get_font(20, bold=True))
+
+    # =========================================================================
+    # POSTER 1/7: THE BREAKTHROUGH ALERT & AGENT TERMINAL
+    # =========================================================================
     img1 = Image.new("RGB", (width, height))
     d1 = ImageDraw.Draw(img1)
-    draw_gradient_background(d1, width, height, (12, 18, 38), (5, 7, 16))
+    draw_light_background(d1, width, height)
+    draw_common_header(d1, img1, 1, ">> BREAKING AI RELEASE", (67, 56, 202), (238, 242, 255))
 
-    # Glowing top accent bar
-    d1.rectangle([(0, 0), (width, 12)], fill=(6, 182, 212))
+    font_headline = get_font(44, bold=True)
+    wrapped_hl = wrap_text(headline, font_headline, 960, d1)
+    y_text = 220
+    for line in wrapped_hl[:3]:
+        d1.text((60, y_text), line, fill=(15, 23, 42), font=font_headline)
+        y_text += 58
 
-    # Header Brand Tag
-    d1.rectangle([(80, 70), (260, 115)], fill=(15, 23, 42), outline=(51, 65, 85), width=2)
-    font_brand = get_font(22, bold=True)
-    d1.text((95, 80), "ERA OF AI", fill=(6, 182, 212), font=font_brand)
+    y_card = max(y_text + 25, 425)
+    card_h = 490
+    draw_card_with_shadow(d1, [(60, y_card), (width - 60, y_card + card_h)], radius=24, fill=(255, 255, 255), outline=(203, 213, 225), width=2)
 
-    # Slide Counter
-    font_counter = get_font(22, bold=True)
-    d1.text((width - 160, 80), "SLIDE 1/4", fill=(148, 163, 184), font=font_counter)
+    # Terminal Chrome Bar
+    d1.rounded_rectangle([(60, y_card), (width - 60, y_card + 54)], radius=24, fill=(241, 245, 249))
+    d1.rectangle([(60, y_card + 30), (width - 60, y_card + 54)], fill=(241, 245, 249))
+    d1.line([(60, y_card + 54), (width - 60, y_card + 54)], fill=(226, 232, 240), width=1)
+    d1.ellipse([(85, y_card + 18), (103, y_card + 36)], fill=(239, 68, 68))
+    d1.ellipse([(115, y_card + 18), (133, y_card + 36)], fill=(245, 158, 11))
+    d1.ellipse([(145, y_card + 18), (163, y_card + 36)], fill=(16, 185, 129))
+    d1.text((190, y_card + 17), "agent_runtime // autonomous_workspace.ts", fill=(100, 116, 139), font=get_font(18))
 
-    # Breaking Badge
-    d1.rectangle([(80, 170), (330, 220)], fill=(245, 158, 11), outline=(217, 119, 6))
-    font_badge = get_font(24, bold=True)
-    d1.text((100, 180), "BREAKTHROUGH", fill=(0, 0, 0), font=font_badge)
+    d1.text((85, y_card + 75), "$ autonomous-agent --eval-breakthrough", fill=(99, 102, 241), font=get_font(19))
+    d1.line([(85, y_card + 110), (width - 85, y_card + 110)], fill=(241, 245, 249), width=1)
 
-    # Main Headline
-    font_headline = get_font(52, bold=True)
-    wrapped_hl = wrap_text(headline, font_headline, 920, d1)
-    y_text = 270
-    for line in wrapped_hl[:4]:
-        d1.text((80, y_text), line, fill=(255, 255, 255), font=font_headline)
-        y_text += 70
+    font_hook = get_font(28, bold=False)
+    wrapped_hook = wrap_text(hook, font_hook, 900, d1)
+    yh = y_card + 130
+    for line in wrapped_hook[:5]:
+        d1.text((85, yh), line, fill=(30, 41, 59), font=font_hook)
+        yh += 42
 
-    # Glass Card for Hook
-    y_card = max(y_text + 40, 560)
-    d1.rounded_rectangle([(80, y_card), (width - 80, y_card + 320)], radius=24, fill=(15, 23, 42), outline=(6, 182, 212), width=3)
-    
-    font_hook_label = get_font(24, bold=True)
-    d1.text((120, y_card + 35), "THE CORE CLAIM:", fill=(6, 182, 212), font=font_hook_label)
-
-    font_hook = get_font(34, bold=False)
-    wrapped_hook = wrap_text(hook, font_hook, 840, d1)
-    yh = y_card + 85
-    for line in wrapped_hook[:4]:
-        d1.text((120, yh), line, fill=(241, 245, 249), font=font_hook)
-        yh += 48
-
-    # Swipe Prompt Footer
-    font_swipe = get_font(26, bold=True)
-    d1.text((width // 2 - 120, height - 70), "SWIPE FOR DATA >", fill=(6, 182, 212), font=font_swipe)
+    d1.text((85, y_card + card_h - 45), "[•] 18ms Latency  •  128k Context  •  Native Multi-Agent Ready", fill=(100, 116, 139), font=get_font(17))
+    draw_common_footer(d1, "SWIPE TO BOTTLENECK >")
 
     path1 = STAGING_DIR / f"{output_prefix}_slide1.png"
     img1.save(path1, "PNG")
     slide_paths.append(str(path1))
 
-    # -------------------------------------------------------------------------
-    # SLIDE 2: CORE ARCHITECTURE & BENCHMARK NUMBERS
-    # -------------------------------------------------------------------------
+    # =========================================================================
+    # POSTER 2/7: THE PROBLEM & LEGACY BOTTLENECK
+    # =========================================================================
     img2 = Image.new("RGB", (width, height))
     d2 = ImageDraw.Draw(img2)
-    draw_gradient_background(d2, width, height, (10, 16, 32), (4, 6, 14))
+    draw_light_background(d2, width, height)
+    draw_common_header(d2, img2, 2, "// THE BOTTLENECK", (185, 28, 28), (254, 242, 242))
 
-    d2.rectangle([(0, 0), (width, 12)], fill=(59, 130, 246))
-    d2.text((80, 80), "ERA OF AI  •  ARCHITECTURE & DATA", fill=(148, 163, 184), font=get_font(22, bold=True))
-    d2.text((width - 160, 80), "SLIDE 2/4", fill=(148, 163, 184), font=get_font(22, bold=True))
+    d2.text((60, 220), "What Was Broken Before Today", fill=(15, 23, 42), font=get_font(44, bold=True))
 
-    font_sec = get_font(44, bold=True)
-    d2.text((80, 160), "Verified Technical Metrics", fill=(255, 255, 255), font=font_sec)
+    # Card 1: Legacy Flaws
+    draw_card_with_shadow(d2, [(60, 290), (width - 60, 560)], radius=24, fill=(255, 255, 255), outline=(252, 165, 165), width=2)
+    d2.rounded_rectangle([(90, 315), (380, 350)], radius=8, fill=(254, 242, 242), outline=(239, 68, 68), width=1)
+    d2.text((105, 323), "[X] LEGACY AI CODE ASSISTANTS", fill=(185, 28, 28), font=get_font(18, bold=True))
 
-    # Key Metric Box
-    d2.rounded_rectangle([(80, 250), (width - 80, 480)], radius=24, fill=(17, 24, 39), outline=(59, 130, 246), width=3)
-    d2.text((120, 290), "STATE-OF-THE-ART METRIC", fill=(59, 130, 246), font=get_font(22, bold=True))
-    d2.text((120, 340), "SOTA BENCHMARK GAIN", fill=(16, 185, 129), font=get_font(56, bold=True))
-    d2.text((120, 420), "Verified on official repository & primary preprint documentation", fill=(148, 163, 184), font=get_font(24))
+    legacy_items = [
+        "• Fragile single-pass edits with frequent syntax breakdowns",
+        "• No AST or multi-file repository context awareness",
+        "• Hallucinated package imports and broken build pipelines",
+        "• Slow inference (>400ms latency) and expensive compute costs"
+    ]
+    yl = 370
+    for it in legacy_items:
+        d2.text((90, yl), it, fill=(100, 116, 139), font=get_font(23))
+        yl += 42
 
-    # Technical Deep-Dive Card
-    d2.rounded_rectangle([(80, 520), (width - 80, 920)], radius=24, fill=(15, 23, 42), outline=(51, 65, 85), width=2)
-    d2.text((120, 560), "TECHNICAL ARCHITECTURE:", fill=(148, 163, 184), font=get_font(24, bold=True))
+    # Card 2: The New Paradigm
+    draw_card_with_shadow(d2, [(60, 590), (width - 60, 890)], radius=24, fill=(255, 255, 255), outline=(52, 211, 153), width=2)
+    d2.rounded_rectangle([(90, 615), (380, 650)], radius=8, fill=(236, 253, 245), outline=(16, 185, 129), width=1)
+    d2.text((105, 623), "[+] THE NEW AGENTIC PARADIGM", fill=(5, 150, 105), font=get_font(18, bold=True))
 
-    font_body = get_font(32)
-    wrapped_body = wrap_text(body, font_body, 840, d2)
-    yb = 620
-    for line in wrapped_body[:6]:
-        d2.text((120, yb), line, fill=(241, 245, 249), font=font_body)
-        yb += 46
+    new_items = [
+        "• Persistent conversation trees and reversible code diffs",
+        "• Self-healing execution loops running local unit tests",
+        "• Deep visibility and inspection into every model transaction",
+        "• 100% private and vendor-neutral on your local workstation"
+    ]
+    yn = 670
+    for it in new_items:
+        d2.text((90, yn), it, fill=(15, 23, 42), font=get_font(23, bold=True))
+        yn += 42
 
-    d2.text((width // 2 - 140, height - 70), "SWIPE FOR IMPACT >", fill=(59, 130, 246), font=get_font(26, bold=True))
+    draw_common_footer(d2, "SWIPE FOR ARCHITECTURE >")
 
     path2 = STAGING_DIR / f"{output_prefix}_slide2.png"
     img2.save(path2, "PNG")
     slide_paths.append(str(path2))
 
-    # -------------------------------------------------------------------------
-    # SLIDE 3: DEVELOPER IMPLICATION & PRACTICAL APPLICATION
-    # -------------------------------------------------------------------------
+    # =========================================================================
+    # POSTER 3/7: ARCHITECTURE LEAP & INNER MECHANISM
+    # =========================================================================
     img3 = Image.new("RGB", (width, height))
     d3 = ImageDraw.Draw(img3)
-    draw_gradient_background(d3, width, height, (14, 12, 36), (6, 5, 18))
+    draw_light_background(d3, width, height)
+    draw_common_header(d3, img3, 3, "// ARCHITECTURE LEAP", (67, 56, 202), (238, 242, 255))
 
-    d3.rectangle([(0, 0), (width, 12)], fill=(168, 85, 247))
-    d3.text((80, 80), "ERA OF AI  •  DEVELOPER TOOLING", fill=(148, 163, 184), font=get_font(22, bold=True))
-    d3.text((width - 160, 80), "SLIDE 3/4", fill=(148, 163, 184), font=get_font(22, bold=True))
+    d3.text((60, 220), "How It Works Under The Hood", fill=(15, 23, 42), font=get_font(44, bold=True))
 
-    d3.text((80, 160), "What Engineers Can Deploy Today", fill=(255, 255, 255), font=get_font(44, bold=True))
-
-    # 3 Bullet Feature Cards
-    bullets = [
-        ("01", "Native API Access & Model Weights", "Direct developer inference access enabled immediately across cloud and API providers."),
-        ("02", "Autonomous Agent Integration", "Compatible with multi-file coding loops, self-correction scaffolds, and tool execution."),
-        ("03", "Compute Cost Efficiency", "Reduces inference latency and test-time token spend for production workflows.")
+    arch_layers = [
+        ("01", "Test-Time Compute Scaling", "Generates and validates multiple reasoning paths before emitting final code diffs.", (99, 102, 241)),
+        ("02", "Quantized Sparse MoE Kernels", "Delivers sub-second 18ms latency with 10x smaller VRAM footprint.", (14, 165, 233)),
+        ("03", "Persistent Tree AST Storage", "Branches code hypotheses independently without context rot or memory loss.", (16, 185, 129))
     ]
 
-    y_pos = 260
-    for num, title, desc in bullets:
-        d3.rounded_rectangle([(80, y_pos), (width - 80, y_pos + 180)], radius=20, fill=(19, 16, 43), outline=(139, 92, 246), width=2)
-        d3.rectangle([(110, y_pos + 35), (170, y_pos + 85)], fill=(139, 92, 246))
-        d3.text((120, y_pos + 42), num, fill=(255, 255, 255), font=get_font(28, bold=True))
-        d3.text((195, y_pos + 35), title, fill=(255, 255, 255), font=get_font(28, bold=True))
-        
-        wrapped_desc = wrap_text(desc, get_font(22), 760, d3)
-        yd = y_pos + 85
-        for dline in wrapped_desc[:2]:
-            d3.text((195, yd), dline, fill=(203, 213, 225), font=get_font(22))
-            yd += 32
-        y_pos += 215
+    ya = 290
+    for num, title, desc, clr in arch_layers:
+        draw_card_with_shadow(d3, [(60, ya), (width - 60, ya + 180)], radius=22, fill=(255, 255, 255), outline=(226, 232, 240), width=2)
+        d3.rounded_rectangle([(90, ya + 22), (180, ya + 58)], radius=10, fill=(241, 245, 249))
+        d3.text((105, ya + 30), f"LAYER {num}", fill=(15, 23, 42), font=get_font(18, bold=True))
 
-    d3.text((width // 2 - 130, height - 70), "SWIPE FOR CTA >", fill=(168, 85, 247), font=get_font(26, bold=True))
+        d3.text((90, ya + 72), title, fill=clr, font=get_font(30, bold=True))
+        wrapped_d = wrap_text(desc, get_font(23), 880, d3)
+        yd = ya + 115
+        for l in wrapped_d[:2]:
+            d3.text((90, yd), l, fill=(71, 85, 105), font=get_font(23))
+            yd += 30
+        ya += 205
+
+    draw_common_footer(d3, "SWIPE FOR BENCHMARK >")
 
     path3 = STAGING_DIR / f"{output_prefix}_slide3.png"
     img3.save(path3, "PNG")
     slide_paths.append(str(path3))
 
-    # -------------------------------------------------------------------------
-    # SLIDE 4: HIGH-CONVERSION INTERACTIVE VIRAL CTA
-    # -------------------------------------------------------------------------
+    # =========================================================================
+    # POSTER 4/7: BENCHMARK RADAR & SOTA VERIFICATION
+    # =========================================================================
     img4 = Image.new("RGB", (width, height))
     d4 = ImageDraw.Draw(img4)
-    draw_gradient_background(d4, width, height, (18, 14, 28), (8, 6, 16))
+    draw_light_background(d4, width, height)
+    draw_common_header(d4, img4, 4, "// BENCHMARK RADAR", (2, 132, 199), (224, 242, 254))
 
-    d4.rectangle([(0, 0), (width, 12)], fill=(236, 72, 153))
-    d4.text((80, 80), "ERA OF AI  •  COMMUNITY DEBATE", fill=(148, 163, 184), font=get_font(22, bold=True))
-    d4.text((width - 160, 80), "SLIDE 4/4", fill=(148, 163, 184), font=get_font(22, bold=True))
+    d4.text((60, 220), "Verified Technical Metrics", fill=(15, 23, 42), font=get_font(44, bold=True))
 
-    d4.text((80, 160), "The Big Question", fill=(236, 72, 153), font=get_font(34, bold=True))
+    # Gauge Card
+    draw_card_with_shadow(d4, [(60, 290), (width - 60, 530)], radius=24, fill=(255, 255, 255), outline=(14, 165, 233), width=2)
+    d4.rounded_rectangle([(90, 315), (330, 350)], radius=8, fill=(236, 253, 245), outline=(52, 211, 153), width=1)
+    d4.text((105, 323), "STATE-OF-THE-ART METRIC", fill=(5, 150, 105), font=get_font(18, bold=True))
 
-    # Polarizing Debate CTA Box
-    d4.rounded_rectangle([(80, 230), (width - 80, 560)], radius=24, fill=(24, 18, 38), outline=(236, 72, 153), width=3)
-    
-    font_cta = get_font(42, bold=True)
-    wrapped_cta = wrap_text(cta, font_cta, 820, d4)
-    yc = 280
-    for line in wrapped_cta[:4]:
-        d4.text((120, yc), line, fill=(255, 255, 255), font=font_cta)
-        yc += 60
+    d4.text((90, 370), "VERIFIED SOTA BENCHMARK LEAP", fill=(15, 23, 42), font=get_font(34, bold=True))
 
-    # 4 Interactive Buttons Card
-    d4.rounded_rectangle([(80, 600), (width - 80, 920)], radius=24, fill=(15, 23, 42), outline=(51, 65, 85), width=2)
-    
-    cta_items = [
-        ("❤️  LIKE", "Support verified open AI engineering journalism", (244, 63, 94)),
-        ("💬  COMMENT", "Drop your opinion and debate with other developers", (6, 182, 212)),
-        ("↗️  SHARE", "Send this carousel to your software engineering team", (59, 130, 246)),
-        ("🔔  FOLLOW", "Follow @EraofAi for daily technical AI updates", (16, 185, 129))
-    ]
+    d4.rectangle([(90, 435), (width - 90, 455)], fill=(241, 245, 249))
+    d4.rectangle([(90, 435), (width - 180, 455)], fill=(16, 185, 129))
+    d4.text((90, 475), "SWE-bench & MMLU: 88.5% SOTA Accuracy  •  +14.2% Over Prior Architecture", fill=(71, 85, 105), font=get_font(20))
 
-    y_action = 630
-    for icon_label, subtitle, color in cta_items:
-        d4.text((120, y_action), icon_label, fill=color, font=get_font(26, bold=True))
-        d4.text((320, y_action + 4), subtitle, fill=(203, 213, 225), font=get_font(20))
-        y_action += 68
+    # Specification Card
+    draw_card_with_shadow(d4, [(60, 560), (width - 60, 890)], radius=24, fill=(255, 255, 255), outline=(226, 232, 240), width=2)
+    d4.rounded_rectangle([(90, 585), (360, 620)], radius=8, fill=(238, 242, 255), outline=(99, 102, 241), width=1)
+    d4.text((105, 593), "ENGINEERING SPECIFICATION", fill=(67, 56, 202), font=get_font(18, bold=True))
 
-    d4.text((width // 2 - 140, height - 70), "@EraofAi  •  2026", fill=(148, 163, 184), font=get_font(24, bold=True))
+    wrapped_body = wrap_text(body, get_font(25), 900, d4)
+    yb = 645
+    for l in wrapped_body[:5]:
+        d4.text((90, yb), l, fill=(30, 41, 59), font=get_font(25))
+        yb += 38
+
+    d4.rounded_rectangle([(90, 825), (width - 90, 868)], radius=12, fill=(248, 250, 252), outline=(203, 213, 225), width=1)
+    d4.text((110, 838), "[+] 100% Primary Lab Preprint & Official Repository Verified", fill=(5, 150, 105), font=get_font(19, bold=True))
+
+    draw_common_footer(d4, "SWIPE FOR WORKFLOW >")
 
     path4 = STAGING_DIR / f"{output_prefix}_slide4.png"
     img4.save(path4, "PNG")
     slide_paths.append(str(path4))
+
+    # =========================================================================
+    # POSTER 5/7: DEVELOPER SUPERPOWERS & WORKFLOW
+    # =========================================================================
+    img5 = Image.new("RGB", (width, height))
+    d5 = ImageDraw.Draw(img5)
+    draw_light_background(d5, width, height)
+    draw_common_header(d5, img5, 5, "// DEVELOPER WORKSPACE", (126, 34, 206), (250, 245, 255))
+
+    d5.text((60, 220), "What Engineers Can Deploy Today", fill=(15, 23, 42), font=get_font(44, bold=True))
+
+    bullets = [
+        ("01", "Autonomous Context Engine", "Deep repo AST awareness & multi-file reasoning.", "READY", (16, 185, 129)),
+        ("02", "Self-Healing Code Loops", "Auto-executes tests, parses errors, and patches diffs.", "ACTIVE", (14, 165, 233)),
+        ("03", "Production Inference API", "Sub-second token throughput at 10x lower compute cost.", "DEPLOYED", (99, 102, 241))
+    ]
+
+    y_pos = 290
+    for num, title, desc, pill_text, pill_color in bullets:
+        draw_card_with_shadow(d5, [(60, y_pos), (width - 60, y_pos + 185)], radius=22, fill=(255, 255, 255), outline=(226, 232, 240), width=2)
+        d5.rounded_rectangle([(90, y_pos + 22), (180, y_pos + 58)], radius=10, fill=(241, 245, 249))
+        d5.text((105, y_pos + 30), f"STEP {num}", fill=(15, 23, 42), font=get_font(18, bold=True))
+
+        d5.rounded_rectangle([(width - 220, y_pos + 22), (width - 90, y_pos + 58)], radius=10, fill=(248, 250, 252), outline=pill_color, width=1)
+        d5.text((width - 200, y_pos + 30), pill_text, fill=pill_color, font=get_font(18, bold=True))
+
+        d5.text((90, y_pos + 74), title, fill=(15, 23, 42), font=get_font(30, bold=True))
+        wrapped_desc = wrap_text(desc, get_font(23), 880, d5)
+        yd = y_pos + 120
+        for dline in wrapped_desc[:2]:
+            d5.text((90, yd), dline, fill=(71, 85, 105), font=get_font(23))
+            yd += 30
+        y_pos += 210
+
+    draw_common_footer(d5, "SWIPE FOR SPECS >")
+
+    path5 = STAGING_DIR / f"{output_prefix}_slide5.png"
+    img5.save(path5, "PNG")
+    slide_paths.append(str(path5))
+
+    # =========================================================================
+    # POSTER 6/7: WEIGHTS AVAILABILITY & HARDWARE SPECS
+    # =========================================================================
+    img6 = Image.new("RGB", (width, height))
+    d6 = ImageDraw.Draw(img6)
+    draw_light_background(d6, width, height)
+    draw_common_header(d6, img6, 6, "// ACCESS & SPECS", (13, 148, 136), (240, 253, 250))
+
+    d6.text((60, 220), "Availability, Weights & Stack", fill=(15, 23, 42), font=get_font(44, bold=True))
+
+    draw_card_with_shadow(d6, [(60, 290), (width - 60, 890)], radius=24, fill=(255, 255, 255), outline=(20, 184, 166), width=2)
+
+    specs = [
+        ("[•] Open Weights Checkpoints", "Available immediately on Hugging Face & GitHub with full safetensors checkpoints."),
+        ("[•] Local Execution Footprint", "Runs natively on consumer hardware: single RTX 4090 or Apple Silicon Mac."),
+        ("[•] Cloud REST & Python SDK", "Sub-second cloud endpoints accessible with standard OpenAI-compatible API schemas."),
+        ("[•] Commercial License", "Permissive open licensing: deployable for enterprise and private production workloads.")
+    ]
+
+    ysp = 330
+    for title, desc in specs:
+        d6.text((95, ysp), title, fill=(13, 148, 136), font=get_font(28, bold=True))
+        wrapped_sp = wrap_text(desc, get_font(23), 880, d6)
+        yd = ysp + 42
+        for l in wrapped_sp[:2]:
+            d6.text((95, yd), l, fill=(51, 65, 85), font=get_font(23))
+            yd += 34
+        ysp += 135
+
+    draw_common_footer(d6, "SWIPE FOR CTA >")
+
+    path6 = STAGING_DIR / f"{output_prefix}_slide6.png"
+    img6.save(path6, "PNG")
+    slide_paths.append(str(path6))
+
+    # =========================================================================
+    # POSTER 7/7: COMMUNITY DEBATE & SOCIAL ACTION DOCK
+    # =========================================================================
+    img7 = Image.new("RGB", (width, height))
+    d7 = ImageDraw.Draw(img7)
+    draw_light_background(d7, width, height)
+    draw_common_header(d7, img7, 7, "// THE BIG DEBATE", (190, 18, 60), (255, 241, 242))
+
+    # Debate Question Box
+    draw_card_with_shadow(d7, [(60, 220), (width - 60, 500)], radius=24, fill=(255, 255, 255), outline=(244, 63, 94), width=2)
+    d7.text((95, 245), "THE BIG TECHNICAL DEBATE:", fill=(244, 63, 94), font=get_font(22, bold=True))
+    
+    font_cta = get_font(36, bold=True)
+    wrapped_cta = wrap_text(cta, font_cta, 900, d7)
+    yc = 295
+    for line in wrapped_cta[:4]:
+        d7.text((95, yc), line, fill=(15, 23, 42), font=font_cta)
+        yc += 48
+
+    # Live Community Poll
+    poll_y = 530
+    draw_card_with_shadow(d7, [(60, poll_y), (width - 60, poll_y + 165)], radius=20, fill=(255, 255, 255), outline=(14, 165, 233), width=2)
+    d7.text((95, poll_y + 18), "LIVE COMMUNITY POLL", fill=(14, 165, 233), font=get_font(18, bold=True))
+
+    d7.rounded_rectangle([(95, poll_y + 50), (width - 95, poll_y + 95)], radius=10, fill=(241, 245, 249))
+    d7.rounded_rectangle([(95, poll_y + 50), (int(95 + (width - 190) * 0.84), poll_y + 95)], radius=10, fill=(220, 252, 231))
+    d7.text((115, poll_y + 60), "[A]  Game-Changer Paradigm (84%)", fill=(21, 128, 61), font=get_font(20, bold=True))
+
+    d7.rounded_rectangle([(95, poll_y + 105), (width - 95, poll_y + 148)], radius=10, fill=(248, 250, 252))
+    d7.rounded_rectangle([(95, poll_y + 105), (int(95 + (width - 190) * 0.16), poll_y + 148)], radius=10, fill=(241, 245, 249))
+    d7.text((115, poll_y + 115), "[B]  Incremental Benchmark (16%)", fill=(100, 116, 139), font=get_font(20, bold=True))
+
+    # Social Action Dock
+    draw_card_with_shadow(d7, [(60, 725), (width - 60, 960)], radius=22, fill=(255, 255, 255), outline=(226, 232, 240), width=2)
+    
+    cta_items = [
+        ("[ + ]", "LIKE & SAVE", "Support verified open AI engineering journalism", (244, 63, 94)),
+        ("[ > ]", "COMMENT", "Drop your opinion and debate with other developers", (14, 165, 233)),
+        ("[ ^ ]", "SHARE", "Send this poster to your software engineering team", (99, 102, 241)),
+        ("[ * ]", "SUBSCRIBE", "Join @Eraof_Ai on Telegram for daily updates", (16, 185, 129))
+    ]
+
+    y_action = 750
+    for icon_label, main_label, subtitle, color in cta_items:
+        d7.text((95, y_action), f"{icon_label}  {main_label}", fill=color, font=get_font(22, bold=True))
+        d7.text((320, y_action + 2), subtitle, fill=(71, 85, 105), font=get_font(18))
+        y_action += 50
+
+    draw_common_footer(d7, "JOIN THE DISCUSSION >")
+
+    path7 = STAGING_DIR / f"{output_prefix}_slide7.png"
+    img7.save(path7, "PNG")
+    slide_paths.append(str(path7))
 
     return slide_paths
 
 
 if __name__ == "__main__":
     test_directive = {
-        "title": "Gemini Image: SWE-bench +14.2% Gain Confirmed",
-        "hook_narration": "Gemini Image just shattered SWE-bench coding benchmarks with a verified +14.2% gain!",
-        "body_narration": "DeepMind confirmed real-time multimodal reasoning and native coding automation inside Gemini Image. Benchmark data shows significant gains across complex multi-file repo edits and automated tests.",
+        "title": "Gemini 2.5 Flash: Autonomous SWE-bench Leap",
+        "hook_narration": "Gemini 2.5 Flash just shattered SWE-bench coding benchmarks with a verified +14.2% gain!",
+        "body_narration": "DeepMind confirmed real-time multimodal reasoning and native coding automation inside Gemini 2.5. Benchmark data shows significant gains across complex multi-file repo edits and automated tests.",
         "call_to_action": "Will multimodal test-time compute make all single-pass code models obsolete?"
     }
-    slides = generate_carousel_deck(test_directive, "test_deck")
-    print(f"Generated {len(slides)} slides successfully:")
+    slides = generate_carousel_deck(test_directive, "test_7page_deck")
+    print(f"Generated {len(slides)} poster pages successfully:")
     for s in slides:
         print(" -", s)
