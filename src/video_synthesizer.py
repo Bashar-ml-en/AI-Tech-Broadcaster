@@ -84,6 +84,9 @@ def get_circular_logo(size: int = 36) -> Optional[Image.Image]:
     return None
 
 
+ASSETS_DIR = ROOT_DIR / "storage" / "assets"
+
+
 def draw_card_with_shadow(
     draw: ImageDraw.ImageDraw,
     bbox: tuple,
@@ -98,10 +101,38 @@ def draw_card_with_shadow(
         x1, y1 = bbox[1]
     else:
         x0, y0, x1, y1 = bbox
-    # Soft ambient drop shadow
-    draw.rounded_rectangle([(x0 + 2, y0 + 3), (x1 + 2, y1 + 3)], radius=radius, fill=(220, 228, 242))
+    # Ambient shadow tuned for vibrant wallpaper
+    draw.rounded_rectangle([(x0 + 3, y0 + 4), (x1 + 3, y1 + 4)], radius=radius, fill=(30, 20, 60))
     # Card surface
     draw.rounded_rectangle([(x0, y0), (x1, y1)], radius=radius, fill=fill, outline=outline, width=width)
+
+
+def load_vertical_wallpaper(width: int = 544, height: int = 960) -> Image.Image:
+    """Load the Apple-style fluid silk wave vertical wallpaper."""
+    for p in [
+        ASSETS_DIR / "wallpaper_9x16_544.jpg",
+        ASSETS_DIR / "wallpaper_9x16_1080.jpg",
+        ASSETS_DIR / "brand_wallpaper.jpg",
+        STAGING_DIR / "brand_wallpaper.jpg",
+    ]:
+        if p.exists():
+            try:
+                im = Image.open(p).convert("RGB")
+                if im.size != (width, height):
+                    im = im.resize((width, height), Image.Resampling.LANCZOS)
+                return im
+            except Exception:
+                pass
+    # Fallback to light gradient
+    img = Image.new("RGB", (width, height))
+    d = ImageDraw.Draw(img)
+    for y in range(0, height, 4):
+        ratio = y / height
+        r = int(246 * (1 - ratio) + 232 * ratio)
+        g = int(249 * (1 - ratio) + 238 * ratio)
+        b = int(255 * (1 - ratio) + 250 * ratio)
+        d.rectangle([(0, y), (width, y + 4)], fill=(r, g, b))
+    return img
 
 
 async def synthesize_audio(narration_text: str, output_path: Path, voice: str = "en-US-AndrewNeural"):
@@ -169,39 +200,18 @@ def render_motion_video(
     font_small = get_font(12, bold=False)
 
     logo_icon = get_circular_logo(size=34)
+    base_wallpaper = load_vertical_wallpaper(width, height)
 
     for f_idx in range(total_frames):
         t = f_idx / fps
         progress = f_idx / total_frames
 
-        # Create base image in crisp modern light palette
-        img = Image.new("RGB", (width, height))
+        # Create base image from Apple fluid wave wallpaper
+        img = base_wallpaper.copy()
         draw = ImageDraw.Draw(img)
 
         # -------------------------------------------------------------
-        # 1. Radiant Light Gradient Background & Subtle Tech Mesh
-        # -------------------------------------------------------------
-        pulse = math.sin(t * 2.0) * 6
-        r_top = int(max(240, min(255, 246 + pulse * 0.5)))
-        g_top = int(max(242, min(255, 249 + pulse * 0.8)))
-        b_top = int(max(250, min(255, 254 + pulse)))
-
-        for y in range(0, height, 4):
-            ratio = y / height
-            r = int(r_top * (1 - ratio) + 232 * ratio)
-            g = int(g_top * (1 - ratio) + 238 * ratio)
-            b = int(b_top * (1 - ratio) + 250 * ratio)
-            draw.rectangle([(0, y), (width, y + 4)], fill=(r, g, b))
-
-        # Precision High-Tech Blueprint Grid
-        grid_shift = int((t * 8) % 40)
-        for gx in range(0, width, 40):
-            draw.line([(gx, 0), (gx, height)], fill=(226, 234, 246), width=1)
-        for gy in range(grid_shift, height, 40):
-            draw.line([(0, gy), (width, gy)], fill=(226, 234, 246), width=1)
-
-        # -------------------------------------------------------------
-        # 2. Top Header: Brand Identity & Live AI Pulse
+        # 1. Top Header: Brand Identity & Live AI Pulse
         # -------------------------------------------------------------
         draw.rectangle([(0, 0), (width // 2, 6)], fill=(6, 182, 212))
         draw.rectangle([(width // 2, 0), (width, 6)], fill=(99, 102, 241))
@@ -223,7 +233,7 @@ def render_motion_video(
 
         # Right Status Pill
         status_pill = [(width - 185, 26), (width - 30, 58)]
-        draw.rounded_rectangle(status_pill, radius=16, fill=(236, 253, 245), outline=(52, 211, 153), width=1)
+        draw.rounded_rectangle(status_pill, radius=16, fill=(255, 255, 255), outline=(52, 211, 153), width=1)
         pulse_green = int(180 + 70 * math.sin(t * 4))
         draw.ellipse([(width - 173, 38), (width - 163, 48)], fill=(16, pulse_green, 129))
         draw.text((width - 155, 34), "AI CORE ACTIVE", fill=(5, 150, 105), font=font_badge)
@@ -236,7 +246,7 @@ def render_motion_video(
             draw.ellipse([(26 + bar_w, 70), (34 + bar_w, 78)], fill=(99, 102, 241))
 
         # -------------------------------------------------------------
-        # 3. 7-Page Poster Architecture Sequencing
+        # 2. 7-Page Poster Architecture Sequencing
         # -------------------------------------------------------------
         # Chapter 1: 0% - 14%
         # Chapter 2: 14% - 28%
@@ -250,13 +260,14 @@ def render_motion_video(
             # =========================================================
             # POSTER 1/7: THE BREAKTHROUGH ALERT & AGENT TERMINAL
             # =========================================================
-            draw.rounded_rectangle([(30, 95), (280, 128)], radius=16, fill=(238, 242, 255), outline=(99, 102, 241), width=1)
+            draw.rounded_rectangle([(30, 95), (280, 128)], radius=16, fill=(255, 255, 255), outline=(99, 102, 241), width=1)
             draw.text((45, 102), "PAGE 01/07 // THE ALERT", fill=(67, 56, 202), font=font_badge)
 
             lines_hl = wrap_text(headline, font_hl, width - 60, draw)
             y_h = 145
             for l in lines_hl[:3]:
-                draw.text((30, y_h), l, fill=(15, 23, 42), font=font_hl)
+                draw.text((31, y_h + 1), l, fill=(15, 23, 42), font=font_hl)
+                draw.text((30, y_h), l, fill=(255, 255, 255), font=font_hl)
                 y_h += 36
 
             term_y = max(y_h + 20, 275)
@@ -298,10 +309,11 @@ def render_motion_video(
             # =========================================================
             # POSTER 2/7: THE PROBLEM & LEGACY BOTTLENECK
             # =========================================================
-            draw.rounded_rectangle([(30, 95), (300, 128)], radius=16, fill=(254, 242, 242), outline=(239, 68, 68), width=1)
+            draw.rounded_rectangle([(30, 95), (300, 128)], radius=16, fill=(255, 255, 255), outline=(239, 68, 68), width=1)
             draw.text((45, 102), "PAGE 02/07 // THE BOTTLENECK", fill=(185, 28, 28), font=font_badge)
 
-            draw.text((30, 142), "What Was Broken Before Today", fill=(15, 23, 42), font=font_hl)
+            draw.text((31, 143), "What Was Broken Before Today", fill=(15, 23, 42), font=font_hl)
+            draw.text((30, 142), "What Was Broken Before Today", fill=(255, 255, 255), font=font_hl)
 
             # Card: Legacy Limitations
             draw_card_with_shadow(draw, [(30, 195), (width - 30, 435)], radius=18, fill=(255, 255, 255), outline=(252, 165, 165), width=2)
@@ -322,7 +334,7 @@ def render_motion_video(
             # Card: The Solution Unlocked
             draw_card_with_shadow(draw, [(30, 460), (width - 30, 755)], radius=18, fill=(255, 255, 255), outline=(52, 211, 153), width=2)
             draw.rounded_rectangle([(45, 480), (250, 507)], radius=8, fill=(236, 253, 245), outline=(16, 185, 129), width=1)
-            draw.text((55, 485), "[✓] THE NEW AGENTIC PARADIGM", fill=(5, 150, 105), font=font_badge)
+            draw.text((55, 485), "[+] THE NEW AGENTIC PARADIGM", fill=(5, 150, 105), font=font_badge)
 
             solutions = [
                 "• Persistent conversation trees and reversible diffs",
@@ -339,10 +351,11 @@ def render_motion_video(
             # =========================================================
             # POSTER 3/7: ARCHITECTURE LEAP & INNER MECHANISM
             # =========================================================
-            draw.rounded_rectangle([(30, 95), (320, 128)], radius=16, fill=(238, 242, 255), outline=(99, 102, 241), width=1)
+            draw.rounded_rectangle([(30, 95), (320, 128)], radius=16, fill=(255, 255, 255), outline=(99, 102, 241), width=1)
             draw.text((45, 102), "PAGE 03/07 // ARCHITECTURE LEAP", fill=(67, 56, 202), font=font_badge)
 
-            draw.text((30, 142), "How It Works Under The Hood", fill=(15, 23, 42), font=font_hl)
+            draw.text((31, 143), "How It Works Under The Hood", fill=(15, 23, 42), font=font_hl)
+            draw.text((30, 142), "How It Works Under The Hood", fill=(255, 255, 255), font=font_hl)
 
             arch_layers = [
                 ("01", "Test-Time Compute Scaling", "Generates and validates multiple reasoning candidates before emitting diffs.", (99, 102, 241)),
@@ -368,10 +381,11 @@ def render_motion_video(
             # =========================================================
             # POSTER 4/7: BENCHMARK RADAR & SOTA VERIFICATION
             # =========================================================
-            draw.rounded_rectangle([(30, 95), (320, 128)], radius=16, fill=(224, 242, 254), outline=(14, 165, 233), width=1)
+            draw.rounded_rectangle([(30, 95), (320, 128)], radius=16, fill=(255, 255, 255), outline=(14, 165, 233), width=1)
             draw.text((45, 102), "PAGE 04/07 // BENCHMARK RADAR", fill=(2, 132, 199), font=font_badge)
 
-            draw.text((30, 142), "Verified Benchmark Metrics", fill=(15, 23, 42), font=font_hl)
+            draw.text((31, 143), "Verified Benchmark Metrics", fill=(15, 23, 42), font=font_hl)
+            draw.text((30, 142), "Verified Benchmark Metrics", fill=(255, 255, 255), font=font_hl)
 
             # SOTA Gauge Card
             draw_card_with_shadow(draw, [(30, 185), (width - 30, 375)], radius=18, fill=(255, 255, 255), outline=(14, 165, 233), width=2)
@@ -398,16 +412,17 @@ def render_motion_video(
                 yb += 28
 
             draw.rounded_rectangle([(45, 685), (width - 45, 725)], radius=10, fill=(248, 250, 252), outline=(203, 213, 225), width=1)
-            draw.text((55, 696), "[✓] 100% Primary Lab Preprint & Repo Verified", fill=(5, 150, 105), font=font_code)
+            draw.text((55, 696), "[+] 100% Primary Lab Preprint & Repo Verified", fill=(5, 150, 105), font=font_code)
 
         elif progress < 0.71:
             # =========================================================
             # POSTER 5/7: DEVELOPER SUPERPOWERS & WORKFLOW
             # =========================================================
-            draw.rounded_rectangle([(30, 95), (330, 128)], radius=16, fill=(250, 245, 255), outline=(168, 85, 247), width=1)
+            draw.rounded_rectangle([(30, 95), (330, 128)], radius=16, fill=(255, 255, 255), outline=(168, 85, 247), width=1)
             draw.text((45, 102), "PAGE 05/07 // DEVELOPER POWERS", fill=(126, 34, 206), font=font_badge)
 
-            draw.text((30, 142), "What Engineers Can Deploy Today", fill=(15, 23, 42), font=font_hl)
+            draw.text((31, 143), "What Engineers Can Deploy Today", fill=(15, 23, 42), font=font_hl)
+            draw.text((30, 142), "What Engineers Can Deploy Today", fill=(255, 255, 255), font=font_hl)
 
             features = [
                 ("01", "Autonomous Context Engine", "Deep repo AST awareness & multi-file reasoning.", "READY", (16, 185, 129)),
@@ -435,10 +450,11 @@ def render_motion_video(
             # =========================================================
             # POSTER 6/7: MODEL WEIGHTS & CLOUD AVAILABILITY
             # =========================================================
-            draw.rounded_rectangle([(30, 95), (330, 128)], radius=16, fill=(240, 253, 250), outline=(20, 184, 166), width=1)
+            draw.rounded_rectangle([(30, 95), (330, 128)], radius=16, fill=(255, 255, 255), outline=(20, 184, 166), width=1)
             draw.text((45, 102), "PAGE 06/07 // ACCESS & SPECS", fill=(13, 148, 136), font=font_badge)
 
-            draw.text((30, 142), "Availability, Weights & Stack", fill=(15, 23, 42), font=font_hl)
+            draw.text((31, 143), "Availability, Weights & Stack", fill=(15, 23, 42), font=font_hl)
+            draw.text((30, 142), "Availability, Weights & Stack", fill=(255, 255, 255), font=font_hl)
 
             # Specs Card
             draw_card_with_shadow(draw, [(30, 195), (width - 30, 745)], radius=18, fill=(255, 255, 255), outline=(20, 184, 166), width=2)
@@ -464,7 +480,7 @@ def render_motion_video(
             # =========================================================
             # POSTER 7/7: COMMUNITY DEBATE & INTERACTIVE CTA
             # =========================================================
-            draw.rounded_rectangle([(30, 95), (320, 128)], radius=16, fill=(255, 241, 242), outline=(244, 63, 94), width=1)
+            draw.rounded_rectangle([(30, 95), (320, 128)], radius=16, fill=(255, 255, 255), outline=(244, 63, 94), width=1)
             draw.text((45, 102), "PAGE 07/07 // THE BIG DEBATE", fill=(190, 18, 60), font=font_badge)
 
             debate_bbox = [(30, 145), (width - 30, 395)]
@@ -500,7 +516,7 @@ def render_motion_video(
                 ("[ + ]", "LIKE & SAVE REEL", (244, 63, 94)),
                 ("[ > ]", "DROP YOUR COMMENT", (14, 165, 233)),
                 ("[ ^ ]", "SHARE WITH ENGINEERS", (99, 102, 241)),
-                ("[ ★ ]", "SUBSCRIBE TO @ERAOF_AI", (16, 185, 129))
+                ("[ * ]", "SUBSCRIBE TO @ERAOF_AI", (16, 185, 129))
             ]
 
             ya = dock_y + 20
@@ -510,21 +526,16 @@ def render_motion_video(
                 ya += 46
 
         # -------------------------------------------------------------
-        # 4. Clean Minimalist Footer (NO Audio Wave Bars)
+        # 3. Clean Minimalist Frosted Footer (NO Audio Wave Bars)
         # -------------------------------------------------------------
-        footer_y = height - 52
-        draw.line([(30, footer_y - 12), (width - 30, footer_y - 12)], fill=(226, 232, 240), width=1)
+        footer_box = [(20, height - 52), (width - 20, height - 16)]
+        draw.rounded_rectangle([(footer_box[0][0] + 2, footer_box[0][1] + 3), (footer_box[1][0] + 2, footer_box[1][1] + 3)], radius=12, fill=(30, 20, 60))
+        draw.rounded_rectangle(footer_box, radius=12, fill=(255, 255, 255), outline=(226, 232, 240), width=1)
 
-        # Brand Tag Left
-        draw.rounded_rectangle([(30, footer_y - 4), (160, footer_y + 24)], radius=8, fill=(241, 245, 249))
-        draw.text((42, footer_y), "ERA OF AI", fill=(15, 23, 42), font=font_badge)
-
-        # Channel Handle Center
-        draw.text((175, footer_y + 2), "@Eraof_Ai  •  t.me/Eraof_Ai", fill=(100, 116, 139), font=font_badge)
-
-        # Page Tracker Right
+        draw.text((32, height - 42), "ERA OF AI", fill=(15, 23, 42), font=font_brand_sub)
+        draw.text((115, height - 42), "@Eraof_Ai  •  t.me/Eraof_Ai", fill=(71, 85, 105), font=font_small)
         curr_page = min(7, int(progress * 7) + 1)
-        draw.text((width - 95, footer_y), f"0{curr_page} / 07", fill=(14, 165, 233), font=font_cta)
+        draw.text((width - 82, height - 43), f"0{curr_page} / 07", fill=(2, 132, 199), font=font_badge)
 
         # Send frame to FFmpeg writer
         writer.send(np.array(img))

@@ -22,6 +22,9 @@ STAGING_DIR = ROOT_DIR / "storage" / "staging"
 STAGING_DIR.mkdir(parents=True, exist_ok=True)
 
 
+ASSETS_DIR = ROOT_DIR / "storage" / "assets"
+
+
 def get_font(size: int, bold: bool = False):
     """Load standard system font with graceful fallback."""
     font_names = [
@@ -71,7 +74,7 @@ def draw_card_with_shadow(
         x1, y1 = bbox[1]
     else:
         x0, y0, x1, y1 = bbox
-    draw.rounded_rectangle([(x0 + 4, y0 + 6), (x1 + 4, y1 + 6)], radius=radius, fill=(218, 226, 240))
+    draw.rounded_rectangle([(x0 + 4, y0 + 6), (x1 + 4, y1 + 6)], radius=radius, fill=(30, 20, 60))
     draw.rounded_rectangle([(x0, y0), (x1, y1)], radius=radius, fill=fill, outline=outline, width=width)
 
 
@@ -89,6 +92,36 @@ def draw_light_background(draw: ImageDraw.ImageDraw, width: int, height: int):
         draw.line([(gx, 0), (gx, height)], fill=(226, 234, 246), width=1)
     for gy in range(0, height, 60):
         draw.line([(0, gy), (width, gy)], fill=(226, 234, 246), width=1)
+
+
+def load_square_wallpaper(width: int = 1080, height: int = 1080) -> Image.Image:
+    """Load the Apple-style fluid silk wave wallpaper, or generate radiant light fallback."""
+    for p in [
+        ASSETS_DIR / "wallpaper_1x1_1080.jpg",
+        ASSETS_DIR / "brand_wallpaper.jpg",
+        STAGING_DIR / "brand_wallpaper.jpg",
+    ]:
+        if p.exists():
+            try:
+                im = Image.open(p).convert("RGB")
+                if im.size != (width, height):
+                    im = im.resize((width, height), Image.Resampling.LANCZOS)
+                return im
+            except Exception:
+                pass
+
+    # Fallback to programmatic gradient
+    img = Image.new("RGB", (width, height))
+    d = ImageDraw.Draw(img)
+    draw_light_background(d, width, height)
+    return img
+
+
+def draw_title(d: ImageDraw.ImageDraw, text: str, y: int = 220, font_size: int = 44):
+    """Draw high-contrast poster section title with soft drop-shadow."""
+    f = get_font(font_size, bold=True)
+    d.text((62, y + 2), text, fill=(15, 23, 42), font=f)
+    d.text((60, y), text, fill=(255, 255, 255), font=f)
 
 
 def wrap_text(text: str, font: ImageFont.ImageFont, max_width: int, draw: ImageDraw.ImageDraw) -> List[str]:
@@ -124,6 +157,7 @@ def generate_carousel_deck(directive: Dict[str, Any], output_prefix: str = "post
 
     slide_paths = []
     logo_icon = get_circular_logo(size=52)
+    base_wallpaper = load_square_wallpaper(width, height)
 
     def draw_common_header(d: ImageDraw.ImageDraw, img: Image.Image, page_num: int, tag_text: str, tag_clr: tuple, tag_bg: tuple):
         # Top dual-accent line
@@ -143,32 +177,34 @@ def generate_carousel_deck(directive: Dict[str, Any], output_prefix: str = "post
         d.text((bx, 92), "TECH INTELLIGENCE", fill=(2, 132, 199), font=get_font(13, bold=True))
 
         # Page Counter Pill
-        d.rounded_rectangle([(width - 240, 58), (width - 60, 112)], radius=16, fill=(241, 245, 249), outline=(226, 232, 240), width=1)
-        d.text((width - 215, 72), f"POSTER 0{page_num} / 07", fill=(71, 85, 105), font=get_font(18, bold=True))
+        d.rounded_rectangle([(width - 240, 58), (width - 60, 112)], radius=16, fill=(255, 255, 255), outline=(226, 232, 240), width=1)
+        d.text((width - 215, 72), f"POSTER 0{page_num} / 07", fill=(15, 23, 42), font=get_font(18, bold=True))
 
         # Category Pill
         d.rounded_rectangle([(60, 150), (420, 198)], radius=14, fill=tag_bg, outline=tag_clr, width=1)
         d.text((80, 162), tag_text, fill=tag_clr, font=get_font(18, bold=True))
 
     def draw_common_footer(d: ImageDraw.ImageDraw, swipe_hint: str):
-        footer_y = height - 60
-        d.line([(60, footer_y - 15), (width - 60, footer_y - 15)], fill=(226, 232, 240), width=1)
-        d.text((60, footer_y), "@Eraof_Ai  •  t.me/Eraof_Ai", fill=(100, 116, 139), font=get_font(20, bold=True))
-        d.text((width - 320, footer_y), swipe_hint, fill=(14, 165, 233), font=get_font(20, bold=True))
+        footer_y = height - 58
+        pill_box = [(50, height - 76), (width - 50, height - 22)]
+        d.rounded_rectangle([(pill_box[0][0] + 3, pill_box[0][1] + 4), (pill_box[1][0] + 3, pill_box[1][1] + 4)], radius=16, fill=(30, 20, 60))
+        d.rounded_rectangle(pill_box, radius=16, fill=(255, 255, 255), outline=(226, 232, 240), width=1)
+        d.text((80, footer_y - 8), "@Eraof_Ai  •  t.me/Eraof_Ai", fill=(15, 23, 42), font=get_font(20, bold=True))
+        d.text((width - 340, footer_y - 8), swipe_hint, fill=(2, 132, 199), font=get_font(20, bold=True))
 
     # =========================================================================
     # POSTER 1/7: THE BREAKTHROUGH ALERT & AGENT TERMINAL
     # =========================================================================
-    img1 = Image.new("RGB", (width, height))
+    img1 = base_wallpaper.copy()
     d1 = ImageDraw.Draw(img1)
-    draw_light_background(d1, width, height)
     draw_common_header(d1, img1, 1, ">> BREAKING AI RELEASE", (67, 56, 202), (238, 242, 255))
 
     font_headline = get_font(44, bold=True)
     wrapped_hl = wrap_text(headline, font_headline, 960, d1)
     y_text = 220
     for line in wrapped_hl[:3]:
-        d1.text((60, y_text), line, fill=(15, 23, 42), font=font_headline)
+        d1.text((62, y_text + 2), line, fill=(15, 23, 42), font=font_headline)
+        d1.text((60, y_text), line, fill=(255, 255, 255), font=font_headline)
         y_text += 58
 
     y_card = max(y_text + 25, 425)
@@ -204,12 +240,10 @@ def generate_carousel_deck(directive: Dict[str, Any], output_prefix: str = "post
     # =========================================================================
     # POSTER 2/7: THE PROBLEM & LEGACY BOTTLENECK
     # =========================================================================
-    img2 = Image.new("RGB", (width, height))
+    img2 = base_wallpaper.copy()
     d2 = ImageDraw.Draw(img2)
-    draw_light_background(d2, width, height)
     draw_common_header(d2, img2, 2, "// THE BOTTLENECK", (185, 28, 28), (254, 242, 242))
-
-    d2.text((60, 220), "What Was Broken Before Today", fill=(15, 23, 42), font=get_font(44, bold=True))
+    draw_title(d2, "What Was Broken Before Today")
 
     # Card 1: Legacy Flaws
     draw_card_with_shadow(d2, [(60, 290), (width - 60, 560)], radius=24, fill=(255, 255, 255), outline=(252, 165, 165), width=2)
@@ -252,12 +286,10 @@ def generate_carousel_deck(directive: Dict[str, Any], output_prefix: str = "post
     # =========================================================================
     # POSTER 3/7: ARCHITECTURE LEAP & INNER MECHANISM
     # =========================================================================
-    img3 = Image.new("RGB", (width, height))
+    img3 = base_wallpaper.copy()
     d3 = ImageDraw.Draw(img3)
-    draw_light_background(d3, width, height)
     draw_common_header(d3, img3, 3, "// ARCHITECTURE LEAP", (67, 56, 202), (238, 242, 255))
-
-    d3.text((60, 220), "How It Works Under The Hood", fill=(15, 23, 42), font=get_font(44, bold=True))
+    draw_title(d3, "How It Works Under The Hood")
 
     arch_layers = [
         ("01", "Test-Time Compute Scaling", "Generates and validates multiple reasoning paths before emitting final code diffs.", (99, 102, 241)),
@@ -288,12 +320,10 @@ def generate_carousel_deck(directive: Dict[str, Any], output_prefix: str = "post
     # =========================================================================
     # POSTER 4/7: BENCHMARK RADAR & SOTA VERIFICATION
     # =========================================================================
-    img4 = Image.new("RGB", (width, height))
+    img4 = base_wallpaper.copy()
     d4 = ImageDraw.Draw(img4)
-    draw_light_background(d4, width, height)
     draw_common_header(d4, img4, 4, "// BENCHMARK RADAR", (2, 132, 199), (224, 242, 254))
-
-    d4.text((60, 220), "Verified Technical Metrics", fill=(15, 23, 42), font=get_font(44, bold=True))
+    draw_title(d4, "Verified Technical Metrics")
 
     # Gauge Card
     draw_card_with_shadow(d4, [(60, 290), (width - 60, 530)], radius=24, fill=(255, 255, 255), outline=(14, 165, 233), width=2)
@@ -329,12 +359,10 @@ def generate_carousel_deck(directive: Dict[str, Any], output_prefix: str = "post
     # =========================================================================
     # POSTER 5/7: DEVELOPER SUPERPOWERS & WORKFLOW
     # =========================================================================
-    img5 = Image.new("RGB", (width, height))
+    img5 = base_wallpaper.copy()
     d5 = ImageDraw.Draw(img5)
-    draw_light_background(d5, width, height)
     draw_common_header(d5, img5, 5, "// DEVELOPER WORKSPACE", (126, 34, 206), (250, 245, 255))
-
-    d5.text((60, 220), "What Engineers Can Deploy Today", fill=(15, 23, 42), font=get_font(44, bold=True))
+    draw_title(d5, "What Engineers Can Deploy Today")
 
     bullets = [
         ("01", "Autonomous Context Engine", "Deep repo AST awareness & multi-file reasoning.", "READY", (16, 185, 129)),
@@ -368,12 +396,10 @@ def generate_carousel_deck(directive: Dict[str, Any], output_prefix: str = "post
     # =========================================================================
     # POSTER 6/7: WEIGHTS AVAILABILITY & HARDWARE SPECS
     # =========================================================================
-    img6 = Image.new("RGB", (width, height))
+    img6 = base_wallpaper.copy()
     d6 = ImageDraw.Draw(img6)
-    draw_light_background(d6, width, height)
     draw_common_header(d6, img6, 6, "// ACCESS & SPECS", (13, 148, 136), (240, 253, 250))
-
-    d6.text((60, 220), "Availability, Weights & Stack", fill=(15, 23, 42), font=get_font(44, bold=True))
+    draw_title(d6, "Availability, Weights & Stack")
 
     draw_card_with_shadow(d6, [(60, 290), (width - 60, 890)], radius=24, fill=(255, 255, 255), outline=(20, 184, 166), width=2)
 
@@ -403,9 +429,8 @@ def generate_carousel_deck(directive: Dict[str, Any], output_prefix: str = "post
     # =========================================================================
     # POSTER 7/7: COMMUNITY DEBATE & SOCIAL ACTION DOCK
     # =========================================================================
-    img7 = Image.new("RGB", (width, height))
+    img7 = base_wallpaper.copy()
     d7 = ImageDraw.Draw(img7)
-    draw_light_background(d7, width, height)
     draw_common_header(d7, img7, 7, "// THE BIG DEBATE", (190, 18, 60), (255, 241, 242))
 
     # Debate Question Box
