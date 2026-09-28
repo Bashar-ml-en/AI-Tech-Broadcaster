@@ -686,7 +686,7 @@ def process_telegram_message(msg: Dict[str, Any]):
             try:
                 from src.pipeline import (
                     tool_web_fetch,
-                    produce_canonical_script,
+                    generate_canonical_script,
                     route_format_briefs,
                     generate_carousel_deck,
                     generate_story_slides,
@@ -711,32 +711,38 @@ def process_telegram_message(msg: Dict[str, Any]):
                     "summary": fetched_text[:500]
                 }
 
-                canonical_script = produce_canonical_script(selected, fetched_text)
-                format_briefs = route_format_briefs(canonical_script, selected)
-                timestamp = int(time.time())
+                # Generate format-differentiated scripts & briefs
+                post_script = generate_canonical_script(selected, fetched_text, format_target="post")
+                story_script = generate_canonical_script(selected, fetched_text, format_target="story")
+                reel_script = generate_canonical_script(selected, fetched_text, format_target="reel")
 
+                post_brief = route_format_briefs(post_script, selected, format_target="post")["post"]
+                story_brief = route_format_briefs(story_script, selected, format_target="story")["story"]
+                reel_brief = route_format_briefs(reel_script, selected, format_target="reel")["reel"]
+
+                timestamp = int(time.time())
                 target_chats = [c for c in [TELEGRAM_CHANNEL_ID, str(chat_id)] if c]
 
-                # 1. Post Carousel
-                post_slides = generate_carousel_deck(format_briefs["post"], f"post_deck_{timestamp}")
+                # 1. Post Carousel (7-Slide Architecture Blueprint)
+                post_slides = generate_carousel_deck(post_brief, f"post_deck_{timestamp}")
                 for tc in target_chats:
-                    send_telegram_post_carousel(tc, post_slides, format_briefs["post"]["platform_captions"]["short_form"])
+                    send_telegram_post_carousel(tc, post_slides, post_brief["platform_captions"]["short_form"])
 
-                # 2. Story Deck
-                story_slides = generate_story_slides(format_briefs["story"], f"story_deck_{timestamp}")
+                # 2. Story Deck (3-Slide Ephemeral with Poll)
+                story_slides = generate_story_slides(story_brief, f"story_deck_{timestamp}")
                 for tc in target_chats:
-                    send_telegram_story_deck(tc, story_slides, format_briefs["story"]["platform_captions"]["short_form"])
+                    send_telegram_story_deck(tc, story_slides, story_brief["platform_captions"]["short_form"])
 
-                # 3. Reel Video
+                # 3. Reel Video (9:16 Vertical Motion Video with Spoken Voiceover)
                 try:
-                    reel_video = asyncio.run(synthesize_broadcast_video(format_briefs["reel"], f"reel_clip_{timestamp}"))
+                    reel_video = asyncio.run(synthesize_broadcast_video(reel_brief, f"reel_clip_{timestamp}"))
                     if reel_video and Path(reel_video).exists():
                         for tc in target_chats:
-                            send_telegram_reel(tc, reel_video, format_briefs["reel"]["platform_captions"]["short_form"])
+                            send_telegram_reel(tc, reel_video, reel_brief["platform_captions"]["short_form"])
                 except Exception as ve:
                     logger.warning("Reel error on URL broadcast: %s", ve)
 
-                reply(f"✅ Published URL broadcast to {TELEGRAM_CHANNEL_ID}:\n\n{canonical_script['title']}")
+                reply(f"✅ Published URL broadcast to {TELEGRAM_CHANNEL_ID}:\n\n📰 Post: {post_script['title']}\n🎬 Reel: {reel_script['title']}")
             except Exception as e:
                 logger.exception("Error broadcasting URL: %s", e)
                 reply(f"⚠️ Error processing URL: {str(e)[:100]}")

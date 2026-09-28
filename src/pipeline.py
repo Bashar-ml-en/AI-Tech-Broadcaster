@@ -498,40 +498,146 @@ Respond ONLY with a JSON object:
     }
 
 
-def generate_canonical_script(candidate: Dict[str, Any], raw_content: str) -> Dict[str, Any]:
+# ---------------------------------------------------------------------------
+# Step 4: AI-News Video Agent Prompt Architecture & Format Affinity Scoring
+# [Step 1: CURATOR] -> [Step 2: SCRIPTWRITER] -> [Step 3: FORMAT ROUTER]
+# ---------------------------------------------------------------------------
+
+def compute_format_affinity_score(candidate: Dict[str, Any], format_type: str) -> float:
+    """
+    Compute format affinity score for a candidate story.
+    - reel: Prioritizes high-velocity leaps, speed/latency improvements, frontier models, demo capabilities.
+    - post: Prioritizes deep architectural breakdowns, systems design, preprints, benchmarks, open weights.
+    - story: Prioritizes controversies, debates, polls, community comparisons, and daily flashes.
+    """
+    scores = candidate.get("curation_scores", {})
+    base = float(scores.get("total", 25))
+    headline = (candidate.get("headline") or "").lower()
+    summary = (candidate.get("summary") or "").lower()
+    text = f"{headline} {summary}"
+
+    bonus = 0.0
+    fmt = format_type.lower().strip()
+    if fmt in ["reel", "reels", "video"]:
+        bonus += scores.get("visual_explainability", 0) * 1.0
+        bonus += scores.get("novelty_recency", 0) * 0.6
+        if any(k in text for k in ["claude", "gemini", "openai", "gpt", "deepseek", "qwen", "groq", "breakthrough", "releases", "launches", "shatters"]):
+            bonus += 5.0
+        if any(k in text for k in ["latency", "speed", "faster", "real-time", "video", "multimodal", "agent", "sub-second"]):
+            bonus += 4.0
+
+    elif fmt in ["post", "posts", "carousel"]:
+        bonus += scores.get("technical_consequence", 0) * 1.0
+        bonus += scores.get("breadth_of_impact", 0) * 0.6
+        if any(k in text for k in ["architecture", "weights", "open-source", "arxiv", "paper", "pre-training", "attention", "quantization", "vllm", "framework"]):
+            bonus += 5.0
+        if any(k in text for k in ["benchmark", "swe-bench", "eval", "throughput", "vram", "hardware", "serving", "parameter"]):
+            bonus += 4.0
+
+    elif fmt in ["story", "stories"]:
+        if any(k in text for k in ["vs", "compare", "leaderboard", "debate", "controversy", "poll", "which", "frontier"]):
+            bonus += 6.0
+        bonus += scores.get("breadth_of_impact", 0) * 0.8
+
+    return base + bonus
+
+
+def generate_canonical_script(candidate: Dict[str, Any], raw_content: str, format_target: str = "general") -> Dict[str, Any]:
     """
     Agent Step 2: SCRIPTWRITER
-    Produces ONE canonical script object conforming strictly to Master Orchestrator rules:
-    - Strictly under 90 words total across all 5 beats combined.
-    - Sound-off hook: first beat visual/text readable in 1.5 seconds.
-    - No throat clearing: start on the noun or verb (never say 'Today' or 'In this video').
-    - Explain the mechanism, not just the marketing claim.
-    - End on the reveal / implication question.
+    Produces format-specialized script object conforming strictly to Master Orchestrator rules:
+    - Post: Deep architectural mechanics, system bottlenecks, memory/compute efficiency, blueprint for 7-slide carousel.
+    - Reels: High-velocity spoken video script, 1.5s sound-off hook, fast pacing for 9:16 vertical motion video.
+    - Story: Ephemeral 24H flash signal with interactive community poll.
     """
     headline = candidate.get("headline", "")
     url = candidate.get("url", "")
-    
-    prompt = f"""You are the Master Scriptwriter for AI Tech Broadcaster.
-Based on the AI update below, write ONE canonical script object following these STRICT rules:
-1. STRICTLY under 90 words total across all 5 fields combined.
-2. Sound-off hook: The first beat MUST be visual/text readable in 1.5 seconds.
-3. No throat clearing: Start directly on the noun or verb (never say 'Today', 'In this video', or 'Hey guys').
-4. Explain the mechanism, not just the marketing claim.
-5. End on the reveal, not a sign-off.
+    fmt = format_target.lower().strip()
 
+    if fmt in ["post", "posts", "carousel"]:
+        prompt = f"""You are the Principal AI Architect and Lead Infographic Writer for AI Tech Broadcaster.
+Write an authoritative ARCHITECTURAL POST BRIEF for a 7-slide technical carousel deck based on this AI update:
 HEADLINE: {headline}
 URL: {url}
 CONTENT:
 {raw_content[:4000]}
 
+STRICT RULES:
+1. Under 110 words total across all 6 fields.
+2. Tone: Senior Staff AI Architect writing for engineering teams and ML researchers.
+3. Focus deeply on internal architectural mechanics, system bottlenecks solved, memory/compute efficiency, and deployment specs.
+4. Title: Authoritative engineering title (e.g., "[Architecture] DeepSeek-R1 Latent Attention Mechanics" or "Technical Breakdown: Claude 3.7 Reasoning Graph").
+5. Core Hook: The scaling or memory bottleneck in previous systems that this breakthrough solves.
+6. Technical Mechanism: Concrete explanation of internal mechanics (e.g. KV cache, MoE routing, tensor parallelism, FP8 quantization).
+7. Engineering Implication: Serving footprint, VRAM requirements, or framework deployment.
+8. Benchmark: Concrete measured numbers or baseline deltas.
+9. Forward Question: An architectural tradeoff question driving comments from software engineers.
+
 Respond with ONLY a valid JSON object matching this schema:
 {{
-  "title": "5-8 word punchy technical headline",
-  "core_hook": "1-2 sentence high-contrast sound-off hook readable in 1.5s.",
-  "technical_mechanism": "Exact architectural leap or system mechanism (1-2 sentences).",
-  "engineering_implication": "What this unlocks for developers and engineering teams today.",
-  "benchmark_or_proof": "Verified metric, benchmark delta, or test result.",
-  "forward_question": "Polarizing open loop question driving comment debate."
+  "title": "Authoritative engineering title (5-8 words)",
+  "core_hook": "Architectural problem and thesis statement (1-2 sentences)",
+  "technical_mechanism": "Internal mechanism and algorithmic leap (1-2 sentences)",
+  "engineering_implication": "Serving footprint, VRAM requirements, and framework integration",
+  "benchmark_or_proof": "Measured benchmark delta or hardware throughput numbers",
+  "forward_question": "Architectural tradeoff question driving technical comments"
+}}
+"""
+    elif fmt in ["story", "stories"]:
+        prompt = f"""You are the Community Story Editor for AI Tech Broadcaster.
+Write a 3-SLIDE EPHEMERAL STORY BRIEF with an interactive poll based on this AI update:
+HEADLINE: {headline}
+URL: {url}
+CONTENT:
+{raw_content[:4000]}
+
+STRICT RULES:
+1. Under 70 words total.
+2. Formatted for fast 24-hour flash news and mobile tap engagement.
+3. Title: Flash headline (e.g., "⚡ 24H AI Flash: [Topic]").
+4. Core Hook: Breaking signal sentence.
+5. Technical Mechanism: Single sentence takeaway on the mechanism.
+6. Engineering Implication: Immediate developer impact.
+7. Benchmark: Key metric or speedup.
+8. Forward Question: An interactive A/B poll question (e.g. "Will you test this today? [A] Yes [B] No").
+
+Respond with ONLY a valid JSON object matching this schema:
+{{
+  "title": "Flash update headline (5-8 words)",
+  "core_hook": "Urgent 24-hour flash signal statement",
+  "technical_mechanism": "Single sentence takeaway on the mechanism",
+  "engineering_implication": "Immediate developer impact",
+  "benchmark_or_proof": "Key metric or speedup",
+  "forward_question": "Interactive A/B poll question"
+}}
+"""
+    else:  # reel / video / general
+        prompt = f"""You are the Lead Video Broadcaster for AI Tech Broadcaster.
+Write a HIGH-VELOCITY VIDEO REEL SCRIPT for a 30-second 9:16 vertical motion video based on this AI update:
+HEADLINE: {headline}
+URL: {url}
+CONTENT:
+{raw_content[:4000]}
+
+STRICT RULES:
+1. STRICTLY under 85 words total across all 6 fields.
+2. Written for the ear: spoken-word pacing, urgent rhythm, zero throat-clearing (never say 'Today' or 'In this video').
+3. Sound-off hook: The first beat MUST be visual/text readable in 1.5 seconds.
+4. Title: High-energy, viral headline (e.g., "[Topic] Just Broke Every AI Benchmark").
+5. Core Hook: 1.5s visual hook that immediately stops the scroll.
+6. Technical Mechanism: Spoken explanation of why this leap matters in plain, powerful developer terms.
+7. Engineering Implication: What developers can build or automate with this today.
+8. Benchmark: Shocking stat or speedup number.
+9. Forward Question: Polarizing question for short-form comment debates.
+
+Respond with ONLY a valid JSON object matching this schema:
+{{
+  "title": "High-impact video headline (5-8 words)",
+  "core_hook": "Explosive 1.5s visual hook readable without sound",
+  "technical_mechanism": "Spoken-word punchy explanation of the breakthrough",
+  "engineering_implication": "What this immediately changes for software developers today",
+  "benchmark_or_proof": "Shocking benchmark stat or speedup metric",
+  "forward_question": "Polarizing short-form comment debate question"
 }}
 """
     if GEMINI_API_KEY and "YOUR_GEMINI" not in GEMINI_API_KEY:
@@ -551,23 +657,45 @@ Respond with ONLY a valid JSON object matching this schema:
             logger.warning("Gemini Scriptwriter call exception: %s. Using constitutional fallback.", e)
 
     clean_title = " ".join(headline.split()[:7])
-    return {
-        "title": clean_title,
-        "core_hook": f"{clean_title} just shattered frontier benchmarks with verified architectural gains.",
-        "technical_mechanism": "Native test-time compute scaling combined with sparse MoE execution delivers sub-second latency.",
-        "engineering_implication": "Developers can now run autonomous multi-turn reasoning loops with persistent context trees.",
-        "benchmark_or_proof": "SWE-bench Verified shows a verified +14.2% leap over legacy baselines.",
-        "forward_question": "Will autonomous test-time compute make all standard prompt engineering obsolete?"
-    }
+    if fmt in ["post", "posts", "carousel"]:
+        return {
+            "title": f"Architecture Deep Dive: {clean_title}",
+            "core_hook": f"{clean_title} solves a critical system bottleneck with verified architectural gains.",
+            "technical_mechanism": "Dynamic KV-cache compression combined with sparse mixture-of-experts routing reduces memory bandwidth pressure.",
+            "engineering_implication": "Enables low-latency serving on single-node GPU clusters with deterministic latency boundaries.",
+            "benchmark_or_proof": "Measured inference latency drops 42% while retaining 99.4% precision on standard evals.",
+            "forward_question": "Will sparse MoE architectures replace dense model deployments in enterprise production?"
+        }
+    elif fmt in ["story", "stories"]:
+        return {
+            "title": f"⚡ 24H Signal: {clean_title}",
+            "core_hook": f"Breaking AI update: {clean_title} is officially live for developers.",
+            "technical_mechanism": "Frontier capability leap confirmed across standard evals.",
+            "engineering_implication": "Immediate API and open checkpoint access available.",
+            "benchmark_or_proof": "State-of-the-art benchmark verified.",
+            "forward_question": "Community Poll: Are you testing this today? [A] Yes [B] Waiting for evals"
+        }
+    else:
+        return {
+            "title": f"{clean_title} Shuts Down Legacy Benchmarks",
+            "core_hook": f"Stop writing single-pass prompts. {clean_title} just changed the game.",
+            "technical_mechanism": "Native test-time compute lets the model reason through complex bugs in real time.",
+            "engineering_implication": "Developers can now run autonomous coding loops that verify their own code before execution.",
+            "benchmark_or_proof": "Official SWE-bench verified data shows a massive double-digit leap over previous frontier models.",
+            "forward_question": "Are you testing this in your workflow today, or waiting for open weights?"
+        }
 
 
-def route_format_briefs(canonical: Dict[str, Any], candidate: Dict[str, Any]) -> Dict[str, Any]:
+produce_canonical_script = generate_canonical_script
+
+
+def route_format_briefs(canonical: Dict[str, Any], candidate: Dict[str, Any], format_target: str = "all") -> Dict[str, Any]:
     """
     Agent Step 3: FORMAT ROUTER
-    Expands canonical script into 3 production briefs:
-    - Post: 4:5 / 1:1 format, 7-poster carousel deck
-    - Reels: 9:16 vertical motion video, sound-off hook, rapid visual beats, neural voiceover
-    - Story: 3-slide 9:16 vertical ephemeral sequence with safe margins (~250px) & poll zone
+    Produces format-tailored production briefs with distinct captions, angles, and hashtags:
+    - Post: 7-poster carousel deck with technical blueprint captions and engineering specs
+    - Reels: 9:16 vertical motion video with spoken voiceover pacing and viral tags
+    - Story: 3-slide 9:16 ephemeral sequence with community poll tags
     """
     title = canonical.get("title") or candidate.get("headline", "AI Architecture Leap")
     hook = canonical.get("core_hook", "")
@@ -587,8 +715,19 @@ def route_format_briefs(canonical: Dict[str, Any], candidate: Dict[str, Any]) ->
         "body_narration": body_combined,
         "call_to_action": question,
         "platform_captions": {
-            "short_form": f"**POST** // {title}\n\n{hook}\n\n[•] Architecture: {mechanism}\n[+] Engineering: {implication}\n[*] Verified Benchmark: {proof}\n\n💬 Debate: {question}\n\nJoin @Eraof_Ai on Telegram for daily open AI engineering journalism.\n\n#AI #Engineering #TechNews #MachineLearning #DevCommunity",
-            "microblog": f"{title}: {hook} Verified benchmark: {proof}. Source: {url}"
+            "short_form": (
+                f"📰 **POST // ARCHITECTURE BRIEFING**\n\n"
+                f"**{title}**\n\n"
+                f"💡 {hook}\n\n"
+                f"[•] **Architecture Leap:**\n{mechanism}\n\n"
+                f"[+] **Systems & Engineering:**\n{implication}\n\n"
+                f"[*] **Verified SOTA Metric:**\n{proof}\n\n"
+                f"💬 **Engineering Debate:**\n{question}\n\n"
+                f"🔗 Source: {url}\n"
+                f"Join @Eraof_Ai on Telegram for daily deep AI engineering breakdowns.\n\n"
+                f"#AIArchitecture #DeepLearning #SystemDesign #SoftwareEngineering #MachineLearning #EraOfAI"
+            ),
+            "microblog": f"{title}: {hook} SOTA: {proof}. Source: {url}"
         }
     }
     
@@ -597,11 +736,20 @@ def route_format_briefs(canonical: Dict[str, Any], candidate: Dict[str, Any]) ->
         "title": title,
         "source_url": url,
         "hook_narration": hook,
-        "body_narration": body_combined,
+        "body_narration": f"{mechanism} {implication} In verified benchmark evaluations: {proof}.",
         "call_to_action": question,
         "platform_captions": {
-            "short_form": f"**REELS** // {title}\n\n{hook}\n\n[•] Verified SWE-bench performance numbers & weights are live.\n\n💬 {question}\n\n#AI #Reels #TechReels #Coding #Developers #EraOfAI",
-            "microblog": f"Watch the breakdown of {title} in 30 seconds. Source: {url}"
+            "short_form": (
+                f"🎬 **REELS // BREAKING AI INTEL**\n\n"
+                f"**{title}**\n\n"
+                f"⚡ {hook}\n\n"
+                f"🔥 {mechanism}\n"
+                f"🚀 SWE-bench & SOTA numbers: {proof}\n\n"
+                f"💬 {question}\n\n"
+                f"Follow @Eraof_Ai for 30-second AI developer breakthroughs daily!\n\n"
+                f"#AI #Reels #TechReels #Coding #AItools #Developers #EraOfAI #Shorts"
+            ),
+            "microblog": f"Watch 30s breakdown: {title}. Source: {url}"
         }
     }
     
@@ -610,11 +758,19 @@ def route_format_briefs(canonical: Dict[str, Any], candidate: Dict[str, Any]) ->
         "title": title,
         "source_url": url,
         "hook_narration": hook,
-        "body_narration": body_combined,
+        "body_narration": f"{mechanism} {implication}",
         "call_to_action": question,
         "platform_captions": {
-            "short_form": f"**STORY** // {title}\n\n⚡ 24H AI TECH SIGNAL\n\n{hook}\n\nTap sticker to vote in the community poll or reply with your take.\n\n#AIStory #TechNews #EraOfAI",
-            "microblog": f"24H Story: {title}. Tap to view technical breakdown."
+            "short_form": (
+                f"⚡ **24H AI STORY // FLASH SIGNAL**\n\n"
+                f"**{title}**\n\n"
+                f"{hook}\n\n"
+                f"📊 {mechanism}\n\n"
+                f"Tap sticker to vote in the community poll or reply with your take!\n"
+                f"@Eraof_Ai\n\n"
+                f"#AIStory #TechNews #CommunityPoll #EraOfAI"
+            ),
+            "microblog": f"24H Story: {title}. Tap to vote."
         }
     }
     
@@ -629,15 +785,11 @@ def generate_director_directive(qualified: Dict[str, Any], target_format: Option
     """Produce Director Output matching target format brief."""
     candidate = qualified["candidate"]
     raw_content = qualified.get("raw_content", "")
-    canonical = generate_canonical_script(candidate, raw_content)
-    briefs = route_format_briefs(canonical, candidate)
     tf = (target_format or "reel").lower().strip()
-    if tf in ["post", "posts", "text_image", "carousel"]:
-        res = briefs["post"]
-    elif tf in ["story", "stories"]:
-        res = briefs["story"]
-    else:
-        res = briefs["reel"]
+    fmt_target = "post" if tf in ["post", "posts", "text_image", "carousel"] else ("story" if tf in ["story", "stories"] else "reel")
+    canonical = generate_canonical_script(candidate, raw_content, format_target=fmt_target)
+    briefs = route_format_briefs(canonical, candidate, format_target=fmt_target)
+    res = briefs[fmt_target]
     res["visual_prompt"] = "9:16 vertical modern high-contrast luminous tech canvas"
     return res
 
@@ -649,7 +801,7 @@ def generate_director_directive(qualified: Dict[str, Any], target_format: Option
 def stage_rendered_asset(directive: Dict[str, Any]) -> str:
     """
     Render output media (real 9:16 vertical MP4 video with neural voiceover,
-    or 4-slide sequential carousel deck with interactive CTA).
+    7-page poster carousel deck, or 3-slide ephemeral story deck).
     """
     fmt = directive.get("format", "post")
     timestamp = int(time.time())
@@ -668,11 +820,16 @@ def stage_rendered_asset(directive: Dict[str, Any]) -> str:
             slides = generate_carousel_deck(directive, f"output_reel_{timestamp}")
             file_path = Path(slides[0])
             filename = file_path.name
+    elif fmt == "story":
+        from src.carousel_generator import generate_story_slides
+        logger.info("Generating 3-Slide Ephemeral Story Deck for Story: %s", directive.get("title"))
+        slides = generate_story_slides(directive, f"output_story_{timestamp}")
+        file_path = Path(slides[0])
+        filename = file_path.name
     else:
         from src.carousel_generator import generate_carousel_deck
-        prefix = f"output_story_{timestamp}" if fmt == "story" else f"output_carousel_{timestamp}"
-        logger.info("Generating 4-Slide Sequential Carousel Deck for %s: %s", fmt, directive.get("title"))
-        slides = generate_carousel_deck(directive, prefix)
+        logger.info("Generating 7-Page Poster Carousel Deck for Post: %s", directive.get("title"))
+        slides = generate_carousel_deck(directive, f"output_carousel_{timestamp}")
         file_path = Path(slides[0])
         filename = file_path.name
 
@@ -681,26 +838,70 @@ def stage_rendered_asset(directive: Dict[str, Any]) -> str:
     return upload_res["media_url"]
 
 
+def _record_post_in_db(
+    source_url: str,
+    headline: str,
+    format_type: str,
+    media_url: str,
+    hook: str,
+    body: str,
+    cta: str,
+    captions: Dict[str, Any],
+    payload: Dict[str, Any]
+) -> Optional[int]:
+    """Helper to insert published broadcast into SQLite DB."""
+    try:
+        write_res = tool_sqlite_write_query(
+            """INSERT INTO posts (
+                source_url, headline, format_type, media_url, approval_status,
+                hook_narration, body_narration, call_to_action, visual_prompt,
+                captions_json, post_payload
+            ) VALUES (
+                :source_url, :headline, :format_type, :media_url, 'published',
+                :hook, :body, :cta, :visual, :captions, :payload
+            )""",
+            {
+                "source_url": source_url,
+                "headline": headline,
+                "format_type": format_type,
+                "media_url": media_url,
+                "hook": hook,
+                "body": body,
+                "cta": cta,
+                "visual": f"Autonomous {format_type} broadcast asset",
+                "captions": json.dumps(captions),
+                "payload": json.dumps(payload)
+            }
+        )
+        return write_res.get("last_row_id")
+    except Exception as db_err:
+        logger.warning("Database insert failed for %s (%s): %s", headline, format_type, db_err)
+        return None
+
+
 # ---------------------------------------------------------------------------
 # Step 6: Full Broadcast Lifecycle Execution
 # ---------------------------------------------------------------------------
 
 def execute_broadcast_cycle(target_format: Optional[str] = None) -> Optional[Dict[str, Any]]:
     """
-    Run full 5-stage broadcast cycle conforming strictly to prompt architecture:
+    Run 5-stage broadcast cycle conforming strictly to prompt architecture:
     [MCP/Harvest] -> [1. CURATOR] -> [2. SCRIPTWRITER] -> [3. FORMAT ROUTER] -> [4. MEDIA GEN] -> [5. TELEGRAM DELIVERY]
-    Delivers all 3 variants (**POST**, **REELS**, **STORY**) tagged separately to Telegram.
+    
+    Differentiates Post vs Reels vs Story:
+    - If target_format == 'post': Curates top architectural candidate, generates 7-page carousel deck, streams Post only.
+    - If target_format == 'reel': Curates top high-velocity candidate, synthesizes 9:16 vertical video, streams Reel only.
+    - If target_format == 'story': Curates top poll/debate candidate, generates 3-slide story deck, streams Story only.
+    - If target_format is None (full cycle): Selects DISTINCT candidates for Reel, Post, and Story so they never repeat!
     """
-    logger.info("=== STARTING 5-STAGE AUTONOMOUS BROADCAST CYCLE ===")
+    logger.info("=== STARTING 5-STAGE AUTONOMOUS BROADCAST CYCLE (target_format=%s) ===", target_format)
     candidates = harvest_candidate_stories()
 
     if not candidates:
         logger.info("No candidates harvested in this cycle. Skipping broadcast.")
         return None
 
-    # -------------------------------------------------------------------------
-    # Stage 1: CURATOR Scoring & Selection (Threshold >= 25/40)
-    # -------------------------------------------------------------------------
+    # Stage 1: Curator Scoring & Deduplication Check
     curated_candidates = []
     for cand in candidates:
         if is_already_covered(cand["url"], cand["headline"]):
@@ -720,141 +921,274 @@ def execute_broadcast_cycle(target_format: Optional[str] = None) -> Optional[Dic
         logger.info("Deterministic Deduplication: All harvested items have already been covered in history or scored below quality threshold. Skipping broadcast to strictly enforce 1-time-only publishing.")
         return None
 
-    # Select the highest-scoring candidate
-    selected_story = max(curated_candidates, key=lambda c: c.get("curation_scores", {}).get("total", 0))
-    if is_already_covered(selected_story["url"], selected_story["headline"]):
-        logger.warning("Safety Intercept: Selected story '%s' already exists in history. Aborting to guarantee 1-time-only publishing.", selected_story["headline"])
-        return None
-    logger.info("Selected Top Story (Score %s/40): %s", selected_story.get("curation_scores", {}).get("total"), selected_story["headline"])
-
-    # Fetch full text content
-    raw_content = selected_story.get("summary", "")
-    try:
-        fetch_res = tool_web_fetch(selected_story["url"])
-        fetched_text = fetch_res.get("content", "")
-        if len(fetched_text) >= 200:
-            raw_content = fetched_text[:12000]
-    except Exception as e:
-        logger.warning("Web fetch failed for %s: %s. Using summary.", selected_story["url"], e)
-
-    # -------------------------------------------------------------------------
-    # Stage 2: SCRIPTWRITER (Canonical Script Object, 5 beats, <90 words)
-    # -------------------------------------------------------------------------
-    canonical_script = generate_canonical_script(selected_story, raw_content)
-    logger.info("Canonical Script Produced: '%s'", canonical_script.get("title"))
-
-    # -------------------------------------------------------------------------
-    # Stage 3: FORMAT ROUTER (Post 4:5/1:1, Reels 9:16, Story 3-slide 9:16)
-    # -------------------------------------------------------------------------
-    format_briefs = route_format_briefs(canonical_script, selected_story)
-    timestamp = int(time.time())
-
-    # -------------------------------------------------------------------------
-    # Stage 4 & 5: ANTIGRAVITY MEDIA GENERATION & IMMEDIATE STREAMING DELIVERY
-    # -------------------------------------------------------------------------
     target_chats = []
     if TELEGRAM_CHANNEL_ID:
         target_chats.append(TELEGRAM_CHANNEL_ID)
     if TELEGRAM_CHAT_ID and TELEGRAM_CHAT_ID not in target_chats:
         target_chats.append(TELEGRAM_CHAT_ID)
 
-    tg_dispatch = {}
+    tf = (target_format or "").lower().strip()
+    timestamp = int(time.time())
 
-    # 1. POST: 7-Page Poster Carousel Deck
-    logger.info("Generating 7-Page Poster Carousel Deck for **POST**...")
-    post_slides = generate_carousel_deck(format_briefs["post"], f"post_deck_{timestamp}")
-    # Stream POST immediately to Telegram Channel
-    logger.info("Streaming **POST** immediately to Telegram channel...")
-    for chat in target_chats:
-        res_p = send_telegram_post_carousel(chat, post_slides, format_briefs["post"]["platform_captions"]["short_form"])
-        tg_dispatch.setdefault(chat, {})["post"] = res_p
+    def fetch_story_content(cand: Dict[str, Any]) -> str:
+        raw = cand.get("summary", "")
+        try:
+            fetch_res = tool_web_fetch(cand["url"])
+            fetched_text = fetch_res.get("content", "")
+            if len(fetched_text) >= 200:
+                raw = fetched_text[:12000]
+        except Exception as e:
+            logger.warning("Web fetch failed for %s: %s. Using summary.", cand["url"], e)
+        return raw
 
-    # 2. STORY: 3-Slide Vertical Ephemeral Deck with Safe Margins & Poll Zone
-    logger.info("Generating 3-Slide Ephemeral Story Deck for **STORY**...")
-    story_slides = generate_story_slides(format_briefs["story"], f"story_deck_{timestamp}")
-    # Stream STORY immediately to Telegram Channel
-    logger.info("Streaming **STORY** immediately to Telegram channel...")
-    for chat in target_chats:
-        res_s = send_telegram_story_deck(chat, story_slides, format_briefs["story"]["platform_captions"]["short_form"])
-        tg_dispatch.setdefault(chat, {})["story"] = res_s
+    # -------------------------------------------------------------------------
+    # BRANCH 1: Target format is explicitly "post"
+    # -------------------------------------------------------------------------
+    if tf in ["post", "posts", "carousel"]:
+        selected = max(curated_candidates, key=lambda c: compute_format_affinity_score(c, "post"))
+        if is_already_covered(selected["url"], selected["headline"]):
+            logger.warning("Safety Intercept: Story already covered: %s", selected["headline"])
+            return None
 
-    # 3. REELS: 9:16 Vertical Motion Video with Neural Voiceover
-    logger.info("Synthesizing 9:16 Vertical Motion Video for **REELS**...")
-    reel_video_path = ""
-    try:
-        reel_video_path = asyncio.run(synthesize_broadcast_video(format_briefs["reel"], f"reel_clip_{timestamp}"))
+        logger.info("Selected Top Story for POST (Score %s): %s", compute_format_affinity_score(selected, "post"), selected["headline"])
+        content = fetch_story_content(selected)
+        post_script = generate_canonical_script(selected, content, format_target="post")
+        briefs = route_format_briefs(post_script, selected, format_target="post")
+        post_brief = briefs["post"]
+
+        logger.info("Generating 7-Page Poster Carousel Deck for **POST**...")
+        post_slides = generate_carousel_deck(post_brief, f"post_deck_{timestamp}")
+
+        logger.info("Streaming **POST** immediately to Telegram channel...")
+        tg_res = {}
+        for chat in target_chats:
+            res_p = send_telegram_post_carousel(chat, post_slides, post_brief["platform_captions"]["short_form"])
+            tg_res[chat] = res_p
+
+        media_url = tool_upload_media_to_r2(post_slides[0], f"renders/{Path(post_slides[0]).name}")["media_url"]
+        post_id = _record_post_in_db(
+            source_url=selected["url"],
+            headline=post_script["title"],
+            format_type="post",
+            media_url=media_url,
+            hook=post_script["core_hook"],
+            body=f"{post_script['technical_mechanism']} {post_script['engineering_implication']}",
+            cta=post_script["forward_question"],
+            captions=post_brief["platform_captions"],
+            payload={
+                "curation": selected.get("curation_scores", {}),
+                "script": post_script,
+                "brief": post_brief,
+                "media_slides": post_slides,
+                "telegram_dispatch": tg_res
+            }
+        )
+        return {"status": "success", "format": "post", "post_id": post_id, "selected_story": selected["headline"], "media": post_slides}
+
+    # -------------------------------------------------------------------------
+    # BRANCH 2: Target format is explicitly "reel"
+    # -------------------------------------------------------------------------
+    elif tf in ["reel", "reels", "video"]:
+        selected = max(curated_candidates, key=lambda c: compute_format_affinity_score(c, "reel"))
+        if is_already_covered(selected["url"], selected["headline"]):
+            logger.warning("Safety Intercept: Story already covered: %s", selected["headline"])
+            return None
+
+        logger.info("Selected Top Story for REEL (Score %s): %s", compute_format_affinity_score(selected, "reel"), selected["headline"])
+        content = fetch_story_content(selected)
+        reel_script = generate_canonical_script(selected, content, format_target="reel")
+        briefs = route_format_briefs(reel_script, selected, format_target="reel")
+        reel_brief = briefs["reel"]
+
+        logger.info("Synthesizing 9:16 Vertical Motion Video for **REELS**...")
+        reel_video_path = ""
+        try:
+            reel_video_path = asyncio.run(synthesize_broadcast_video(reel_brief, f"reel_clip_{timestamp}"))
+        except Exception as vid_err:
+            logger.warning("Reel synthesis exception: %s", vid_err)
+
+        tg_res = {}
         if reel_video_path and Path(reel_video_path).exists():
             logger.info("Streaming **REELS** video immediately to Telegram channel...")
             for chat in target_chats:
-                res_r = send_telegram_reel(chat, reel_video_path, format_briefs["reel"]["platform_captions"]["short_form"])
-                tg_dispatch.setdefault(chat, {})["reel"] = res_r
-    except Exception as vid_err:
-        logger.warning("Reel synthesis exception: %s", vid_err)
+                res_r = send_telegram_reel(chat, reel_video_path, reel_brief["platform_captions"]["short_form"])
+                tg_res[chat] = res_r
 
-    # Stage primary asset for database record & cloud CDN
-    primary_media_path = reel_video_path if (reel_video_path and Path(reel_video_path).exists()) else post_slides[0]
-    media_url = tool_upload_media_to_r2(primary_media_path, f"renders/{Path(primary_media_path).name}")["media_url"]
-
-    # Record in SQLite Database
-    post_id = None
-    try:
-        write_res = tool_sqlite_write_query(
-            """INSERT INTO posts (
-                source_url, headline, format_type, media_url, approval_status,
-                hook_narration, body_narration, call_to_action, visual_prompt,
-                captions_json, post_payload
-            ) VALUES (
-                :source_url, :headline, :format_type, :media_url, 'published',
-                :hook, :body, :cta, :visual, :captions, :payload
-            )""",
-            {
-                "source_url": selected_story["url"],
-                "headline": canonical_script["title"],
-                "format_type": "multi_variant",
-                "media_url": media_url,
-                "hook": canonical_script["core_hook"],
-                "body": f"{canonical_script['technical_mechanism']} {canonical_script['engineering_implication']}",
-                "cta": canonical_script["forward_question"],
-                "visual": "Multi-variant suite: Post 7-slide carousel + Reels 9:16 MP4 + Story 3-slide deck",
-                "captions": json.dumps({
-                    "post": format_briefs["post"]["platform_captions"],
-                    "reel": format_briefs["reel"]["platform_captions"],
-                    "story": format_briefs["story"]["platform_captions"]
-                }),
-                "payload": json.dumps({
-                    "curation": selected_story.get("curation_scores", {}),
-                    "canonical_script": canonical_script,
-                    "briefs": format_briefs,
-                    "media": {
-                        "post_slides": post_slides,
-                        "reel_video": reel_video_path,
-                        "story_slides": story_slides
-                    },
-                    "telegram_dispatch": tg_dispatch
-                })
+        primary_media = reel_video_path if (reel_video_path and Path(reel_video_path).exists()) else "placeholder.mp4"
+        media_url = tool_upload_media_to_r2(primary_media, f"renders/{Path(primary_media).name}")["media_url"] if Path(primary_media).exists() else ""
+        post_id = _record_post_in_db(
+            source_url=selected["url"],
+            headline=reel_script["title"],
+            format_type="reel",
+            media_url=media_url,
+            hook=reel_script["core_hook"],
+            body=f"{reel_script['technical_mechanism']} {reel_script['engineering_implication']}",
+            cta=reel_script["forward_question"],
+            captions=reel_brief["platform_captions"],
+            payload={
+                "curation": selected.get("curation_scores", {}),
+                "script": reel_script,
+                "brief": reel_brief,
+                "video_path": reel_video_path,
+                "telegram_dispatch": tg_res
             }
         )
-        post_id = write_res["last_row_id"]
-    except Exception as db_err:
-        logger.warning("Database insert failed: %s", db_err)
+        return {"status": "success", "format": "reel", "post_id": post_id, "selected_story": selected["headline"], "media": reel_video_path}
 
-    logger.info("Broadcast cycle successfully executed. Database ID: %s", post_id)
+    # -------------------------------------------------------------------------
+    # BRANCH 3: Target format is explicitly "story"
+    # -------------------------------------------------------------------------
+    elif tf in ["story", "stories"]:
+        selected = max(curated_candidates, key=lambda c: compute_format_affinity_score(c, "story"))
+        if is_already_covered(selected["url"], selected["headline"]):
+            logger.warning("Safety Intercept: Story already covered: %s", selected["headline"])
+            return None
+
+        logger.info("Selected Top Story for STORY (Score %s): %s", compute_format_affinity_score(selected, "story"), selected["headline"])
+        content = fetch_story_content(selected)
+        story_script = generate_canonical_script(selected, content, format_target="story")
+        briefs = route_format_briefs(story_script, selected, format_target="story")
+        story_brief = briefs["story"]
+
+        logger.info("Generating 3-Slide Ephemeral Story Deck for **STORY**...")
+        story_slides = generate_story_slides(story_brief, f"story_deck_{timestamp}")
+
+        logger.info("Streaming **STORY** immediately to Telegram channel...")
+        tg_res = {}
+        for chat in target_chats:
+            res_s = send_telegram_story_deck(chat, story_slides, story_brief["platform_captions"]["short_form"])
+            tg_res[chat] = res_s
+
+        media_url = tool_upload_media_to_r2(story_slides[0], f"renders/{Path(story_slides[0]).name}")["media_url"]
+        post_id = _record_post_in_db(
+            source_url=selected["url"],
+            headline=story_script["title"],
+            format_type="story",
+            media_url=media_url,
+            hook=story_script["core_hook"],
+            body=f"{story_script['technical_mechanism']} {story_script['engineering_implication']}",
+            cta=story_script["forward_question"],
+            captions=story_brief["platform_captions"],
+            payload={
+                "curation": selected.get("curation_scores", {}),
+                "script": story_script,
+                "brief": story_brief,
+                "story_slides": story_slides,
+                "telegram_dispatch": tg_res
+            }
+        )
+        return {"status": "success", "format": "story", "post_id": post_id, "selected_story": selected["headline"], "media": story_slides}
+
+    # -------------------------------------------------------------------------
+    # BRANCH 4: Full Multi-Variant Scan (target_format is None / "all")
+    # Decouples Post vs Reel with DISTINCT stories or distinct angles!
+    # -------------------------------------------------------------------------
+    logger.info("Executing Full Multi-Variant Broadcast Cycle with Candidate Diversification...")
+    available = list(curated_candidates)
+
+    # 1. Select distinct story for Reel (High-velocity / visual)
+    cand_reel = max(available, key=lambda c: compute_format_affinity_score(c, "reel"))
+    available = [c for c in available if c["url"] != cand_reel["url"]]
+
+    # 2. Select distinct story for Post (Architectural deep dive)
+    if available:
+        cand_post = max(available, key=lambda c: compute_format_affinity_score(c, "post"))
+        available = [c for c in available if c["url"] != cand_post["url"]]
+    else:
+        cand_post = cand_reel
+
+    # 3. Select distinct story for Story (Community debate / poll)
+    if available:
+        cand_story = max(available, key=lambda c: compute_format_affinity_score(c, "story"))
+    else:
+        cand_story = cand_post
+
+    logger.info("Multi-Variant Story Decoupling:")
+    logger.info("  -> REEL Story: '%s'", cand_reel["headline"][:50])
+    logger.info("  -> POST Story: '%s'", cand_post["headline"][:50])
+    logger.info("  -> STORY Story: '%s'", cand_story["headline"][:50])
+
+    # A. Execute POST
+    content_post = fetch_story_content(cand_post)
+    script_post = generate_canonical_script(cand_post, content_post, format_target="post")
+    brief_post = route_format_briefs(script_post, cand_post, format_target="post")["post"]
+    post_slides = generate_carousel_deck(brief_post, f"post_deck_{timestamp}")
+    for chat in target_chats:
+        send_telegram_post_carousel(chat, post_slides, brief_post["platform_captions"]["short_form"])
+    media_url_post = tool_upload_media_to_r2(post_slides[0], f"renders/{Path(post_slides[0]).name}")["media_url"]
+    id_post = _record_post_in_db(
+        source_url=cand_post["url"],
+        headline=script_post["title"],
+        format_type="post",
+        media_url=media_url_post,
+        hook=script_post["core_hook"],
+        body=f"{script_post['technical_mechanism']} {script_post['engineering_implication']}",
+        cta=script_post["forward_question"],
+        captions=brief_post["platform_captions"],
+        payload={"script": script_post, "brief": brief_post, "slides": post_slides}
+    )
+
+    # B. Execute STORY
+    content_story = fetch_story_content(cand_story)
+    script_story = generate_canonical_script(cand_story, content_story, format_target="story")
+    brief_story = route_format_briefs(script_story, cand_story, format_target="story")["story"]
+    story_slides = generate_story_slides(brief_story, f"story_deck_{timestamp}")
+    for chat in target_chats:
+        send_telegram_story_deck(chat, story_slides, brief_story["platform_captions"]["short_form"])
+    media_url_story = tool_upload_media_to_r2(story_slides[0], f"renders/{Path(story_slides[0]).name}")["media_url"]
+    id_story = _record_post_in_db(
+        source_url=cand_story["url"],
+        headline=script_story["title"],
+        format_type="story",
+        media_url=media_url_story,
+        hook=script_story["core_hook"],
+        body=f"{script_story['technical_mechanism']} {script_story['engineering_implication']}",
+        cta=script_story["forward_question"],
+        captions=brief_story["platform_captions"],
+        payload={"script": script_story, "brief": brief_story, "slides": story_slides}
+    )
+
+    # C. Execute REELS
+    content_reel = fetch_story_content(cand_reel)
+    script_reel = generate_canonical_script(cand_reel, content_reel, format_target="reel")
+    brief_reel = route_format_briefs(script_reel, cand_reel, format_target="reel")["reel"]
+    reel_video_path = ""
+    try:
+        reel_video_path = asyncio.run(synthesize_broadcast_video(brief_reel, f"reel_clip_{timestamp}"))
+        if reel_video_path and Path(reel_video_path).exists():
+            for chat in target_chats:
+                send_telegram_reel(chat, reel_video_path, brief_reel["platform_captions"]["short_form"])
+    except Exception as e:
+        logger.warning("Reel error: %s", e)
+    primary_reel = reel_video_path if (reel_video_path and Path(reel_video_path).exists()) else "placeholder.mp4"
+    media_url_reel = tool_upload_media_to_r2(primary_reel, f"renders/{Path(primary_reel).name}")["media_url"] if Path(primary_reel).exists() else ""
+    id_reel = _record_post_in_db(
+        source_url=cand_reel["url"],
+        headline=script_reel["title"],
+        format_type="reel",
+        media_url=media_url_reel,
+        hook=script_reel["core_hook"],
+        body=f"{script_reel['technical_mechanism']} {script_reel['engineering_implication']}",
+        cta=script_reel["forward_question"],
+        captions=brief_reel["platform_captions"],
+        payload={"script": script_reel, "brief": brief_reel, "video_path": reel_video_path}
+    )
+
     return {
         "status": "success",
-        "post_id": post_id,
-        "selected_story": selected_story["headline"],
-        "curation_scores": selected_story.get("curation_scores", {}),
-        "canonical_script": canonical_script,
+        "format": "multi_variant_diversified",
+        "post_id": id_post,
+        "reel_id": id_reel,
+        "story_id": id_story,
+        "reel_story": cand_reel["headline"],
+        "post_story": cand_post["headline"],
+        "story_story": cand_story["headline"],
         "media_generated": {
             "post_slides_count": len(post_slides),
             "reel_video": reel_video_path,
             "story_slides_count": len(story_slides)
-        },
-        "telegram_dispatch": tg_dispatch
+        }
     }
-
-    logger.info("No new qualified stories discovered in this cycle.")
-    return None
 
 
 def run_scheduled_sidecar(interval_hours: Optional[int] = None):
