@@ -68,8 +68,9 @@ def send_telegram_media_group(
         with httpx.Client(timeout=60.0) as client:
             resp = client.post(url, data=data, files=files)
             if resp.status_code == 400:
-                # Markdown parse error fallback
-                media_payload[0]["caption"] = caption.replace("*", "").replace("`", "")[:1024]
+                # Markdown parse error fallback: strip formatting and unescaped underscores
+                clean_cap = caption.replace("*", "").replace("`", "").replace("_", " ")[:1024]
+                media_payload[0]["caption"] = clean_cap
                 media_payload[0].pop("parse_mode", None)
                 data["media"] = json.dumps(media_payload)
                 for f in opened_files:
@@ -124,7 +125,8 @@ def send_telegram_reel(
                 resp = client.post(url, data=data, files=files)
                 if resp.status_code == 400:
                     vf.seek(0)
-                    data["caption"] = formatted_caption.replace("*", "").replace("`", "")[:1024]
+                    clean_cap = formatted_caption.replace("*", "").replace("`", "").replace("_", " ")[:1024]
+                    data["caption"] = clean_cap
                     data.pop("parse_mode", None)
                     resp = client.post(url, data=data, files=files)
 
@@ -179,10 +181,11 @@ def dispatch_three_variants_to_telegram(
     """
     targets = target_chats or []
     if not targets:
-        if TELEGRAM_CHAT_ID:
-            targets.append(TELEGRAM_CHAT_ID)
-        if TELEGRAM_CHANNEL_ID and TELEGRAM_CHANNEL_ID not in targets:
+        # Prioritize public channel first so audience sees updates immediately
+        if TELEGRAM_CHANNEL_ID:
             targets.append(TELEGRAM_CHANNEL_ID)
+        if TELEGRAM_CHAT_ID and TELEGRAM_CHAT_ID not in targets:
+            targets.append(TELEGRAM_CHAT_ID)
 
     dispatch_results = {}
 

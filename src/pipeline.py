@@ -48,7 +48,14 @@ from src.mcp_social_server import (
 )
 from src.carousel_generator import generate_carousel_deck, generate_story_slides
 from src.video_synthesizer import synthesize_broadcast_video
-from src.telegram_broadcaster import dispatch_three_variants_to_telegram
+from src.telegram_broadcaster import (
+    dispatch_three_variants_to_telegram,
+    send_telegram_post_carousel,
+    send_telegram_story_deck,
+    send_telegram_reel,
+    TELEGRAM_CHANNEL_ID,
+    TELEGRAM_CHAT_ID
+)
 from src.persona_manager import detect_persona
 import asyncio
 
@@ -743,36 +750,46 @@ def execute_broadcast_cycle(target_format: Optional[str] = None) -> Optional[Dic
     timestamp = int(time.time())
 
     # -------------------------------------------------------------------------
-    # Stage 4: ANTIGRAVITY MEDIA GENERATION
+    # Stage 4 & 5: ANTIGRAVITY MEDIA GENERATION & IMMEDIATE STREAMING DELIVERY
     # -------------------------------------------------------------------------
+    target_chats = []
+    if TELEGRAM_CHANNEL_ID:
+        target_chats.append(TELEGRAM_CHANNEL_ID)
+    if TELEGRAM_CHAT_ID and TELEGRAM_CHAT_ID not in target_chats:
+        target_chats.append(TELEGRAM_CHAT_ID)
+
+    tg_dispatch = {}
+
     # 1. POST: 7-Page Poster Carousel Deck
     logger.info("Generating 7-Page Poster Carousel Deck for **POST**...")
     post_slides = generate_carousel_deck(format_briefs["post"], f"post_deck_{timestamp}")
+    # Stream POST immediately to Telegram Channel
+    logger.info("Streaming **POST** immediately to Telegram channel...")
+    for chat in target_chats:
+        res_p = send_telegram_post_carousel(chat, post_slides, format_briefs["post"]["platform_captions"]["short_form"])
+        tg_dispatch.setdefault(chat, {})["post"] = res_p
 
-    # 2. REELS: 9:16 Vertical Motion Video with Neural Voiceover
+    # 2. STORY: 3-Slide Vertical Ephemeral Deck with Safe Margins & Poll Zone
+    logger.info("Generating 3-Slide Ephemeral Story Deck for **STORY**...")
+    story_slides = generate_story_slides(format_briefs["story"], f"story_deck_{timestamp}")
+    # Stream STORY immediately to Telegram Channel
+    logger.info("Streaming **STORY** immediately to Telegram channel...")
+    for chat in target_chats:
+        res_s = send_telegram_story_deck(chat, story_slides, format_briefs["story"]["platform_captions"]["short_form"])
+        tg_dispatch.setdefault(chat, {})["story"] = res_s
+
+    # 3. REELS: 9:16 Vertical Motion Video with Neural Voiceover
     logger.info("Synthesizing 9:16 Vertical Motion Video for **REELS**...")
     reel_video_path = ""
     try:
         reel_video_path = asyncio.run(synthesize_broadcast_video(format_briefs["reel"], f"reel_clip_{timestamp}"))
+        if reel_video_path and Path(reel_video_path).exists():
+            logger.info("Streaming **REELS** video immediately to Telegram channel...")
+            for chat in target_chats:
+                res_r = send_telegram_reel(chat, reel_video_path, format_briefs["reel"]["platform_captions"]["short_form"])
+                tg_dispatch.setdefault(chat, {})["reel"] = res_r
     except Exception as vid_err:
         logger.warning("Reel synthesis exception: %s", vid_err)
-
-    # 3. STORY: 3-Slide Vertical Ephemeral Deck with Safe Margins & Poll Zone
-    logger.info("Generating 3-Slide Ephemeral Story Deck for **STORY**...")
-    story_slides = generate_story_slides(format_briefs["story"], f"story_deck_{timestamp}")
-
-    # -------------------------------------------------------------------------
-    # Stage 5: TELEGRAM DELIVERY (Tagged as **POST**, **REELS**, **STORY**)
-    # -------------------------------------------------------------------------
-    logger.info("Dispatching all 3 variants to Telegram...")
-    tg_dispatch = dispatch_three_variants_to_telegram(
-        post_slides=post_slides,
-        reel_video_path=reel_video_path,
-        story_slides=story_slides,
-        post_caption=format_briefs["post"]["platform_captions"]["short_form"],
-        reel_caption=format_briefs["reel"]["platform_captions"]["short_form"],
-        story_caption=format_briefs["story"]["platform_captions"]["short_form"]
-    )
 
     # Stage primary asset for database record & cloud CDN
     primary_media_path = reel_video_path if (reel_video_path and Path(reel_video_path).exists()) else post_slides[0]

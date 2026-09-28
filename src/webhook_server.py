@@ -600,8 +600,153 @@ def update_telegram_message(chat_id: int, message_id: int, text: str):
         pass
 
 
+def process_telegram_message(msg: Dict[str, Any]):
+    """Process incoming direct text commands and news URLs from Telegram."""
+    chat_id = msg.get("chat", {}).get("id")
+    text = (msg.get("text") or "").strip()
+    from_user = msg.get("from", {}).get("first_name") or msg.get("from", {}).get("username", "Editor")
+
+    if not chat_id or not text:
+        return
+
+    def reply(txt: str):
+        if TELEGRAM_BOT_TOKEN:
+            try:
+                clean = txt.replace("_", " ")
+                httpx.post(
+                    f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage",
+                    json={"chat_id": chat_id, "text": clean},
+                    timeout=10.0
+                )
+            except Exception:
+                pass
+
+    lower = text.lower()
+
+    if lower in ["/start", "/help"]:
+        reply(
+            f"👋 Hello {from_user}! AI Tech Broadcaster is active.\n\n"
+            f"📡 Target Channel: {TELEGRAM_CHANNEL_ID}\n\n"
+            "⚡ Instant Commands:\n"
+            "• /now or /scan: Immediately harvest 17 primary feeds & broadcast fresh breakthrough to channel\n"
+            "• /post: Immediately generate and dispatch a 7-slide Carousel Post\n"
+            "• /reel: Immediately synthesize and dispatch a 9:16 Video Reel\n"
+            "• /story: Immediately generate and dispatch a 3-slide Ephemeral Story\n"
+            "• /status: View current scheduler & sidecar status\n\n"
+            "🔗 Direct URL Mode:\n"
+            "Send any primary AI news URL (OpenAI, DeepMind, Anthropic, HuggingFace, etc.) to immediately turn it into a broadcast for @Eraof_Ai!"
+        )
+        return
+
+    if lower == "/status":
+        with get_db_connection() as conn:
+            cnt = conn.execute("SELECT COUNT(*) FROM posts").fetchone()[0]
+            last_p = conn.execute("SELECT headline, created_at FROM posts ORDER BY id DESC LIMIT 1").fetchone()
+        last_str = f"{last_p['headline']} ({last_p['created_at']})" if last_p else "None"
+        reply(
+            f"📊 Broadcaster Status\n\n"
+            f"• Target Channel: {TELEGRAM_CHANNEL_ID}\n"
+            f"• Total Broadcasts in DB: {cnt}\n"
+            f"• Latest Broadcast: {last_str}\n"
+            f"• Cadences: Story (15m), Reel (30m), Post (60m)\n"
+            f"• Feeds Monitored: 17 primary sources"
+        )
+        return
+
+    if lower in ["/now", "/scan", "/broadcast", "/update", "/post", "/reel", "/story"]:
+        fmt = None
+        if "post" in lower:
+            fmt = "post"
+        elif "reel" in lower:
+            fmt = "reel"
+        elif "story" in lower:
+            fmt = "story"
+
+        reply(f"🚀 Scanning 17 primary AI feeds now... Broadcasting immediately to {TELEGRAM_CHANNEL_ID}!")
+
+        def run_instant_cycle():
+            from src.pipeline import execute_broadcast_cycle
+            try:
+                res = execute_broadcast_cycle(target_format=fmt)
+                if res:
+                    reply(f"✅ Published immediately to {TELEGRAM_CHANNEL_ID}:\n\n{res.get('selected_story')}")
+                else:
+                    reply(f"ℹ️ All current feed stories have already been published in history. Strict 1-time-only deduplication enforced.")
+            except Exception as e:
+                logger.exception("Error in instant Telegram broadcast command: %s", e)
+                reply(f"⚠️ Broadcast Error: {str(e)[:100]}")
+
+        threading.Thread(target=run_instant_cycle, daemon=True).start()
+        return
+
+    if text.startswith("http://") or text.startswith("https://"):
+        reply(f"🔗 Processing primary source URL: {text}\nBroadcasting to {TELEGRAM_CHANNEL_ID} immediately...")
+
+        def run_url_cycle():
+            try:
+                from src.pipeline import (
+                    tool_web_fetch,
+                    produce_canonical_script,
+                    route_format_briefs,
+                    generate_carousel_deck,
+                    generate_story_slides,
+                    synthesize_broadcast_video
+                )
+                from src.telegram_broadcaster import (
+                    send_telegram_post_carousel,
+                    send_telegram_story_deck,
+                    send_telegram_reel
+                )
+                import asyncio
+
+                fetch_res = tool_web_fetch(text)
+                fetched_text = fetch_res.get("content", text)
+                headline = fetched_text.split("\n")[0][:100] if fetched_text else "AI Breakthrough Announcement"
+
+                selected = {
+                    "tier": 1,
+                    "source_name": "Direct URL",
+                    "headline": headline,
+                    "url": text,
+                    "summary": fetched_text[:500]
+                }
+
+                canonical_script = produce_canonical_script(selected, fetched_text)
+                format_briefs = route_format_briefs(canonical_script, selected)
+                timestamp = int(time.time())
+
+                target_chats = [c for c in [TELEGRAM_CHANNEL_ID, str(chat_id)] if c]
+
+                # 1. Post Carousel
+                post_slides = generate_carousel_deck(format_briefs["post"], f"post_deck_{timestamp}")
+                for tc in target_chats:
+                    send_telegram_post_carousel(tc, post_slides, format_briefs["post"]["platform_captions"]["short_form"])
+
+                # 2. Story Deck
+                story_slides = generate_story_slides(format_briefs["story"], f"story_deck_{timestamp}")
+                for tc in target_chats:
+                    send_telegram_story_deck(tc, story_slides, format_briefs["story"]["platform_captions"]["short_form"])
+
+                # 3. Reel Video
+                try:
+                    reel_video = asyncio.run(synthesize_broadcast_video(format_briefs["reel"], f"reel_clip_{timestamp}"))
+                    if reel_video and Path(reel_video).exists():
+                        for tc in target_chats:
+                            send_telegram_reel(tc, reel_video, format_briefs["reel"]["platform_captions"]["short_form"])
+                except Exception as ve:
+                    logger.warning("Reel error on URL broadcast: %s", ve)
+
+                reply(f"✅ Published URL broadcast to {TELEGRAM_CHANNEL_ID}:\n\n{canonical_script['title']}")
+            except Exception as e:
+                logger.exception("Error broadcasting URL: %s", e)
+                reply(f"⚠️ Error processing URL: {str(e)[:100]}")
+
+        threading.Thread(target=run_url_cycle, daemon=True).start()
+        return
+
+
 def telegram_polling_worker():
-    """Background polling worker for Telegram callback queries (instant mobile button handling without ngrok)."""
+    """Background polling worker for Telegram callback queries and instant user commands."""
     if not TELEGRAM_BOT_TOKEN or "Example" in TELEGRAM_BOT_TOKEN:
         return
     logger.info("Telegram background polling worker activated.")
@@ -630,6 +775,9 @@ def telegram_polling_worker():
                         cb = update.get("callback_query")
                         if cb:
                             process_telegram_callback(cb)
+                        msg = update.get("message")
+                        if msg:
+                            process_telegram_message(msg)
         except Exception as e:
             time.sleep(2)
         time.sleep(0.5)
@@ -1011,6 +1159,9 @@ async def telegram_webhook(request: Request):
         cb = data.get("callback_query")
         if cb:
             process_telegram_callback(cb)
+        msg = data.get("message")
+        if msg:
+            process_telegram_message(msg)
         return {"ok": True}
     except Exception as e:
         logger.warning("Telegram webhook error: %s", e)
