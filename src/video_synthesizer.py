@@ -28,10 +28,13 @@ import imageio.v3 as iio
 import imageio_ffmpeg
 import edge_tts
 
+ROOT_DIR = Path(__file__).resolve().parent.parent
+if str(ROOT_DIR) not in sys.path:
+    sys.path.insert(0, str(ROOT_DIR))
+
 from src.persona_manager import detect_persona, get_circular_avatar
 from src.google_veo_client import generate_veo_broll
 
-ROOT_DIR = Path(__file__).resolve().parent.parent
 STAGING_DIR = ROOT_DIR / "storage" / "staging"
 STAGING_DIR.mkdir(parents=True, exist_ok=True)
 

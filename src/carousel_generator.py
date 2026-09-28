@@ -13,16 +13,19 @@ Generates high-retention 7-page poster decks (1080x1080) for Instagram, Facebook
 """
 
 import os
+import sys
 from pathlib import Path
 from typing import Dict, Any, List, Optional
 from PIL import Image, ImageDraw, ImageFont
 
+ROOT_DIR = Path(__file__).resolve().parent.parent
+if str(ROOT_DIR) not in sys.path:
+    sys.path.insert(0, str(ROOT_DIR))
+
 from src.persona_manager import detect_persona, get_circular_avatar
 
-ROOT_DIR = Path(__file__).resolve().parent.parent
 STAGING_DIR = ROOT_DIR / "storage" / "staging"
 STAGING_DIR.mkdir(parents=True, exist_ok=True)
-
 
 ASSETS_DIR = ROOT_DIR / "storage" / "assets"
 
