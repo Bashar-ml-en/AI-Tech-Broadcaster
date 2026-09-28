@@ -23,6 +23,7 @@ import warnings
 from pathlib import Path
 from typing import Dict, Any, List, Optional
 import httpx
+import xml.etree.ElementTree as ET
 from bs4 import BeautifulSoup, XMLParsedAsHTMLWarning
 from dotenv import load_dotenv
 
@@ -77,24 +78,32 @@ DIRECTOR_MODEL = os.getenv("DIRECTOR_MODEL", "gemini-2.0-flash")
 STAGING_DIR = root_dir / "storage" / "staging"
 STAGING_DIR.mkdir(parents=True, exist_ok=True)
 
-# Curated Primary Feeds conforming strictly to Section 2 of Constitution
+# Curated Primary Feeds conforming strictly to Section 2 of Constitution & Direct AI Labs
 FEED_SOURCES = [
-    # Tier 1: Primary AI Labs
-    {"tier": 1, "name": "Google DeepMind", "url": "https://deepmind.google/discover/blog/", "type": "html"},
-    {"tier": 1, "name": "OpenAI News", "url": "https://openai.com/news/", "type": "html"},
-    {"tier": 1, "name": "Anthropic Research", "url": "https://www.anthropic.com/research", "type": "html"},
+    # Tier 1: Primary AI Labs (Direct Company Feeds & APIs)
+    {"tier": 1, "name": "OpenAI News", "url": "https://openai.com/news/rss.xml", "type": "rss"},
+    {"tier": 1, "name": "Google AI Blog", "url": "https://blog.google/technology/ai/rss/", "type": "rss"},
+    {"tier": 1, "name": "Google DeepMind", "url": "https://deepmind.google/blog/", "type": "html"},
+    {"tier": 1, "name": "Anthropic Research", "url": "https://www.anthropic.com/news", "type": "html"},
+    {"tier": 1, "name": "Mistral AI", "url": "https://mistral.ai/news/rss", "type": "rss"},
+    {"tier": 1, "name": "DeepSeek Models (HF)", "url": "https://huggingface.co/api/models?sort=lastModified&direction=-1&author=deepseek-ai&limit=5", "type": "json_hf_models", "author": "DeepSeek"},
+    {"tier": 1, "name": "Qwen Models (HF)", "url": "https://huggingface.co/api/models?sort=lastModified&direction=-1&author=Qwen&limit=5", "type": "json_hf_models", "author": "Qwen"},
     {"tier": 1, "name": "Meta AI Blog", "url": "https://ai.meta.com/blog/", "type": "html"},
-    {"tier": 1, "name": "Hugging Face Blog", "url": "https://huggingface.co/blog", "type": "html"},
+    {"tier": 1, "name": "Hugging Face Daily Papers", "url": "https://huggingface.co/api/daily_papers", "type": "json_hf_papers"},
+    {"tier": 1, "name": "Hugging Face Blog", "url": "https://huggingface.co/blog/feed.xml", "type": "rss"},
     # Real-Time Dynamic AI Intelligence Feeds
+    {"tier": 1, "name": "HackerNews AI", "url": "https://hn.algolia.com/api/v1/search_by_date?tags=story&query=AI+OR+LLM+OR+DeepSeek+OR+Gemini&hitsPerPage=20", "type": "json_hn"},
     {"tier": 1, "name": "Google News AI", "url": "https://news.google.com/rss/search?q=Artificial+Intelligence+LLM+OR+DeepSeek+OR+OpenAI+when:1d&hl=en-US&gl=US&ceid=US:en", "type": "rss"},
-    {"tier": 1, "name": "HackerNews AI", "url": "https://hn.algolia.com/api/v1/search_by_date?tags=story&query=AI+OR+LLM+OR+DeepSeek+OR+Gemini&hitsPerPage=15", "type": "json_hn"},
-    # Tier 2: Academic Preprints & Code Releases
+    # Tier 2: Academic Preprints & Core Runtime Releases
+    {"tier": 2, "name": "ArXiv cs.CL (LLMs)", "url": "https://rss.arxiv.org/rss/cs.CL", "type": "rss"},
     {"tier": 2, "name": "ArXiv cs.AI Recent", "url": "https://rss.arxiv.org/rss/cs.AI", "type": "rss"},
-    {"tier": 2, "name": "GitHub Trending AI", "url": "https://github.com/trending?since=daily", "type": "html"},
+    {"tier": 2, "name": "ArXiv cs.CV (Vision & Video)", "url": "https://rss.arxiv.org/rss/cs.CV", "type": "rss"},
+    {"tier": 2, "name": "vLLM Releases", "url": "https://github.com/vllm-project/vllm/releases.atom", "type": "atom"},
+    {"tier": 2, "name": "Ollama Releases", "url": "https://github.com/ollama/ollama/releases.atom", "type": "atom"},
     # Tier 3: Tier-1 Tech Publications
-    {"tier": 3, "name": "TechCrunch AI", "url": "https://techcrunch.com/category/artificial-intelligence/", "type": "html"},
-    {"tier": 3, "name": "VentureBeat AI", "url": "https://venturebeat.com/category/ai/feed/", "type": "rss"},
-    {"tier": 3, "name": "Ars Technica AI", "url": "https://arstechnica.com/tag/ai/", "type": "html"}
+    {"tier": 3, "name": "TechCrunch AI", "url": "https://techcrunch.com/category/artificial-intelligence/feed/", "type": "rss"},
+    {"tier": 3, "name": "VentureBeat AI", "url": "https://venturebeat.com/category/ai/feed", "type": "rss"},
+    {"tier": 3, "name": "Ars Technica AI", "url": "https://arstechnica.com/tag/ai/feed/", "type": "rss"}
 ]
 
 
@@ -106,6 +115,7 @@ def is_already_covered(source_url: str, headline_candidate: str = "") -> bool:
     """
     Check if URL or story was processed within the last 14 days.
     Constitutional Invariant: Strictly deduplicate against storage/published_history.db.
+    Ensures every news item is published exactly ONCE.
     """
     from urllib.parse import urlparse, urlunparse
 
@@ -127,7 +137,7 @@ def is_already_covered(source_url: str, headline_candidate: str = "") -> bool:
                 logger.info("Deduplication Hit: URL already in history (ID %s, status=%s): %s", post["id"], post["approval_status"], source_url)
                 return True
 
-        # Token overlap deduplication: only flag as duplicate if headlines share >= 60% distinctive terms
+        # Token overlap deduplication: strictly flag duplicate if headlines share >= 50% distinctive terms
         if headline_candidate:
             cand_tokens = set(re.findall(r"\b[a-z0-9]{3,}\b", headline_candidate.lower()))
             common_stops = {"the", "and", "for", "with", "this", "that", "from", "how", "what", "are", "new", "ai", "model", "models", "announces", "introduces", "releases"}
@@ -145,7 +155,7 @@ def is_already_covered(source_url: str, headline_candidate: str = "") -> bool:
                     union = cand_distinct.union(p_distinct)
                     similarity = len(intersection) / len(union) if union else 0.0
 
-                    if similarity >= 0.60:
+                    if similarity >= 0.50:
                         logger.info("Deduplication Hit: Story overlap (%.0f%%) with ID %s (%s)", similarity * 100, post["id"], p_headline)
                         return True
 
@@ -192,23 +202,112 @@ def harvest_candidate_stories() -> List[Dict[str, Any]]:
                                 })
                     except Exception:
                         pass
+
+                elif feed["type"] == "json_hf_papers":
+                    try:
+                        data = resp.json()
+                        for item in data[:8]:
+                            p = item.get("paper", {})
+                            pid = p.get("id") or item.get("id")
+                            title = item.get("title") or p.get("title", "")
+                            summary = item.get("summary") or p.get("summary", "")
+                            url = f"https://huggingface.co/papers/{pid}" if pid else ""
+                            if title and url and url not in found_links:
+                                found_links.add(url)
+                                candidates.append({
+                                    "tier": feed["tier"],
+                                    "source_name": feed["name"],
+                                    "headline": title.strip(),
+                                    "url": url,
+                                    "summary": summary[:600]
+                                })
+                    except Exception:
+                        pass
+
+                elif feed["type"] == "json_hf_models":
+                    try:
+                        data = resp.json()
+                        author = feed.get("author", "AI Lab")
+                        for m in data[:5]:
+                            mid = m.get("id")
+                            if not mid:
+                                continue
+                            url = f"https://huggingface.co/{mid}"
+                            model_name = mid.split("/")[-1]
+                            headline = f"{author} Releases {model_name} Model Weights"
+                            if url not in found_links:
+                                found_links.add(url)
+                                candidates.append({
+                                    "tier": feed["tier"],
+                                    "source_name": feed["name"],
+                                    "headline": headline,
+                                    "url": url,
+                                    "summary": f"Official model weights release of {mid} on Hugging Face Hub."
+                                })
+                    except Exception:
+                        pass
+
+                elif feed["type"] == "atom":
+                    try:
+                        root = ET.fromstring(resp.content)
+                        ns = {"atom": "http://www.w3.org/2005/Atom"}
+                        entries = root.findall(".//atom:entry", ns) or root.findall(".//entry")
+                        for entry in entries[:4]:
+                            title_el = entry.find("atom:title", ns) if ns else entry.find("title")
+                            link_el = entry.find("atom:link", ns) if ns else entry.find("link")
+                            title = title_el.text.strip() if title_el is not None and title_el.text else ""
+                            link = link_el.get("href", "").strip() if link_el is not None else ""
+                            if title and link and link not in found_links:
+                                found_links.add(link)
+                                candidates.append({
+                                    "tier": feed["tier"],
+                                    "source_name": feed["name"],
+                                    "headline": title,
+                                    "url": link,
+                                    "summary": title
+                                })
+                    except Exception:
+                        pass
+
                 elif feed["type"] == "rss":
-                    soup = BeautifulSoup(resp.text, "html.parser")
-                    # RSS parsing for ArXiv & Google News AI
-                    items = soup.find_all("item")
-                    for item in items[:6]:
-                        title = item.title.text.strip() if item.title else ""
-                        link = item.link.text.strip() if item.link else ""
-                        description = item.description.text.strip() if item.description else ""
-                        if link and link not in found_links:
-                            found_links.add(link)
-                            candidates.append({
-                                "tier": feed["tier"],
-                                "source_name": feed["name"],
-                                "headline": title,
-                                "url": link,
-                                "summary": description[:500]
-                            })
+                    try:
+                        root = ET.fromstring(resp.content)
+                        items = root.findall(".//item")
+                        for item in items[:6]:
+                            title_el = item.find("title")
+                            link_el = item.find("link")
+                            desc_el = item.find("description")
+                            title = title_el.text.strip() if title_el is not None and title_el.text else ""
+                            link = link_el.text.strip() if link_el is not None and link_el.text else ""
+                            description = desc_el.text.strip() if desc_el is not None and desc_el.text else ""
+                            if title and link and link not in found_links:
+                                found_links.add(link)
+                                candidates.append({
+                                    "tier": feed["tier"],
+                                    "source_name": feed["name"],
+                                    "headline": title,
+                                    "url": link,
+                                    "summary": description[:600]
+                                })
+                    except Exception:
+                        # Fallback to BeautifulSoup if XML malformed
+                        soup = BeautifulSoup(resp.text, "html.parser")
+                        for item in soup.find_all("item")[:6]:
+                            title = item.title.text.strip() if item.title else ""
+                            link = ""
+                            if item.link:
+                                link = item.link.text.strip() or (item.link.next_sibling and str(item.link.next_sibling).strip())
+                            description = item.description.text.strip() if item.description else ""
+                            if title and link and link not in found_links:
+                                found_links.add(link)
+                                candidates.append({
+                                    "tier": feed["tier"],
+                                    "source_name": feed["name"],
+                                    "headline": title,
+                                    "url": link,
+                                    "summary": description[:600]
+                                })
+
                 else:
                     soup = BeautifulSoup(resp.text, "html.parser")
                     # HTML link parsing
@@ -589,14 +688,8 @@ def execute_broadcast_cycle(target_format: Optional[str] = None) -> Optional[Dic
     candidates = harvest_candidate_stories()
 
     if not candidates:
-        logger.info("Injecting canonical Tier 1 candidate for autonomous verification.")
-        candidates = [{
-            "tier": 1,
-            "source_name": "Google DeepMind",
-            "headline": "Gemini 2.5 Flash: Autonomous SWE-bench Coding Leap Confirmed",
-            "url": "https://deepmind.google/technologies/gemini/flash/",
-            "summary": "Google DeepMind confirmed Gemini 2.5 Flash with sub-second multimodal latency and state-of-the-art SWE-bench autonomous coding execution."
-        }]
+        logger.info("No candidates harvested in this cycle. Skipping broadcast.")
+        return None
 
     # -------------------------------------------------------------------------
     # Stage 1: CURATOR Scoring & Selection (Threshold >= 25/40)
@@ -617,50 +710,14 @@ def execute_broadcast_cycle(target_format: Optional[str] = None) -> Optional[Dic
             curated_candidates.append(cand)
 
     if not curated_candidates:
-        logger.info("All live feed candidates were already published in history. Injecting frontier architecture deep-dive to maintain cadence.")
-        frontier_pool = [
-            {
-                "tier": 1,
-                "source_name": "Google DeepMind",
-                "headline": "Gemini 2.5 Flash: Autonomous Multimodal Coding Agents",
-                "url": f"https://deepmind.google/technologies/gemini/flash/?cycle={int(time.time())}",
-                "summary": "Google DeepMind confirmed Gemini 2.5 Flash with sub-second multimodal latency and verified SWE-bench autonomous coding execution."
-            },
-            {
-                "tier": 1,
-                "source_name": "Anthropic Research",
-                "headline": "Claude 3.7 Sonnet: Hybrid Reasoning Tokens in Autonomous Dev",
-                "url": f"https://www.anthropic.com/research/claude-3-7-sonnet?cycle={int(time.time())}",
-                "summary": "Anthropic engineering analysis on dynamic reasoning tokens, autonomous error-correction loops, and 70.3% verified SWE-bench execution."
-            },
-            {
-                "tier": 1,
-                "source_name": "DeepSeek AI",
-                "headline": "DeepSeek-R1 Architecture: Extreme Compute Efficiency & Open Weights",
-                "url": f"https://github.com/deepseek-ai/DeepSeek-R1?cycle={int(time.time())}",
-                "summary": "DeepSeek open-source architecture demonstrating multi-head latent attention, extreme training cost reduction, and SOTA reasoning benchmarks."
-            },
-            {
-                "tier": 1,
-                "source_name": "OpenAI Research",
-                "headline": "OpenAI Operator: Autonomous Computer Use & Enterprise Agent Swarms",
-                "url": f"https://openai.com/index/introducing-operator?cycle={int(time.time())}",
-                "summary": "OpenAI developer preview of Operator autonomous browser action model navigating web interfaces, multi-step forms, and automated code review workflows."
-            }
-        ]
-        topic = frontier_pool[int(time.time() // 900) % len(frontier_pool)]
-        topic["curation_scores"] = {
-            "technical_consequence": 9,
-            "breadth_of_impact": 9,
-            "visual_explainability": 8,
-            "novelty_recency": 8,
-            "total": 34
-        }
-        topic["curation_justification"] = "Automated cadence continuity: High-impact frontier architecture deep-dive."
-        curated_candidates = [topic]
+        logger.info("Deterministic Deduplication: All harvested items have already been covered in history or scored below quality threshold. Skipping broadcast to strictly enforce 1-time-only publishing.")
+        return None
 
     # Select the highest-scoring candidate
     selected_story = max(curated_candidates, key=lambda c: c.get("curation_scores", {}).get("total", 0))
+    if is_already_covered(selected_story["url"], selected_story["headline"]):
+        logger.warning("Safety Intercept: Selected story '%s' already exists in history. Aborting to guarantee 1-time-only publishing.", selected_story["headline"])
+        return None
     logger.info("Selected Top Story (Score %s/40): %s", selected_story.get("curation_scores", {}).get("total"), selected_story["headline"])
 
     # Fetch full text content
