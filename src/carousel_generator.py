@@ -17,6 +17,8 @@ from pathlib import Path
 from typing import Dict, Any, List, Optional
 from PIL import Image, ImageDraw, ImageFont
 
+from src.persona_manager import detect_persona, get_circular_avatar
+
 ROOT_DIR = Path(__file__).resolve().parent.parent
 STAGING_DIR = ROOT_DIR / "storage" / "staging"
 STAGING_DIR.mkdir(parents=True, exist_ok=True)
@@ -117,6 +119,30 @@ def load_square_wallpaper(width: int = 1080, height: int = 1080) -> Image.Image:
     return img
 
 
+def load_vertical_wallpaper(width: int = 1080, height: int = 1920) -> Image.Image:
+    """Load the Apple-style fluid silk wave wallpaper for 9:16 vertical stories."""
+    for p in [
+        ASSETS_DIR / "wallpaper_9x16_1080.jpg",
+        ASSETS_DIR / "brand_wallpaper_vertical.jpg",
+        ASSETS_DIR / "brand_wallpaper.jpg",
+        STAGING_DIR / "brand_wallpaper.jpg",
+    ]:
+        if p.exists():
+            try:
+                im = Image.open(p).convert("RGB")
+                if im.size != (width, height):
+                    im = im.resize((width, height), Image.Resampling.LANCZOS)
+                return im
+            except Exception:
+                pass
+
+    # Fallback to programmatic gradient
+    img = Image.new("RGB", (width, height))
+    d = ImageDraw.Draw(img)
+    draw_light_background(d, width, height)
+    return img
+
+
 def draw_title(d: ImageDraw.ImageDraw, text: str, y: int = 220, font_size: int = 44):
     """Draw high-contrast poster section title with soft drop-shadow."""
     f = get_font(font_size, bold=True)
@@ -159,6 +185,9 @@ def generate_carousel_deck(directive: Dict[str, Any], output_prefix: str = "post
     logo_icon = get_circular_logo(size=52)
     base_wallpaper = load_square_wallpaper(width, height)
 
+    persona = detect_persona(headline + " " + hook + " " + body)
+    persona_avatar = get_circular_avatar(persona["id"], size=50)
+
     def draw_common_header(d: ImageDraw.ImageDraw, img: Image.Image, page_num: int, tag_text: str, tag_clr: tuple, tag_bg: tuple):
         # Top dual-accent line
         d.rectangle([(0, 0), (width // 2, 8)], fill=(6, 182, 212))
@@ -175,6 +204,17 @@ def generate_carousel_deck(directive: Dict[str, Any], output_prefix: str = "post
             bx = 140
         d.text((bx, 62), "ERA OF AI", fill=(15, 23, 42), font=get_font(26, bold=True))
         d.text((bx, 92), "TECH INTELLIGENCE", fill=(2, 132, 199), font=get_font(13, bold=True))
+
+        # Titan Persona Chip (Center Header)
+        persona_card = [(380, 50), (780, 120)]
+        draw_card_with_shadow(d, persona_card, radius=16, fill=(255, 255, 255), outline=persona["accent_color"], width=1)
+        if persona_avatar:
+            img.paste(persona_avatar, (395, 60), mask=persona_avatar)
+            px = 460
+        else:
+            px = 395
+        d.text((px, 62), persona["name"], fill=(15, 23, 42), font=get_font(22, bold=True))
+        d.text((px, 92), persona["title"][:26], fill=persona["accent_color"], font=get_font(13, bold=True))
 
         # Page Counter Pill
         d.rounded_rectangle([(width - 240, 58), (width - 60, 112)], radius=16, fill=(255, 255, 255), outline=(226, 232, 240), width=1)
@@ -245,10 +285,24 @@ def generate_carousel_deck(directive: Dict[str, Any], output_prefix: str = "post
     draw_common_header(d2, img2, 2, "// THE BOTTLENECK", (185, 28, 28), (254, 242, 242))
     draw_title(d2, "What Was Broken Before Today")
 
+    # Executive Stance Card
+    draw_card_with_shadow(d2, [(60, 275), (width - 60, 395)], radius=18, fill=(255, 255, 255), outline=persona["accent_color"], width=2)
+    if persona_avatar:
+        img2.paste(persona_avatar, (80, 290), mask=persona_avatar)
+        qx = 145
+    else:
+        qx = 85
+    d2.text((qx, 290), f"{persona['name'].upper()} // {persona['title']}", fill=persona["accent_color"], font=get_font(16, bold=True))
+    q_lines = wrap_text(f"\"{persona['default_quote']}\"", get_font(20, bold=True), 840, d2)
+    qy = 320
+    for ql in q_lines[:2]:
+        d2.text((qx, qy), ql, fill=(15, 23, 42), font=get_font(20, bold=True))
+        qy += 28
+
     # Card 1: Legacy Flaws
-    draw_card_with_shadow(d2, [(60, 290), (width - 60, 560)], radius=24, fill=(255, 255, 255), outline=(252, 165, 165), width=2)
-    d2.rounded_rectangle([(90, 315), (380, 350)], radius=8, fill=(254, 242, 242), outline=(239, 68, 68), width=1)
-    d2.text((105, 323), "[X] LEGACY AI CODE ASSISTANTS", fill=(185, 28, 28), font=get_font(18, bold=True))
+    draw_card_with_shadow(d2, [(60, 415), (width - 60, 640)], radius=20, fill=(255, 255, 255), outline=(252, 165, 165), width=2)
+    d2.rounded_rectangle([(90, 435), (380, 468)], radius=8, fill=(254, 242, 242), outline=(239, 68, 68), width=1)
+    d2.text((105, 442), "[X] LEGACY AI CODE ASSISTANTS", fill=(185, 28, 28), font=get_font(18, bold=True))
 
     legacy_items = [
         "• Fragile single-pass edits with frequent syntax breakdowns",
@@ -256,15 +310,15 @@ def generate_carousel_deck(directive: Dict[str, Any], output_prefix: str = "post
         "• Hallucinated package imports and broken build pipelines",
         "• Slow inference (>400ms latency) and expensive compute costs"
     ]
-    yl = 370
+    yl = 480
     for it in legacy_items:
-        d2.text((90, yl), it, fill=(100, 116, 139), font=get_font(23))
-        yl += 42
+        d2.text((90, yl), it, fill=(100, 116, 139), font=get_font(21))
+        yl += 36
 
     # Card 2: The New Paradigm
-    draw_card_with_shadow(d2, [(60, 590), (width - 60, 890)], radius=24, fill=(255, 255, 255), outline=(52, 211, 153), width=2)
-    d2.rounded_rectangle([(90, 615), (380, 650)], radius=8, fill=(236, 253, 245), outline=(16, 185, 129), width=1)
-    d2.text((105, 623), "[+] THE NEW AGENTIC PARADIGM", fill=(5, 150, 105), font=get_font(18, bold=True))
+    draw_card_with_shadow(d2, [(60, 660), (width - 60, 890)], radius=20, fill=(255, 255, 255), outline=(52, 211, 153), width=2)
+    d2.rounded_rectangle([(90, 680), (380, 715)], radius=8, fill=(236, 253, 245), outline=(16, 185, 129), width=1)
+    d2.text((105, 688), "[+] THE NEW AGENTIC PARADIGM", fill=(5, 150, 105), font=get_font(18, bold=True))
 
     new_items = [
         "• Persistent conversation trees and reversible code diffs",
@@ -272,10 +326,10 @@ def generate_carousel_deck(directive: Dict[str, Any], output_prefix: str = "post
         "• Deep visibility and inspection into every model transaction",
         "• 100% private and vendor-neutral on your local workstation"
     ]
-    yn = 670
+    yn = 730
     for it in new_items:
-        d2.text((90, yn), it, fill=(15, 23, 42), font=get_font(23, bold=True))
-        yn += 42
+        d2.text((90, yn), it, fill=(15, 23, 42), font=get_font(21, bold=True))
+        yn += 36
 
     draw_common_footer(d2, "SWIPE FOR ARCHITECTURE >")
 
@@ -478,6 +532,225 @@ def generate_carousel_deck(directive: Dict[str, Any], output_prefix: str = "post
     path7 = STAGING_DIR / f"{output_prefix}_slide7.png"
     img7.save(path7, "PNG")
     slide_paths.append(str(path7))
+
+    return slide_paths
+
+
+def generate_story_slides(directive: Dict[str, Any], output_prefix: str = "story_deck") -> List[str]:
+    """
+    Generate high-retention 3-slide vertical Story deck (1080x1920, 9:16) for Instagram,
+    Facebook, and Telegram Stories. Built with strict safe zones (~250px top/bottom) and
+    100M+ creator interactive mechanics:
+    - Slide 1: Ephemeral Hook Card + Executive Avatar Badge + Breaking Alert
+    - Slide 2: Architecture Leap & Titan Executive Quote Card
+    - Slide 3: Interactive Poll Zone + Link Sticker Area + Reply Action Dock
+    """
+    width, height = 1080, 1920
+    base_wallpaper = load_vertical_wallpaper(width, height)
+    slide_paths = []
+
+    title = directive.get("title", "AI Architecture Breakthrough")
+    hook = directive.get("hook_narration", "")
+    body = directive.get("body_narration", "")
+    cta = directive.get("call_to_action", "What is your perspective on this paradigm shift?")
+    persona = detect_persona(title, body)
+
+    def draw_story_header(d: ImageDraw.ImageDraw, img: Image.Image, slide_idx: int, main_title: str, subtitle: str):
+        """Header anchored inside the vertical safe zone (y >= 260). High contrast on dark gradient."""
+        logo = get_circular_logo(size=56)
+        if logo:
+            img.paste(logo, (60, 260), mask=logo)
+            text_x = 130
+        else:
+            text_x = 60
+
+        d.text((text_x, 264), main_title, fill=(255, 255, 255), font=get_font(22, bold=True))
+        d.text((text_x, 294), subtitle, fill=(52, 211, 153), font=get_font(16, bold=True))
+
+        # Slide counter pill
+        d.rounded_rectangle([(width - 190, 265), (width - 60, 315)], radius=14, fill=(255, 255, 255), outline=(226, 232, 240), width=2)
+        d.text((width - 170, 276), f"STORY {slide_idx}/3", fill=(99, 102, 241), font=get_font(18, bold=True))
+
+    def draw_story_tap_indicator(d: ImageDraw.ImageDraw, label: str):
+        """Pulsing tap guidance indicator above bottom safe zone (y ~ 1620)."""
+        d.rounded_rectangle([(140, 1610), (width - 140, 1665)], radius=16, fill=(255, 255, 255), outline=(226, 232, 240), width=2)
+        d.text((180, 1624), label, fill=(79, 70, 229), font=get_font(20, bold=True))
+
+    # =========================================================================
+    # STORY SLIDE 1/3: EPHEMERAL HOOK CARD & EXECUTIVE BADGE
+    # =========================================================================
+    img1 = base_wallpaper.copy()
+    d1 = ImageDraw.Draw(img1)
+    draw_story_header(d1, img1, 1, "@Eraof_Ai // BREAKING SIGNAL", "[•] VERIFIED TECH DISPATCH")
+
+    # Titan Persona Avatar Chip (Frosted Glass Pill)
+    draw_card_with_shadow(d1, [(60, 345), (width - 60, 435)], radius=20, fill=(255, 255, 255), outline=(226, 232, 240), width=1)
+    avatar = get_circular_avatar(persona["avatar_file"], size=64)
+    if avatar:
+        img1.paste(avatar, (80, 357), mask=avatar)
+        d1.text((160, 366), f"KEY FIGURE: {persona['name'].upper()}", fill=(79, 70, 229), font=get_font(20, bold=True))
+        d1.text((160, 396), persona["role"].upper(), fill=(71, 85, 105), font=get_font(16, bold=True))
+    else:
+        d1.text((85, 375), f"[•] TECH TITAN: {persona['name'].upper()}", fill=(79, 70, 229), font=get_font(22, bold=True))
+
+    # Big Central Hook Card
+    draw_card_with_shadow(d1, [(60, 460), (width - 60, 980)], radius=28, fill=(255, 255, 255), outline=(226, 232, 240), width=2)
+    d1.rounded_rectangle([(95, 495), (420, 535)], radius=10, fill=(254, 242, 242))
+    d1.text((115, 503), "[!] CRITICAL ANNOUNCEMENT", fill=(225, 29, 72), font=get_font(16, bold=True))
+
+    font_title = get_font(46, bold=True)
+    wrapped_title = wrap_text(title, font_title, 880, d1)
+    yt = 560
+    for line in wrapped_title[:4]:
+        d1.text((95, yt), line, fill=(15, 23, 42), font=font_title)
+        yt += 58
+
+    # Hook Narration Box
+    d1.rounded_rectangle([(95, yt + 15), (width - 95, 940)], radius=16, fill=(248, 250, 252))
+    font_hook = get_font(24)
+    wrapped_hook = wrap_text(hook, font_hook, 840, d1)
+    yh = yt + 35
+    for line in wrapped_hook[:5]:
+        d1.text((120, yh), line, fill=(51, 65, 85), font=font_hook)
+        yh += 36
+
+    # 3-Point Impact Matrix Card
+    draw_card_with_shadow(d1, [(60, 1020), (width - 60, 1560)], radius=26, fill=(255, 255, 255), outline=(226, 232, 240), width=2)
+    d1.text((95, 1055), "RAPID IMPACT MATRIX", fill=(15, 23, 42), font=get_font(26, bold=True))
+
+    matrix_rows = [
+        ("[01]", "BENCHMARK PERFORMANCE", "Verified SOTA delta vs legacy models", (14, 165, 233)),
+        ("[02]", "COMPUTE EFFICIENCY", "Reduced inference latency & cost/token", (16, 185, 129)),
+        ("[03]", "DEVELOPER AVAILABILITY", "Live API endpoints & open weights ecosystem", (168, 85, 247))
+    ]
+    ym = 1115
+    for tag, m_title, m_desc, clr in matrix_rows:
+        d1.rounded_rectangle([(95, ym), (width - 95, ym + 115)], radius=16, fill=(248, 250, 252), outline=(226, 232, 240), width=1)
+        d1.text((120, ym + 18), tag, fill=clr, font=get_font(20, bold=True))
+        d1.text((180, ym + 18), m_title, fill=(15, 23, 42), font=get_font(20, bold=True))
+        d1.text((120, ym + 62), m_desc, fill=(71, 85, 105), font=get_font(18))
+        ym += 140
+
+    draw_story_tap_indicator(d1, ">> TAP SCREEN FOR ARCHITECTURE BREAKDOWN >>")
+
+    path1 = STAGING_DIR / f"{output_prefix}_slide1.png"
+    img1.save(path1, "PNG")
+    slide_paths.append(str(path1))
+
+    # =========================================================================
+    # STORY SLIDE 2/3: ARCHITECTURE LEAP & TITAN EXECUTIVE QUOTE
+    # =========================================================================
+    img2 = base_wallpaper.copy()
+    d2 = ImageDraw.Draw(img2)
+    draw_story_header(d2, img2, 2, "@Eraof_Ai // CORE ARCHITECTURE", "[•] TECHNICAL MECHANISM")
+
+    # Architecture Breakdown Card
+    draw_card_with_shadow(d2, [(60, 360), (width - 60, 940)], radius=26, fill=(255, 255, 255), outline=(226, 232, 240), width=2)
+    d2.rounded_rectangle([(95, 395), (430, 435)], radius=10, fill=(238, 242, 255))
+    d2.text((115, 403), "[•] DEEP SYSTEM ARCHITECTURE", fill=(79, 70, 229), font=get_font(16, bold=True))
+    d2.text((95, 455), "HOW IT OPERATES UNDER THE HOOD", fill=(15, 23, 42), font=get_font(30, bold=True))
+
+    bullets = [
+        ("[+] REASONING ENGINE", "Native test-time compute scaling with recursive search over reasoning trees."),
+        ("[•] ATTENTION EFFICIENCY", "Optimized cross-attention layers reducing memory footprint during long-context execution."),
+        ("[ * ] AUTONOMOUS SYNTHESIS", "Multi-turn tool-calling with deterministic error self-correction loops.")
+    ]
+    yb = 515
+    for b_title, b_desc in bullets:
+        d2.text((95, yb), b_title, fill=(14, 165, 233), font=get_font(20, bold=True))
+        font_b = get_font(20)
+        wrapped_b = wrap_text(b_desc, font_b, 850, d2)
+        ybl = yb + 32
+        for line in wrapped_b[:2]:
+            d2.text((95, ybl), line, fill=(51, 65, 85), font=font_b)
+            ybl += 28
+        yb += 120
+
+    # Executive Quote Card
+    draw_card_with_shadow(d2, [(60, 980), (width - 60, 1560)], radius=26, fill=(255, 255, 255), outline=(226, 232, 240), width=2)
+    avatar_lg = get_circular_avatar(persona["avatar_file"], size=88)
+    if avatar_lg:
+        img2.paste(avatar_lg, (95, 1015), mask=avatar_lg)
+        d2.text((205, 1025), f"EXECUTIVE PERSPECTIVE", fill=(14, 165, 233), font=get_font(18, bold=True))
+        d2.text((205, 1055), persona["name"].upper(), fill=(15, 23, 42), font=get_font(24, bold=True))
+        d2.text((205, 1085), persona["role"], fill=(100, 116, 139), font=get_font(16))
+    else:
+        d2.text((95, 1025), f"EXECUTIVE PERSPECTIVE // {persona['name'].upper()}", fill=(15, 23, 42), font=get_font(24, bold=True))
+
+    # Quote block
+    d2.rounded_rectangle([(95, 1140), (width - 95, 1460)], radius=18, fill=(248, 250, 252), outline=(226, 232, 240), width=1)
+    d2.line([(110, 1160), (110, 1440)], fill=(79, 70, 229), width=5)
+    font_quote = get_font(26, bold=True)
+    wrapped_quote = wrap_text(f'"{persona["quote"]}"', font_quote, 780, d2)
+    yq = 1175
+    for line in wrapped_quote[:5]:
+        d2.text((135, yq), line, fill=(30, 41, 59), font=font_quote)
+        yq += 42
+
+    d2.text((115, 1495), "SOURCE: Verified Research Paper & Engineering Keynote", fill=(100, 116, 139), font=get_font(18))
+
+    draw_story_tap_indicator(d2, ">> TAP SCREEN FOR FINAL VERDICT & POLL >>")
+
+    path2 = STAGING_DIR / f"{output_prefix}_slide2.png"
+    img2.save(path2, "PNG")
+    slide_paths.append(str(path2))
+
+    # =========================================================================
+    # STORY SLIDE 3/3: INTERACTIVE POLL ZONE & ACTION DOCK
+    # =========================================================================
+    img3 = base_wallpaper.copy()
+    d3 = ImageDraw.Draw(img3)
+    draw_story_header(d3, img3, 3, "@Eraof_Ai // VERDICT & POLL", "[•] COMMUNITY VERDICT")
+
+    # Technical Verdict Card
+    draw_card_with_shadow(d3, [(60, 360), (width - 60, 680)], radius=26, fill=(255, 255, 255), outline=(226, 232, 240), width=2)
+    d3.rounded_rectangle([(95, 395), (420, 435)], radius=10, fill=(240, 253, 244))
+    d3.text((115, 403), "[+] THE ENGINEERING VERDICT", fill=(21, 128, 61), font=get_font(16, bold=True))
+    d3.text((95, 455), "WHAT THIS MEANS FOR PRACTITIONERS", fill=(15, 23, 42), font=get_font(28, bold=True))
+    
+    font_vd = get_font(22)
+    vd_text = "This breakthrough shifts AI engineering from prompt tuning to systematic agent orchestration and automated compute allocation."
+    wrapped_vd = wrap_text(vd_text, font_vd, 860, d3)
+    yvd = 515
+    for line in wrapped_vd[:4]:
+        d3.text((95, yvd), line, fill=(51, 65, 85), font=font_vd)
+        yvd += 34
+
+    # Interactive Story Poll Container (Optimized for Instagram/Telegram poll sticker placement)
+    draw_card_with_shadow(d3, [(60, 720), (width - 60, 1280)], radius=26, fill=(255, 255, 255), outline=(124, 58, 237), width=2)
+    d3.rounded_rectangle([(95, 755), (460, 795)], radius=10, fill=(245, 243, 255))
+    d3.text((115, 763), "[?] COMMUNITY POLL ZONE", fill=(109, 40, 217), font=get_font(16, bold=True))
+
+    font_cta = get_font(30, bold=True)
+    wrapped_cta = wrap_text(cta, font_cta, 860, d3)
+    yc = 815
+    for line in wrapped_cta[:3]:
+        d3.text((95, yc), line, fill=(15, 23, 42), font=font_cta)
+        yc += 44
+
+    # Native Poll Option Stickers
+    d3.rounded_rectangle([(95, 960), (width - 95, 1045)], radius=16, fill=(241, 245, 249), outline=(124, 58, 237), width=2)
+    d3.rounded_rectangle([(95, 960), (int(95 + (width - 190) * 0.81), 1045)], radius=16, fill=(237, 233, 254))
+    d3.text((125, 985), "[A]  Revolutionary Paradigm Shift  (81%)", fill=(109, 40, 217), font=get_font(24, bold=True))
+
+    d3.rounded_rectangle([(95, 1070), (width - 95, 1155)], radius=16, fill=(248, 250, 252), outline=(203, 213, 225), width=2)
+    d3.rounded_rectangle([(95, 1070), (int(95 + (width - 190) * 0.19), 1155)], radius=16, fill=(241, 245, 249))
+    d3.text((125, 1095), "[B]  Incremental Benchmark Noise  (19%)", fill=(100, 116, 139), font=get_font(24, bold=True))
+
+    d3.text((95, 1195), "[*] Tap option above or place native Instagram Story poll sticker here", fill=(100, 116, 139), font=get_font(16))
+
+    # Link Sticker & Social Dock
+    draw_card_with_shadow(d3, [(60, 1320), (width - 60, 1560)], radius=24, fill=(255, 255, 255), outline=(226, 232, 240), width=2)
+    d3.text((95, 1345), "[ TAP LINK STICKER TO JOIN TELEGRAM ]", fill=(14, 165, 233), font=get_font(20, bold=True))
+    d3.text((95, 1385), "t.me/Eraof_Ai", fill=(15, 23, 42), font=get_font(34, bold=True))
+    d3.text((95, 1445), "[+] Daily AI breakthroughs, verified research papers, and open weights", fill=(71, 85, 105), font=get_font(18))
+    d3.text((95, 1485), "[>] Reply to this story with your opinion to join the discussion", fill=(16, 185, 129), font=get_font(18, bold=True))
+
+    draw_story_tap_indicator(d3, ">> SWIPE UP TO JOIN @Eraof_Ai ON TELEGRAM >>")
+
+    path3 = STAGING_DIR / f"{output_prefix}_slide3.png"
+    img3.save(path3, "PNG")
+    slide_paths.append(str(path3))
 
     return slide_paths
 

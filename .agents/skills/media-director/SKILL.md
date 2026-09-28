@@ -1,94 +1,97 @@
 ---
 name: media-director
-description: Synthesize qualified AI technical stories into high-retention short-form media directives, route formats (Veo 3.1 vs Imagen 3.0), and enforce the strict JSON Director schema.
+description: Synthesize qualified AI technical stories into high-retention short-form media directives, route formats (Post 7-page carousel, Reels 9:16 MP4, Story 3-slide 9:16), integrate CEO avatars & Veo 3.1, and enforce the 5-stage prompt architecture.
 ---
 
-# Media Director & Retention Engineering Skill
+# Media Director & Retention Engineering Skill (100M+ Mega-Creator Playbook)
 
-This skill guides the autonomous agent in transforming raw, verified technical breakthroughs into captivating, high-retention short-form broadcast media designed for TikTok, Instagram Reels, Facebook Reels, Threads, and X.
+This skill guides the autonomous agent in transforming raw, verified technical breakthroughs into captivating, high-retention short-form broadcast media designed for Instagram, Telegram, TikTok, YouTube Shorts, and X.
 
 ---
 
-## 1. Format Assignment Matrix
+## 1. Five-Stage Pipeline Architecture
 
-Evaluate the qualified update and assign the format strictly according to technical subject matter:
+```
+[MCP / News Scraper]
+      |
+      v
+[Agent Step 1: CURATOR]
+      |-> Evaluates candidates across 4 dimensions (0-10 each):
+      |   - Technical Consequence
+      |   - Breadth of Impact
+      |   - Visual Explainability
+      |   - Novelty / Recency
+      |-> Threshold: total_score >= 25/40
+      v
+[Agent Step 2: SCRIPTWRITER]
+      |-> Produces ONE canonical script object (<90 words, 5 beats):
+      |   - core_hook (sound-off readable in 1.5s)
+      |   - technical_mechanism (how it works under the hood)
+      |   - engineering_implication (what developers unlock)
+      |   - benchmark_or_proof (verified SOTA metric delta)
+      |   - forward_question (open loop driving comments)
+      v
+[Agent Step 3: FORMAT ROUTER]
+      |-> Expands canonical script into 3 production briefs:
+      |   - POST: 4:5 / 1:1, 7-page poster carousel deck
+      |   - REELS: 9:16 vertical motion video, sound-off hook, rapid visual pacing
+      |   - STORY: 3-slide vertical ephemeral deck with safe margins (~250px)
+      v
+[Agent Step 4: ANTIGRAVITY MEDIA GEN]
+      |-> POST: generate_carousel_deck() (7 high-contrast poster cards)
+      |-> REELS: synthesize_broadcast_video() (Veo 3.1 / Apple fluid silk wave)
+      |-> STORY: generate_story_slides() (3 vertical ephemeral slides)
+      v
+[Agent Step 5: TELEGRAM DELIVERY]
+      |-> Dispatches 3 separate messages tagged in bold:
+          1. **POST** (7-page carousel album)
+          2. **REELS** (9:16 playable MP4 video)
+          3. **STORY** (3-page story album with poll zone)
+```
 
-| Subject Type | Assigned Format | Target Pipeline |
+---
+
+## 2. 100M+ Creator Retention Psychology
+
+### 1. Reels (9:16 Vertical Video)
+- **The 0–1.5s Hook**: Stop the scroll immediately. Combine a **human face** (AI Tech Titan CEO avatar) + a **bold claim**.
+- **Visual Pacing**: Change visual state every 2.0 to 2.5 seconds (7 poster chapters across 30 seconds).
+- **Upper-Middle Safe Zone Captions**: Captions must stay between y=200 and y=750 to prevent overlap with platform UI overlays (account handle, audio track, reaction dock).
+- **Seamless Looping**: The closing beat bridges visually and syntactically back into the opening hook, driving completion rates >100%.
+
+### 2. Carousel Posts (1:1 / 4:5 Posters)
+- **Slide 1**: High-contrast headline + Titan CEO avatar badge + agent terminal IDE.
+- **Slide 2**: The Legacy Problem vs New Solution. Acts as an algorithmic "second cover".
+- **Slides 3–6**: Architecture Leap, Verified Benchmark Radar, Developer Workflow, and SDK/Weights.
+- **Slide 7**: The Big Technical Debate + Live Poll Simulation + Social Action Dock.
+
+### 3. Stories (9:16 Ephemeral Decks)
+- **Strict Safe Zones**: 250px top margin (header) and 250px bottom margin (reply dock).
+- **Slide 1**: Breaking signal alert + Titan avatar + rapid impact matrix.
+- **Slide 2**: Architectural breakdown + verified executive quote card.
+- **Slide 3**: Dedicated interactive community poll zone + link sticker area.
+
+---
+
+## 3. AI Tech Titan CEO Persona System
+
+Automatically matches headlines and source texts to industry leaders with circular executive badges and verified quotes:
+
+| Persona | Lab / Organization | Trigger Keywords |
 | :--- | :--- | :--- |
-| Dynamic software demos, robotics, code execution screencasts, multimodal VLM capabilities | `video` | Google Veo 3.1 Fast (9:16 vertical MP4, 6s) + TTS Voiceover |
-| Benchmark charts, system schematics, policy/safety papers, API pricing updates | `text_image` | Imagen 3.0 (1:1 square graphic) + Technical Copy |
+| **Demis Hassabis** | Google DeepMind | `gemini`, `deepmind`, `hassabis`, `alphafold` |
+| **Sam Altman** | OpenAI | `openai`, `chatgpt`, `altman`, `gpt-4`, `o1`, `sora` |
+| **Dario Amodei** | Anthropic | `anthropic`, `claude`, `amodei`, `artifacts` |
+| **Jensen Huang** | NVIDIA | `nvidia`, `jensen`, `blackwell`, `cuda`, `gpu` |
+| **Mark Zuckerberg** | Meta AI | `meta`, `zuckerberg`, `llama`, `fair` |
+| **Liang Wenfeng** | DeepSeek | `deepseek`, `wenfeng`, `r1`, `v3` |
+| **Sundar Pichai** | Google / Alphabet | `google`, `pichai`, `tpu`, `vertex ai` |
+| **Frontier AI Lead** | Era of AI Research | Default fallback |
 
 ---
 
-## 2. Short-Form Narration Formula (Strict 30–45s Pacing)
+## 4. Google AI Studio Veo Integration & Fallback Engine
 
-All narration copy must adhere strictly to the 4-block psychological retention model:
-
-```
-[0s - 3s] Block 1: Disruption Hook
-  - Goal: Stop scroll immediately.
-  - Formula: Bold, high-contrast factual assertion.
-  - Invariant: Zero greetings, zero channel introductions, zero filler.
-  - Example: "Google DeepMind just made standard transformer fine-tuning obsolete."
-
-[4s - 18s] Block 2: The Core Event
-  - Goal: Deliver dense, verified technical information.
-  - Formula: State the release name, the engineering team, and the definitive metric.
-  - Example: "Their newly released Gemini 2.0 Flash architecture achieves a 14.2% jump on SWE-bench while cutting inference latency under 200 milliseconds."
-
-[19s - 30s] Block 3: Practical Application
-  - Goal: Demonstrate immediate developer utility.
-  - Formula: Explain what engineers can build right now that was previously impossible.
-  - Example: "Developers can now run real-time agentic reasoning loops over multi-million token codebases with zero throughput degradation."
-
-[31s - 35s] Block 4: The Debate CTA
-  - Goal: Drive high-velocity comment section engagement.
-  - Formula: Ask a polarizing, non-trivial technical trade-off question.
-  - Example: "Will open-weight alternatives ever catch up, or is proprietary infrastructure now unassailable?"
-```
-
----
-
-## 3. Generative Prompt Guidelines
-
-### For Google Veo 3.1 Fast (`format = "video"`)
-- **Aspect Ratio**: Must be explicitly `9:16 vertical aspect ratio`.
-- **Cinematography**: Dynamic camera motion (`rapid macro tracking zoom`, `low-angle orbital sweep`, `fpv dive into silicon dies`).
-- **Lighting**: Cinematic volumetric lighting, high-contrast atmospheric rays, neon accents over dark matte textures.
-- **Rendering**: Ultra-photorealistic, 8k render, octane render style.
-- **Typography Rule**: Strictly **ZERO baked-in typography, text, or floating subtitles** in the video prompt (captions are rendered natively by platforms).
-
-### For Imagen 3.0 (`format = "text_image"`)
-- **Aspect Ratio**: Must be explicitly `1:1 square aspect ratio`.
-- **Style**: Clean vector or isometric schematic aesthetic.
-- **Color Balance**: Dark-mode palette (obsidian, deep navy) with vibrant contrast (cyan, electric amber).
-
----
-
-## 4. Strict JSON Director Output Schema
-
-All synthesis outputs must match this JSON contract:
-
-```json
-{
-  "title": "5-8 word punchy technical headline",
-  "source_url": "https://official-source-link.com/announcement",
-  "format": "video",
-  "hook_narration": "First 3 seconds of spoken audio designed to stop scrolling.",
-  "body_narration": "Remaining spoken audio covering the core release and practical developer implications (40-60 words).",
-  "call_to_action": "High-velocity polarizing question to trigger comments.",
-  "visual_prompt": "Cinematic visual prompt for Veo 3 (9:16 vertical, dynamic lighting) or Imagen 3 (1:1 clean tech graphic).",
-  "platform_captions": {
-    "short_form": "Hook-first caption optimized for TikTok, Instagram Reels, and Facebook Reels with 4-5 hashtags.",
-    "microblog": "Dense, insight-rich summary optimized for X and Threads under 280 characters, including the source link."
-  }
-}
-```
-
----
-
-## 5. Dispatch & HITL Procedures
-
-1. **Asset Staging**: Call `social-dispatcher/upload_media_to_r2` with local render.
-2. **Database Logging**: Call `sqlite-history/write_query` to record post in `pending` state.
-3. **HITL Review**: Call `social-dispatcher/send_telegram_approval` to present the interactive review card. Never publish directly to social networks without callback approval.
+- **Target Models**: `veo-3.1-fast-generate-preview`, `veo-3.1-generate-preview`, `veo-2.0-generate-001`.
+- **Automatic Fallback**: If Veo video generation requires pay-as-you-go billing that is not active, the system automatically falls back to our local **Apple fluid silk wave motion engine** with zero interruption.
+- **Visual Typography Invariant**: Never bake subtitles directly into generated video frames. Use ASCII tech badges (`[+]`, `[•]`, `[ * ]`, `>>`) instead of multi-byte emojis to prevent square glyph boxes `[]` on Windows.

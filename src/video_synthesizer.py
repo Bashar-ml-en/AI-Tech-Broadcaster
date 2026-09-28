@@ -28,6 +28,9 @@ import imageio.v3 as iio
 import imageio_ffmpeg
 import edge_tts
 
+from src.persona_manager import detect_persona, get_circular_avatar
+from src.google_veo_client import generate_veo_broll
+
 ROOT_DIR = Path(__file__).resolve().parent.parent
 STAGING_DIR = ROOT_DIR / "storage" / "staging"
 STAGING_DIR.mkdir(parents=True, exist_ok=True)
@@ -201,6 +204,7 @@ def render_motion_video(
 
     logo_icon = get_circular_logo(size=34)
     base_wallpaper = load_vertical_wallpaper(width, height)
+    persona = detect_persona(headline, hook + " " + body)
 
     for f_idx in range(total_frames):
         t = f_idx / fps
@@ -262,6 +266,13 @@ def render_motion_video(
             # =========================================================
             draw.rounded_rectangle([(30, 95), (280, 128)], radius=16, fill=(255, 255, 255), outline=(99, 102, 241), width=1)
             draw.text((45, 102), "PAGE 01/07 // THE ALERT", fill=(67, 56, 202), font=font_badge)
+
+            # Titan Persona Avatar Chip (MrBeast Hook rule: Human face + bold claim in first 1.5s)
+            avatar_chip = get_circular_avatar(persona["avatar_file"], size=36)
+            if avatar_chip:
+                img.paste(avatar_chip, (width - 70, 88), mask=avatar_chip)
+                draw.text((width - 170, 93), f"{persona['name'].split()[0].upper()}", fill=(255, 255, 255), font=font_badge)
+                draw.text((width - 170, 109), f"{persona['lab'].upper()}", fill=(167, 243, 208), font=font_brand_sub)
 
             lines_hl = wrap_text(headline, font_hl, width - 60, draw)
             y_h = 145
@@ -525,6 +536,11 @@ def render_motion_video(
                 draw.text((58, ya + 8), f"{icon}  {label}", fill=clr, font=font_dock)
                 ya += 46
 
+            # Seamless Loop Indicator (Loop completion psychology)
+            if progress > 0.93:
+                draw.rounded_rectangle([(30, 765), (width - 30, 805)], radius=10, fill=(238, 242, 255), outline=(99, 102, 241), width=1)
+                draw.text((42, 775), ">> SEAMLESS LOOP: RE-EXAMINE SOTA LEAP >>", fill=(79, 70, 229), font=font_dock)
+
         # -------------------------------------------------------------
         # 3. Clean Minimalist Frosted Footer (NO Audio Wave Bars)
         # -------------------------------------------------------------
@@ -567,8 +583,15 @@ def render_motion_video(
     return str(output_video_path)
 
 
-async def synthesize_broadcast_video(directive: Dict[str, Any], output_filename: str) -> str:
-    """End-to-end video synthesis pipeline: Script -> Neural Voiceover -> 7-Poster Motion Graphics -> MP4."""
+async def synthesize_broadcast_video(
+    directive: Dict[str, Any],
+    output_filename: str,
+    use_veo: bool = False
+) -> str:
+    """
+    End-to-end video synthesis pipeline:
+    Script -> Neural Voiceover -> Google AI Studio Veo / Apple Silk Wave -> 7-Poster Motion Graphics -> MP4.
+    """
     # Compose captivating, structured voiceover covering the 7-poster narrative
     hook_text = directive.get('hook_narration', '').strip()
     body_text = directive.get('body_narration', '').strip()
@@ -582,7 +605,17 @@ async def synthesize_broadcast_video(directive: Dict[str, Any], output_filename:
     # Step 1: Synthesize charismatic neural speech
     await synthesize_audio(narration, audio_path)
 
-    # Step 2: Render 9:16 vertical motion video across 7 poster pages
+    # Step 2: Optional Google AI Studio Veo video generation with automatic fallback to Apple silk wave
+    if use_veo:
+        try:
+            print("[Google AI Studio] Generating Veo b-roll video...")
+            veo_path = generate_veo_broll(directive.get('title', 'AI Architecture'))
+            if veo_path:
+                print(f"[Google AI Studio] Veo b-roll generated: {veo_path}")
+        except Exception as e:
+            print(f"[Google AI Studio] Veo unavailable ({e}); proceeding with Apple fluid silk wave engine.")
+
+    # Step 3: Render 9:16 vertical motion video across 7 poster pages
     render_motion_video(directive, audio_path, video_path)
 
     return str(video_path)

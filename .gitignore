@@ -15,7 +15,7 @@ config/.env
 !config/.env.example
 
 # Local SQLite databases and logs
-storage/published_history.db
+storage/*.db
 storage/logs/*.log
 storage/staging/*.mp4
 storage/staging/*.png
