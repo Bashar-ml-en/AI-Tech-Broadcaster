@@ -81,34 +81,41 @@ def tool_web_fetch(url: str) -> Dict[str, Any]:
     headers = {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AI-Tech-Broadcaster/2.0 (Grounded-Verification-Engine)"
     }
-    with httpx.Client(timeout=30.0, follow_redirects=True) as client:
-        resp = client.get(url, headers=headers)
-        if resp.status_code >= 400:
+    try:
+        with httpx.Client(timeout=20.0, follow_redirects=True, verify=False) as client:
+            resp = client.get(url, headers=headers)
+            if resp.status_code >= 400:
+                return {
+                    "error": f"HTTP {resp.status_code}",
+                    "url": url,
+                    "content": ""
+                }
+
+            soup = BeautifulSoup(resp.text, "html.parser")
+            
+            # Remove noisy elements
+            for element in soup(["script", "style", "nav", "footer", "header", "noscript", "svg"]):
+                element.decompose()
+
+            title = soup.title.string.strip() if soup.title and soup.title.string else "Technical Announcement"
+            
+            # Extract text preserving paragraphs and headers
+            body_text = soup.get_text(separator="\n", strip=True)
+            truncated_text = body_text[:25000]
+
             return {
-                "error": f"HTTP {resp.status_code}",
                 "url": url,
-                "text": ""
+                "title": title,
+                "status": resp.status_code,
+                "content": truncated_text,
+                "length": len(truncated_text)
             }
-
-        soup = BeautifulSoup(resp.text, "html.parser")
-        
-        # Remove noisy elements
-        for element in soup(["script", "style", "nav", "footer", "header", "noscript", "svg"]):
-            element.decompose()
-
-        title = soup.title.string.strip() if soup.title and soup.title.string else "Technical Announcement"
-        
-        # Extract text preserving paragraphs and headers
-        body_text = soup.get_text(separator="\n", strip=True)
-        # Limit to first 25,000 chars to fit context window comfortably while retaining dense technical metrics
-        truncated_text = body_text[:25000]
-
+    except Exception as e:
+        logger.warning("tool_web_fetch failed gracefully for %s: %s", url, e)
         return {
+            "error": str(e),
             "url": url,
-            "title": title,
-            "status": resp.status_code,
-            "content": truncated_text,
-            "length": len(truncated_text)
+            "content": ""
         }
 
 

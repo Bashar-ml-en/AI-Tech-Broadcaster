@@ -260,11 +260,18 @@ def qualify_candidate_story(candidate: Dict[str, Any]) -> Optional[Dict[str, Any
         return None
 
     # Fetch primary documentation via MCP web-fetcher
-    fetch_data = tool_web_fetch(url)
+    try:
+        fetch_data = tool_web_fetch(url)
+    except Exception as e:
+        logger.warning("Qualify candidate fetch exception for %s: %s", url, e)
+        fetch_data = {}
+
     content = fetch_data.get("content", "")
     if len(content) < 200:
-        logger.debug("Source content too brief for verification: %s", url)
-        return None
+        content = candidate.get("summary", "")
+        if len(content) < 40:
+            logger.debug("Source content too brief for verification: %s", url)
+            return None
 
     content_lower = content.lower()
 

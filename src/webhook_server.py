@@ -671,13 +671,13 @@ def sidecar_worker():
                 pipeline_phase = "directing"
                 phase_timestamp = time.time()
                 story_res = execute_broadcast_cycle(target_format="story")
-                last_story_time = time.time()
-                last_scan_time = last_story_time
                 last_scan_result = f"Story #{story_res.get('post_id')} staged" if story_res else "Story: no new stories"
-                pipeline_phase = "idle"
             except Exception as e:
                 logger.exception("Story cycle error: %s", e)
                 last_scan_result = f"Story error: {str(e)[:40]}"
+            finally:
+                last_story_time = time.time()
+                last_scan_time = last_story_time
                 pipeline_phase = "idle"
 
         # 2. Check Reel Cadence (every 30 mins)
@@ -688,13 +688,13 @@ def sidecar_worker():
                 pipeline_phase = "directing"
                 phase_timestamp = time.time()
                 reel_res = execute_broadcast_cycle(target_format="reel")
-                last_reel_time = time.time()
-                last_scan_time = last_reel_time
                 last_scan_result = f"Reel #{reel_res.get('post_id')} staged" if reel_res else "Reel: no new stories"
-                pipeline_phase = "idle"
             except Exception as e:
                 logger.exception("Reel cycle error: %s", e)
                 last_scan_result = f"Reel error: {str(e)[:40]}"
+            finally:
+                last_reel_time = time.time()
+                last_scan_time = last_reel_time
                 pipeline_phase = "idle"
 
         # 3. Check Post Cadence (every 60 mins)
@@ -705,13 +705,13 @@ def sidecar_worker():
                 pipeline_phase = "directing"
                 phase_timestamp = time.time()
                 post_res = execute_broadcast_cycle(target_format="post")
-                last_post_time = time.time()
-                last_scan_time = last_post_time
                 last_scan_result = f"Feed Post #{post_res.get('post_id')} staged" if post_res else "Post: no new stories"
-                pipeline_phase = "idle"
             except Exception as e:
                 logger.exception("Feed Post cycle error: %s", e)
                 last_scan_result = f"Post error: {str(e)[:40]}"
+            finally:
+                last_post_time = time.time()
+                last_scan_time = last_post_time
                 pipeline_phase = "idle"
 
         time.sleep(10)
