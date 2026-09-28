@@ -209,12 +209,34 @@ def render_motion_video(
     base_wallpaper = load_vertical_wallpaper(width, height)
     persona = detect_persona(headline, hook + " " + body)
 
+    # Fetch 9:16 photorealistic FLUX AI visual for animated motion video
+    ai_motion_source = None
+    try:
+        from src.pollinations_client import generate_visual_for_story
+        from PIL import ImageEnhance
+        visual_path = generate_visual_for_story(headline, aspect_ratio="9:16")
+        if visual_path and visual_path.exists():
+            ai_motion_source = Image.open(visual_path).convert("RGB")
+    except Exception:
+        pass
+
     for f_idx in range(total_frames):
         t = f_idx / fps
         progress = f_idx / total_frames
 
-        # Create base image from Apple fluid wave wallpaper
-        img = base_wallpaper.copy()
+        # Create animated motion base image (Continuous Ken Burns Camera Motion)
+        if ai_motion_source is not None:
+            zoom = 1.0 + (progress * 0.16)
+            w_crop = int(ai_motion_source.width / zoom)
+            h_crop = int(ai_motion_source.height / zoom)
+            x_crop = int((ai_motion_source.width - w_crop) / 2)
+            y_crop = int((ai_motion_source.height - h_crop) * progress)
+            cropped = ai_motion_source.crop((x_crop, y_crop, x_crop + w_crop, y_crop + h_crop))
+            frame_base = cropped.resize((width, height), Image.Resampling.BILINEAR)
+            from PIL import ImageEnhance
+            img = ImageEnhance.Brightness(frame_base).enhance(0.42)
+        else:
+            img = base_wallpaper.copy()
         draw = ImageDraw.Draw(img)
 
         # -------------------------------------------------------------

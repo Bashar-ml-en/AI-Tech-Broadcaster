@@ -186,7 +186,21 @@ def generate_carousel_deck(directive: Dict[str, Any], output_prefix: str = "post
 
     slide_paths = []
     logo_icon = get_circular_logo(size=52)
-    base_wallpaper = load_square_wallpaper(width, height)
+
+    # Fetch photorealistic FLUX.1 generative AI visual for this technical story
+    ai_backdrop = None
+    try:
+        from src.pollinations_client import generate_visual_for_story
+        from PIL import ImageEnhance
+        visual_path = generate_visual_for_story(headline, aspect_ratio="1:1")
+        if visual_path and visual_path.exists():
+            raw_ai = Image.open(visual_path).convert("RGB").resize((width, height), Image.Resampling.LANCZOS)
+            enhancer = ImageEnhance.Brightness(raw_ai)
+            ai_backdrop = enhancer.enhance(0.40)
+    except Exception:
+        pass
+
+    base_wallpaper = ai_backdrop if ai_backdrop is not None else load_square_wallpaper(width, height)
 
     persona = detect_persona(headline + " " + hook + " " + body)
     persona_avatar = get_circular_avatar(persona["id"], size=50)
@@ -549,10 +563,23 @@ def generate_story_slides(directive: Dict[str, Any], output_prefix: str = "story
     - Slide 3: Interactive Poll Zone + Link Sticker Area + Reply Action Dock
     """
     width, height = 1080, 1920
-    base_wallpaper = load_vertical_wallpaper(width, height)
-    slide_paths = []
-
     title = directive.get("title", "AI Architecture Breakthrough")
+
+    # Fetch 9:16 vertical photorealistic FLUX.1 generative AI visual
+    ai_story_backdrop = None
+    try:
+        from src.pollinations_client import generate_visual_for_story
+        from PIL import ImageEnhance
+        visual_path = generate_visual_for_story(title, aspect_ratio="9:16")
+        if visual_path and visual_path.exists():
+            raw_s = Image.open(visual_path).convert("RGB").resize((width, height), Image.Resampling.LANCZOS)
+            enhancer = ImageEnhance.Brightness(raw_s)
+            ai_story_backdrop = enhancer.enhance(0.40)
+    except Exception:
+        pass
+
+    base_wallpaper = ai_story_backdrop if ai_story_backdrop is not None else load_vertical_wallpaper(width, height)
+    slide_paths = []
     hook = directive.get("hook_narration", "")
     body = directive.get("body_narration", "")
     cta = directive.get("call_to_action", "What is your perspective on this paradigm shift?")
