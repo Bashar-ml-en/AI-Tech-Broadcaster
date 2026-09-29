@@ -469,10 +469,27 @@ def publish_dispatcher(post_record: Dict[str, Any]) -> Dict[str, Any]:
     """
     Unified multi-channel publisher dispatcher.
     Prioritizes:
-    1. Postiz (if configured)
-    2. Ayrshare (if configured)
-    3. Direct Telegram Channel / Broadcast (100% Free native mode)
+    1. Direct Meta Graph API (100% Free: Facebook Page + Instagram Professional)
+    2. Postiz (if configured)
+    3. Ayrshare (if configured)
+    4. Direct Telegram Channel / Broadcast (100% Free native mode)
     """
+    # 1. Native Meta Graph API (Instagram Reels/Carousels + Facebook Page Video/Photos)
+    try:
+        from src.publisher_meta import is_meta_configured, publish_to_meta
+        if is_meta_configured():
+            logger.info("Routing broadcast for post %s via Native Meta Graph API (Instagram + Facebook)...", post_record.get("id"))
+            meta_res = publish_to_meta(post_record)
+            # Also mirror to Telegram Channel for unified community notification
+            try:
+                publish_to_telegram_channel(post_record)
+            except Exception:
+                pass
+            return meta_res
+    except Exception as e:
+        logger.warning("Meta Graph API dispatch failed (%s). Falling back...", e)
+
+    # 2. Postiz
     try:
         from src.publisher_postiz import is_postiz_configured, publish_to_postiz
         if is_postiz_configured():
@@ -481,9 +498,11 @@ def publish_dispatcher(post_record: Dict[str, Any]) -> Dict[str, Any]:
     except Exception as e:
         logger.warning("Postiz dispatch attempt failed (%s). Falling back...", e)
 
+    # 3. Ayrshare
     if AYRSHARE_API_KEY and "AYRSHARE" not in AYRSHARE_API_KEY and len(AYRSHARE_API_KEY) > 10:
         return publish_to_ayrshare(post_record)
 
+    # 4. Telegram Channel Fallback
     logger.info("Routing broadcast for post %s to Telegram Channel...", post_record.get("id"))
     return publish_to_telegram_channel(post_record)
 
@@ -921,6 +940,7 @@ def get_system_status():
             "post": post_row[0] if post_row else 0
         }
 
+    from src.publisher_meta import is_meta_configured
     gemini_ready = bool(os.getenv("GEMINI_API_KEY") and "YOUR_GEMINI" not in os.getenv("GEMINI_API_KEY", ""))
     telegram_ready = bool(os.getenv("TELEGRAM_BOT_TOKEN") and "Example" not in os.getenv("TELEGRAM_BOT_TOKEN", ""))
     ayrshare_ready = bool(os.getenv("AYRSHARE_API_KEY") and "AYRSHARE" not in os.getenv("AYRSHARE_API_KEY", ""))
@@ -964,9 +984,10 @@ def get_system_status():
         "integrations": {
             "gemini_director": "live" if gemini_ready else "simulated",
             "telegram_gate": "live" if telegram_ready else "local_web",
+            "meta_publisher": "live (Facebook + Instagram)" if is_meta_configured() else "standby",
             "ayrshare_publisher": "live" if ayrshare_ready else "simulated",
             "postiz_publisher": "live" if is_postiz_configured() else "standby",
-            "active_publisher": "postiz" if is_postiz_configured() else ("ayrshare" if ayrshare_ready else "simulated"),
+            "active_publisher": "meta (direct free)" if is_meta_configured() else ("postiz" if is_postiz_configured() else ("ayrshare" if ayrshare_ready else "telegram_direct")),
             "cloudflare_r2": "live" if r2_ready else "local_staging"
         }
     }

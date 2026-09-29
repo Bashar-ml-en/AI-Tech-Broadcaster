@@ -966,6 +966,21 @@ def execute_broadcast_cycle(target_format: Optional[str] = None) -> Optional[Dic
             tg_res[chat] = res_p
 
         media_url = tool_upload_media_to_r2(post_slides[0], f"renders/{Path(post_slides[0]).name}")["media_url"]
+
+        # Autonomous Meta Publishing (Instagram Carousel + Facebook Photo)
+        try:
+            from src.publisher_meta import is_meta_configured, publish_to_meta
+            if is_meta_configured():
+                publish_to_meta({
+                    "format_type": "post",
+                    "headline": post_script["title"],
+                    "media_url": media_url,
+                    "captions_json": json.dumps(post_brief["platform_captions"]),
+                    "post_payload": json.dumps({"media_slides": post_slides})
+                })
+        except Exception as me:
+            logger.warning("Auto Meta dispatch failed for POST: %s", me)
+
         post_id = _record_post_in_db(
             source_url=selected["url"],
             headline=post_script["title"],
@@ -1016,6 +1031,19 @@ def execute_broadcast_cycle(target_format: Optional[str] = None) -> Optional[Dic
 
         primary_media = reel_video_path if (reel_video_path and Path(reel_video_path).exists()) else "placeholder.mp4"
         media_url = tool_upload_media_to_r2(primary_media, f"renders/{Path(primary_media).name}")["media_url"] if Path(primary_media).exists() else ""
+
+        # Autonomous Meta Publishing (Instagram Reel + Facebook Reel)
+        try:
+            from src.publisher_meta import is_meta_configured, publish_to_meta
+            if is_meta_configured() and reel_video_path and Path(reel_video_path).exists():
+                publish_to_meta({
+                    "format_type": "reel",
+                    "headline": reel_script["title"],
+                    "media_url": media_url,
+                    "captions_json": json.dumps(reel_brief["platform_captions"])
+                })
+        except Exception as me:
+            logger.warning("Auto Meta dispatch failed for REEL: %s", me)
         post_id = _record_post_in_db(
             source_url=selected["url"],
             headline=reel_script["title"],
@@ -1173,6 +1201,28 @@ def execute_broadcast_cycle(target_format: Optional[str] = None) -> Optional[Dic
         captions=brief_reel["platform_captions"],
         payload={"script": script_reel, "brief": brief_reel, "video_path": reel_video_path}
     )
+
+    # Autonomous Meta Publishing (Instagram + Facebook)
+    try:
+        from src.publisher_meta import is_meta_configured, publish_to_meta
+        if is_meta_configured():
+            logger.info("Autonomous Omnichannel Broadcast: Publishing Post & Reel to Facebook Page and Instagram...")
+            publish_to_meta({
+                "format_type": "post",
+                "headline": script_post["title"],
+                "media_url": media_url_post,
+                "captions_json": json.dumps(brief_post["platform_captions"]),
+                "post_payload": json.dumps({"media_slides": post_slides})
+            })
+            if reel_video_path and Path(reel_video_path).exists():
+                publish_to_meta({
+                    "format_type": "reel",
+                    "headline": script_reel["title"],
+                    "media_url": media_url_reel,
+                    "captions_json": json.dumps(brief_reel["platform_captions"])
+                })
+    except Exception as me:
+        logger.warning("Auto Meta dispatch failed for multi-variant: %s", me)
 
     return {
         "status": "success",
