@@ -912,6 +912,7 @@ def server_startup_event():
 # ---------------------------------------------------------------------------
 
 @app.get("/health")
+@app.get("/api/health")
 def health_check():
     return {
         "status": "healthy",
@@ -1560,6 +1561,9 @@ def get_mcp_status():
 
 @app.get("/", response_class=HTMLResponse)
 @app.get("/studio", response_class=HTMLResponse)
+@app.get("/api", response_class=HTMLResponse)
+@app.get("/api/", response_class=HTMLResponse)
+@app.get("/api/studio", response_class=HTMLResponse)
 def executive_studio_dashboard():
     # Attempt to load Aegis Cybernetic Command template across local and Vercel serverless environments
     possible_paths = [
