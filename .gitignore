@@ -16,6 +16,9 @@ config/.env
 
 # Local SQLite databases and logs
 storage/*.db
+storage/*.lock
+storage/.*.lock
+storage/tiktok_token.json
 storage/logs/*.log
 storage/staging/*.mp4
 storage/staging/*.png

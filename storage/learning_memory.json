@@ -1,0 +1,40 @@
+{
+  "version": "2.0",
+  "last_updated": "2026-10-08T23:27:01Z",
+  "total_cycles_analyzed": 13,
+  "active_rules": [
+    {
+      "rule_id": "LR-001",
+      "category": "hook",
+      "directive": "Limit opening hooks to <=12 words. Lead with an active engineering verb or high-contrast claim in the first 3 words.",
+      "rationale": "Viewer retention drop-off spikes beyond 15 words; 0-1.5s scroll-stopping velocity requires immediate contrast.",
+      "confidence": 0.95,
+      "created_at": "2026-10-07T00:00:00Z"
+    },
+    {
+      "rule_id": "LR-002",
+      "category": "retention",
+      "directive": "Always pair quantitative benchmark numbers (SWE-bench, latency, VRAM) with a concrete architecture mechanism (KV-cache, MoE, LoRA).",
+      "rationale": "Posts with generic claims without mechanisms suffer from shallow engagement and low peer-to-peer sharing.",
+      "confidence": 0.92,
+      "created_at": "2026-10-07T00:00:00Z"
+    },
+    {
+      "rule_id": "LR-003",
+      "category": "cta",
+      "directive": "End every broadcast with an architectural tradeoff debate question (e.g., 'Dense vs MoE' or 'VRAM footprint vs Throughput').",
+      "rationale": "High-value engineering comments trigger algorithmic distribution bursts across Threads and Instagram.",
+      "confidence": 0.94,
+      "created_at": "2026-10-07T00:00:00Z"
+    },
+    {
+      "rule_id": "LR-004",
+      "category": "grounding",
+      "directive": "Never invent numbers or unverified benchmark deltas. Format boilerplate (e.g. 30s breakdown) must be kept strictly separated from factual lab metrics.",
+      "rationale": "Preserves brand credibility and prevents automated Quality Gate blocks.",
+      "confidence": 0.98,
+      "created_at": "2026-10-07T00:00:00Z"
+    }
+  ],
+  "historical_lessons": []
+}

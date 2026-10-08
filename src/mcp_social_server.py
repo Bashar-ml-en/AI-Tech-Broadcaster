@@ -312,7 +312,7 @@ def tool_send_telegram_approval(
 
 
 def tool_publish_to_networks(post_id: int) -> Dict[str, Any]:
-    """Publish an approved post to TikTok, Instagram Reels, Facebook Reels, Threads, and X."""
+    """Publish a post autonomously across Facebook, Instagram, Threads, and TikTok."""
     with sqlite3.connect(DATABASE_PATH) as conn:
         conn.row_factory = sqlite3.Row
         row = conn.cursor().execute("SELECT * FROM posts WHERE id = ?", (post_id,)).fetchone()
@@ -320,26 +320,37 @@ def tool_publish_to_networks(post_id: int) -> Dict[str, Any]:
             raise ValueError(f"Post ID {post_id} not found.")
         post = dict(row)
 
-    if post["approval_status"] not in ("approved", "pending"):
-        raise ValueError(f"Cannot publish post with status '{post['approval_status']}'. Must be approved.")
-
-    publish_result = publish_dispatcher(post)
-    pub_id = publish_result.get("id", "simulated")
-    provider = publish_result.get("provider", "ayrshare")
-    with sqlite3.connect(DATABASE_PATH) as conn:
-        conn.execute(
-            "UPDATE posts SET approval_status = 'published', published_at = CURRENT_TIMESTAMP, ayrshare_post_id = ? WHERE id = ?",
-            (pub_id, post_id)
-        )
-        conn.commit()
+    from src.publisher_autonomous import dispatch_autonomous_broadcast
+    dispatch_res = dispatch_autonomous_broadcast(post_id, post)
+    pub_id = f"broadcaster_{post_id}_{dispatch_res['timestamp']}"
 
     return {
-        "status": "published",
+        "status": dispatch_res["overall"],
         "post_id": post_id,
         "broadcast_id": pub_id,
-        "provider": provider,
-        "details": publish_result
+        "provider": "autonomous_engine",
+        "details": dispatch_res
     }
+
+
+def tool_get_publish_status(post_id: int) -> Dict[str, Any]:
+    """Query publication outcome, status, attempts, and platform links for a given post ID."""
+    with sqlite3.connect(DATABASE_PATH) as conn:
+        conn.row_factory = sqlite3.Row
+        row = conn.cursor().execute(
+            "SELECT id, headline, format_type, approval_status, publish_status, publish_attempts, last_error, publish_results_json, published_at FROM posts WHERE id = ?",
+            (post_id,)
+        ).fetchone()
+        if not row:
+            raise ValueError(f"Post ID {post_id} not found.")
+        res = dict(row)
+        if res.get("publish_results_json"):
+            try:
+                res["platform_results"] = json.loads(res["publish_results_json"])
+            except Exception:
+                res["platform_results"] = []
+        return res
+
 
 
 # ---------------------------------------------------------------------------
@@ -419,17 +430,30 @@ TOOL_DEFINITIONS = {
     },
     "publish_to_networks": {
         "server": "social-dispatcher",
-        "description": "Publish approved post to TikTok, Instagram Reels, Facebook Reels, Threads, and X via Ayrshare with 'is_aigc': true.",
+        "description": "Publish post autonomously across Facebook, Instagram, Threads, and TikTok via native APIs with 'is_aigc': true.",
         "inputSchema": {
             "type": "object",
             "properties": {
-                "post_id": {"type": "integer", "description": "Database ID of approved post."}
+                "post_id": {"type": "integer", "description": "Database ID of post to broadcast."}
             },
             "required": ["post_id"]
         },
         "handler": tool_publish_to_networks
+    },
+    "get_publish_status": {
+        "server": "social-dispatcher",
+        "description": "Query publication outcome, status, attempts, and platform links for a given post ID.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "post_id": {"type": "integer", "description": "Database ID of post to inspect."}
+            },
+            "required": ["post_id"]
+        },
+        "handler": tool_get_publish_status
     }
 }
+
 
 
 def get_tools_for_service(service_filter: str = "all") -> List[Dict[str, Any]]:

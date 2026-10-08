@@ -1,34 +1,37 @@
 {
   "mcpServers": {
     "sqlite-history": {
-      "command": "python",
+      "command": "/Users/donation/.gemini/antigravity/scratch/AI-Tech-Broadcaster/.venv/bin/python",
       "args": [
         "src/mcp_social_server.py",
         "--service",
         "sqlite-history"
       ],
+      "cwd": "/Users/donation/.gemini/antigravity/scratch/AI-Tech-Broadcaster",
       "env": {
         "PYTHONUNBUFFERED": "1"
       }
     },
     "web-fetcher": {
-      "command": "python",
+      "command": "/Users/donation/.gemini/antigravity/scratch/AI-Tech-Broadcaster/.venv/bin/python",
       "args": [
         "src/mcp_social_server.py",
         "--service",
         "web-fetcher"
       ],
+      "cwd": "/Users/donation/.gemini/antigravity/scratch/AI-Tech-Broadcaster",
       "env": {
         "PYTHONUNBUFFERED": "1"
       }
     },
     "social-dispatcher": {
-      "command": "python",
+      "command": "/Users/donation/.gemini/antigravity/scratch/AI-Tech-Broadcaster/.venv/bin/python",
       "args": [
         "src/mcp_social_server.py",
         "--service",
         "social-dispatcher"
       ],
+      "cwd": "/Users/donation/.gemini/antigravity/scratch/AI-Tech-Broadcaster",
       "env": {
         "PYTHONUNBUFFERED": "1"
       }

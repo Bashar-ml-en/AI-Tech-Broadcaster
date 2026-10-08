@@ -31,8 +31,9 @@ def send_telegram_media_group(
     bot_token: Optional[str] = None
 ) -> Dict[str, Any]:
     """Upload multiple photos as a single media group album to Telegram."""
-    token = bot_token or TELEGRAM_BOT_TOKEN
-    if not token or not chat_id:
+    token = bot_token or TELEGRAM_BOT_TOKEN or os.getenv("TELEGRAM_BOT_TOKEN", "").strip()
+    target = chat_id or TELEGRAM_CHANNEL_ID or os.getenv("TELEGRAM_CHANNEL_ID", "").strip()
+    if not token or not target:
         return {"status": "skipped", "reason": "missing_credentials"}
 
     valid_paths = [p for p in image_paths if Path(p).exists()]
@@ -61,7 +62,7 @@ def send_telegram_media_group(
 
         url = f"https://api.telegram.org/bot{token}/sendMediaGroup"
         data = {
-            "chat_id": chat_id,
+            "chat_id": target,
             "media": json.dumps(media_payload)
         }
 
@@ -79,7 +80,7 @@ def send_telegram_media_group(
 
             if resp.status_code == 200:
                 result = resp.json()
-                logger.info("Media group successfully sent to %s (%d photos)", chat_id, len(valid_paths))
+                logger.info("Media group successfully sent to %s (%d photos)", target, len(valid_paths))
                 return {"status": "success", "result": result}
             else:
                 logger.warning("sendMediaGroup failed: %s %s", resp.status_code, resp.text)
@@ -102,8 +103,9 @@ def send_telegram_reel(
     bot_token: Optional[str] = None
 ) -> Dict[str, Any]:
     """Upload 9:16 playable MP4 video to Telegram."""
-    token = bot_token or TELEGRAM_BOT_TOKEN
-    if not token or not chat_id:
+    token = bot_token or TELEGRAM_BOT_TOKEN or os.getenv("TELEGRAM_BOT_TOKEN", "").strip()
+    target = chat_id or TELEGRAM_CHANNEL_ID or os.getenv("TELEGRAM_CHANNEL_ID", "").strip()
+    if not token or not target:
         return {"status": "skipped", "reason": "missing_credentials"}
 
     vp = Path(video_path)
@@ -117,7 +119,7 @@ def send_telegram_reel(
         with open(vp, "rb") as vf:
             files = {"video": (vp.name, vf, "video/mp4")}
             data = {
-                "chat_id": chat_id,
+                "chat_id": target,
                 "caption": formatted_caption[:1024],
                 "parse_mode": "Markdown"
             }
@@ -182,10 +184,12 @@ def dispatch_three_variants_to_telegram(
     targets = target_chats or []
     if not targets:
         # Prioritize public channel first so audience sees updates immediately
-        if TELEGRAM_CHANNEL_ID:
-            targets.append(TELEGRAM_CHANNEL_ID)
-        if TELEGRAM_CHAT_ID and TELEGRAM_CHAT_ID not in targets:
-            targets.append(TELEGRAM_CHAT_ID)
+        chan = TELEGRAM_CHANNEL_ID or os.getenv("TELEGRAM_CHANNEL_ID", "").strip()
+        chat = TELEGRAM_CHAT_ID or os.getenv("TELEGRAM_CHAT_ID", "").strip()
+        if chan:
+            targets.append(chan)
+        if chat and chat not in targets:
+            targets.append(chat)
 
     dispatch_results = {}
 
