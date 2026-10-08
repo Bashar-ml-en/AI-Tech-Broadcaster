@@ -14,13 +14,12 @@ def test_aegis_dashboard_html_response():
     assert response.status_code == 200
     assert "text/html" in response.headers.get("content-type", "")
     html = response.text
-    # Check for Aegis Mission Control markers
-    assert "AEGIS MISSION CONTROL" in html
-    assert "SAHARA EDITION" in html
-    assert "MULTI-AGENT DAG TOPOLOGY" in html
-    assert "MCP INTEGRATION" in html
-    assert "6-STAGE AUTONOMOUS PIPELINE STEPPER" in html
-    assert "OMNICHANNEL FLEET COMMAND" in html
+    # Check for Aegis Nexus Sahara markers
+    assert "AEGIS NEXUS" in html
+    assert "Sahara Edition" in html or "SAHARA" in html.upper()
+    assert "Directed Acyclic Graph (DAG)" in html
+    assert "MCP" in html
+    assert "Autonomous Pipeline Stepper" in html
     assert "MEDIA STAGE" in html
 
 

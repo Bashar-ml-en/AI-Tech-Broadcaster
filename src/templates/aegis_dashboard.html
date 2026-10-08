@@ -1,1046 +1,1088 @@
 <!DOCTYPE html>
-<html lang="en" class="dark">
+<html class="light" lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AEGIS Mission Control // Sahara Edition — AI Tech Broadcaster</title>
-    <!-- Fonts: Space Grotesk (Display), Outfit (Body), JetBrains Mono (Telemetry) -->
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Outfit:wght@300;400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
-    <!-- Tailwind CSS CDN -->
-    <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Chart.js CDN -->
-    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
-    <!-- Font Awesome Icons -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <meta charset="utf-8"/>
+    <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+    <meta content="web_dashboard" name="shell-type"/>
+    <title>AEGIS NEXUS // Sahara Edition — Operations Console</title>
 
-    <script>
-        tailwind.config = {
-            darkMode: 'class',
-            theme: {
-                extend: {
-                    colors: {
-                        void: '#07080F',
-                        surface: '#12131A',
-                        surfaceHigh: '#1E1F27',
-                        surfaceBorder: 'rgba(255, 255, 255, 0.08)',
-                        laserCyan: '#00F2FE',
-                        electricAzure: '#4FACFE',
-                        emeraldNominal: '#00FFAA',
-                        ionizedAmber: '#FFD13B',
-                        laserCrimson: '#FF3B5C',
-                        spectralViolet: '#A05FF3'
-                    },
-                    fontFamily: {
-                        display: ['Space Grotesk', 'sans-serif'],
-                        body: ['Outfit', 'sans-serif'],
-                        telemetry: ['JetBrains Mono', 'monospace']
-                    }
-                }
+    <!-- Google Fonts & Material Symbols -->
+    <link href="https://fonts.googleapis.com" rel="preconnect"/>
+    <link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+    <link href="https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,400..700;1,400..700&family=JetBrains+Mono:wght@400;500;600;700&family=Manrope:wght@300;400;500;600;700;800&family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&display=swap" rel="stylesheet"/>
+    <!-- FontAwesome fallback icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css"/>
+
+    <!-- Tailwind CSS with Sahara Palette -->
+    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+    <script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            colors: {
+              "surface": "#faf5ee",
+              "surface-container-lowest": "#ffffff",
+              "surface-container-low": "#f6f0e8",
+              "surface-container": "#f2ece4",
+              "surface-container-high": "#ece6dc",
+              "surface-container-highest": "#e6e0d6",
+              "surface-dim": "#dcd6cc",
+              "surface-bright": "#faf5ee",
+              "surface-tint": "#c2652a",
+              "on-surface": "#3a302a",
+              "on-surface-variant": "#605850",
+              "on-background": "#3a302a",
+              "background": "#faf5ee",
+              "primary": "#c2652a",
+              "primary-container": "#e08850",
+              "primary-fixed": "#fbe8d8",
+              "primary-fixed-dim": "#f0a878",
+              "on-primary": "#ffffff",
+              "on-primary-fixed": "#401a08",
+              "on-primary-fixed-variant": "#8a4518",
+              "on-primary-container": "#401a08",
+              "secondary": "#78706a",
+              "secondary-container": "#eae2da",
+              "secondary-fixed": "#eae2da",
+              "secondary-fixed-dim": "#cec6be",
+              "on-secondary": "#ffffff",
+              "on-secondary-fixed": "#2a2420",
+              "on-secondary-fixed-variant": "#504840",
+              "on-secondary-container": "#605850",
+              "tertiary": "#8c3c3c",
+              "tertiary-container": "#d47070",
+              "tertiary-fixed": "#fce0e0",
+              "tertiary-fixed-dim": "#e8a0a0",
+              "on-tertiary": "#ffffff",
+              "on-tertiary-fixed": "#2e1515",
+              "on-tertiary-fixed-variant": "#6e3030",
+              "on-tertiary-container": "#3a2020",
+              "outline": "#9a9088",
+              "outline-variant": "#d8d0c8",
+              "error": "#c0392b",
+              "error-container": "#fce4e0",
+              "on-error": "#ffffff",
+              "on-error-container": "#7a1a10"
+            },
+            fontFamily: {
+              "headline": ["EB Garamond", "serif"],
+              "display": ["EB Garamond", "serif"],
+              "body": ["Manrope", "sans-serif"],
+              "label": ["Manrope", "sans-serif"],
+              "mono": ["JetBrains Mono", "monospace"]
+            },
+            spacing: {
+              "space-xs": "0.25rem",
+              "space-sm": "0.5rem",
+              "space-md": "1rem",
+              "space-lg": "1.5rem",
+              "space-xl": "2.5rem"
             }
+          }
         }
+      }
     </script>
 
     <style>
-        :root {
-            --cosmic-void: #07080F;
-            --surface-glass: rgba(14, 18, 30, 0.75);
-            --surface-elevated: rgba(21, 28, 48, 0.85);
-            --laser-cyan: #00F2FE;
-            --electric-azure: #4FACFE;
-            --emerald-green: #00FFAA;
-            --ionized-amber: #FFD13B;
-            --laser-crimson: #FF3B5C;
-            --spectral-violet: #A05FF3;
-        }
-
-        * {
-            box-sizing: border-box;
-            border-radius: 0px !important; /* Level 0 Brutalist Sharp Geometry */
-        }
-
         body {
-            background-color: var(--cosmic-void);
-            color: #E2E8F0;
-            font-family: 'Outfit', sans-serif;
-            background-image: radial-gradient(rgba(0, 242, 254, 0.08) 1px, transparent 0);
-            background-size: 24px 24px;
-            background-attachment: fixed;
-            min-height: 100vh;
+            background-color: #faf5ee;
+            color: #3a302a;
+            font-family: 'Manrope', sans-serif;
+            margin: 0;
+            padding: 0;
+            overscroll-behavior: none;
         }
 
-        /* Glassmorphic Panels */
-        .glass-panel {
-            background: var(--surface-glass);
-            backdrop-filter: blur(16px);
-            -webkit-backdrop-filter: blur(16px);
-            border: 1px solid rgba(255, 255, 255, 0.08);
+        /* Reticle corners in warm terracotta */
+        .reticle-corner {
             position: relative;
         }
-
-        .glass-panel-elevated {
-            background: var(--surface-elevated);
-            backdrop-filter: blur(20px);
-            -webkit-backdrop-filter: blur(20px);
-            border: 1px solid rgba(0, 242, 254, 0.35);
-            position: relative;
-        }
-
-        /* Corner Reticles (L-brackets) */
-        .reticle-box {
-            position: relative;
-        }
-        .reticle-box::before {
+        .reticle-corner::before {
             content: '';
             position: absolute;
-            top: -1px;
-            left: -1px;
-            width: 8px;
-            height: 8px;
-            border-top: 2px solid var(--laser-cyan);
-            border-left: 2px solid var(--laser-cyan);
+            top: 0;
+            left: 0;
+            width: 10px;
+            height: 10px;
+            border-top: 2px solid #c2652a;
+            border-left: 2px solid #c2652a;
             pointer-events: none;
-            z-index: 20;
         }
-        .reticle-box::after {
+        .reticle-corner::after {
             content: '';
             position: absolute;
-            bottom: -1px;
-            right: -1px;
-            width: 8px;
-            height: 8px;
-            border-bottom: 2px solid var(--laser-cyan);
-            border-right: 2px solid var(--laser-cyan);
+            bottom: 0;
+            right: 0;
+            width: 10px;
+            height: 10px;
+            border-bottom: 2px solid #c2652a;
+            border-right: 2px solid #c2652a;
             pointer-events: none;
-            z-index: 20;
         }
 
-        /* Tactical Cyber-Triggers */
-        .cyber-btn {
-            background: rgba(0, 242, 254, 0.08);
-            border: 1px solid var(--laser-cyan);
-            color: var(--laser-cyan);
-            font-family: 'JetBrains Mono', monospace;
-            font-weight: 700;
-            text-transform: uppercase;
-            letter-spacing: 0.12em;
-            transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            gap: 0.5rem;
-            cursor: pointer;
-        }
-        .cyber-btn:hover {
-            background: var(--laser-cyan);
-            color: #07080F;
-            box-shadow: 0 0 18px rgba(0, 242, 254, 0.45);
-        }
-
-        .cyber-btn-danger {
-            background: rgba(255, 59, 92, 0.08);
-            border: 1px solid var(--laser-crimson);
-            color: var(--laser-crimson);
-            font-family: 'JetBrains Mono', monospace;
-            font-weight: 700;
-            text-transform: uppercase;
-            letter-spacing: 0.12em;
-            transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
-            cursor: pointer;
-        }
-        .cyber-btn-danger:hover {
-            background: var(--laser-crimson);
-            color: #07080F;
-            box-shadow: 0 0 18px rgba(255, 59, 92, 0.45);
-        }
-
-        .cyber-btn-ghost {
-            background: transparent;
-            border: 1px solid rgba(255, 255, 255, 0.12);
-            color: #94A3B8;
-            font-family: 'JetBrains Mono', monospace;
-            font-weight: 600;
-            letter-spacing: 0.08em;
-            transition: all 0.2s ease;
-            cursor: pointer;
-        }
-        .cyber-btn-ghost:hover {
-            border-color: var(--electric-azure);
-            color: #FFFFFF;
-        }
-
-        /* Blinking Beacon */
-        @keyframes pulse-dot {
-            0%, 100% { opacity: 1; transform: scale(1); }
-            50% { opacity: 0.3; transform: scale(0.85); }
-        }
-        .pulse-beacon {
-            animation: pulse-dot 1.8s infinite ease-in-out;
-        }
-
-        /* Scanline Texture Effect */
-        .scanlines {
-            position: relative;
-        }
-        .scanlines::before {
-            content: " ";
-            display: block;
-            position: absolute;
-            top: 0; left: 0; bottom: 0; right: 0;
-            background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%);
-            background-size: 100% 4px;
-            z-index: 10;
-            pointer-events: none;
-            opacity: 0.4;
-        }
-
-        /* Monospace Tabular Inputs */
-        input, select, textarea {
-            background: rgba(7, 8, 15, 0.85) !important;
-            border: 1px solid rgba(255, 255, 255, 0.15) !important;
-            color: #F1F5F9 !important;
-            font-family: 'JetBrains Mono', monospace;
-            border-radius: 0 !important;
-        }
-        input:focus, select:focus, textarea:focus {
-            outline: none !important;
-            border-color: var(--laser-cyan) !important;
-            box-shadow: 0 0 10px rgba(0, 242, 254, 0.25) !important;
-        }
-
-        /* Custom Scrollbar */
-        ::-webkit-scrollbar { width: 6px; height: 6px; }
-        ::-webkit-scrollbar-track { background: #07080F; }
-        ::-webkit-scrollbar-thumb { background: rgba(0, 242, 254, 0.3); }
-        ::-webkit-scrollbar-thumb:hover { background: var(--laser-cyan); }
-
-        /* Smartphone Reel Bezel */
-        .reel-screen-container {
-            width: 320px;
-            height: 568px; /* 9:16 aspect ratio */
-            border: 2px solid rgba(0, 242, 254, 0.4);
-            background: #000000;
-            box-shadow: 0 0 30px rgba(0, 242, 254, 0.15), inset 0 0 20px rgba(0, 0, 0, 0.8);
-            position: relative;
-            overflow: hidden;
-        }
+        /* Subtle scrollbar */
+        ::-webkit-scrollbar { width: 5px; height: 5px; }
+        ::-webkit-scrollbar-track { background: #faf5ee; }
+        ::-webkit-scrollbar-thumb { background: #d8d0c8; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #c2652a; }
     </style>
 </head>
-<body class="flex flex-col min-h-screen">
+<body class="bg-background font-body text-body text-on-surface antialiased selection:bg-primary-fixed selection:text-on-primary-fixed">
 
     <!-- ========================================================================= -->
-    <!-- TOP TACTICAL NAVIGATION BAR                                              -->
+    <!-- LEFT FIXED NAVIGATION SIDEBAR (NEXUS CONSOLE)                            -->
     <!-- ========================================================================= -->
-    <header class="sticky top-0 z-50 border-b border-surfaceBorder bg-void/90 backdrop-blur-xl px-6 py-3.5 flex flex-wrap items-center justify-between gap-4">
-        <!-- Brand & Node Identifier -->
-        <div class="flex items-center space-x-4">
-            <div class="w-10 h-10 bg-void border border-laserCyan flex items-center justify-center text-laserCyan shadow-[0_0_15px_rgba(0,242,254,0.3)]">
-                <i class="fa-solid fa-satellite-dish text-lg"></i>
+    <aside class="fixed left-0 top-0 h-full w-64 bg-surface-container-lowest/95 backdrop-blur-2xl z-50 flex flex-col pt-4 pb-6 border-r border-outline-variant/60 shadow-sm">
+        <div class="px-space-md mb-6">
+            <div class="flex items-center gap-space-xs font-mono text-xs text-primary font-semibold">
+                <span class="w-2 h-2 rounded-full bg-primary animate-ping"></span>
+                <span>AGENT_OPS // SEC_01</span>
             </div>
-            <div>
-                <div class="flex items-center gap-3">
-                    <span class="font-display font-bold text-lg tracking-wider text-white">AEGIS MISSION CONTROL</span>
-                    <span class="px-2 py-0.5 text-[10px] font-telemetry tracking-widest bg-laserCyan/10 text-laserCyan border border-laserCyan/30">SAHARA EDITION</span>
-                </div>
-                <div class="font-telemetry text-[11px] text-slate-400 tracking-wider">
-                    SYS_NODE // <span class="text-white font-semibold">ORBIT-01</span> &bull; BROADCASTER_DAEMON: <span class="text-emeraldNominal font-semibold">ACTIVE</span>
-                </div>
+            <div class="font-headline text-2xl uppercase text-on-surface font-bold mt-1 tracking-wide">
+                NEXUS CONSOLE
             </div>
         </div>
 
-        <!-- Global Status Beacon & Cadence Countdown -->
-        <div class="flex items-center space-x-6 text-xs font-telemetry">
-            <div class="flex items-center gap-2 bg-void/80 px-3 py-1.5 border border-surfaceBorder">
-                <span class="w-2.5 h-2.5 bg-emeraldNominal pulse-beacon inline-block"></span>
-                <span class="text-slate-300 font-semibold tracking-wider" id="global-status-text">AEGIS_ONLINE: NOMINAL</span>
-            </div>
+        <nav class="flex-1 px-space-sm space-y-1">
+            <a aria-current="page" class="flex items-center gap-space-sm px-space-sm py-2.5 rounded-lg transition-all bg-primary-fixed text-primary font-bold shadow-sm" href="#overview">
+                <span class="material-symbols-outlined text-[18px]">radar</span>
+                <span class="text-xs uppercase tracking-wider font-mono">OPS OVERVIEW</span>
+            </a>
+            <a class="flex items-center gap-space-sm px-space-sm py-2.5 rounded-lg text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface transition-all text-xs font-semibold uppercase tracking-wider font-mono" href="#dag-topology">
+                <span class="material-symbols-outlined text-[18px]">account_tree</span>
+                <span>DAG TOPOLOGY</span>
+            </a>
+            <a class="flex items-center gap-space-sm px-space-sm py-2.5 rounded-lg text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface transition-all text-xs font-semibold uppercase tracking-wider font-mono" href="#mcp-bus">
+                <span class="material-symbols-outlined text-[18px]">hub</span>
+                <span>MCP BUS MONITOR</span>
+            </a>
+            <a class="flex items-center gap-space-sm px-space-sm py-2.5 rounded-lg text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface transition-all text-xs font-semibold uppercase tracking-wider font-mono" href="#pipeline-stepper">
+                <span class="material-symbols-outlined text-[18px]">linear_scale</span>
+                <span>PIPELINE MATRIX</span>
+            </a>
+            <a class="flex items-center gap-space-sm px-space-sm py-2.5 rounded-lg text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface transition-all text-xs font-semibold uppercase tracking-wider font-mono" href="#fleet-matrix">
+                <span class="material-symbols-outlined text-[18px]">broadcast_on_personal</span>
+                <span>BROADCASTER MATRIX</span>
+            </a>
+            <a class="flex items-center gap-space-sm px-space-sm py-2.5 rounded-lg text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface transition-all text-xs font-semibold uppercase tracking-wider font-mono" href="#media-stage">
+                <span class="material-symbols-outlined text-[18px]">smart_display</span>
+                <span>MEDIA STAGE</span>
+            </a>
+            <a class="flex items-center gap-space-sm px-space-sm py-2.5 rounded-lg text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface transition-all text-xs font-semibold uppercase tracking-wider font-mono" href="#terminal-logs">
+                <span class="material-symbols-outlined text-[18px]">terminal</span>
+                <span>TERMINAL LOGS</span>
+            </a>
+        </nav>
 
-            <div class="hidden md:flex items-center gap-4 text-slate-400">
-                <div>
-                    <span class="text-slate-500">CYCLE_CADENCE:</span>
-                    <span class="text-laserCyan font-bold" id="cadence-countdown">00:45:12</span>
-                </div>
-                <div>
-                    <span class="text-slate-500">STAGING_DISK:</span>
-                    <span class="text-white font-bold" id="staging-disk-val">READY</span>
-                </div>
-                <div>
-                    <span class="text-slate-500">MODE:</span>
-                    <span class="text-emeraldNominal font-bold">AUTO_AUTONOMOUS</span>
-                </div>
+        <div class="px-space-md pt-space-sm border-t border-outline-variant/60">
+            <div class="font-mono text-xs text-on-surface-variant flex items-center justify-between">
+                <span>SYS_STATE</span>
+                <span class="text-primary font-semibold" id="sidebar-state-val">STABLE // ONLINE</span>
+            </div>
+            <div class="font-mono text-[11px] text-on-surface-variant/80 flex items-center justify-between mt-1">
+                <span>CANDIDATES</span>
+                <span class="text-on-surface font-bold" id="sidebar-candidates-cnt">42 INGESTED</span>
             </div>
         </div>
-
-        <!-- Tactical Fast Action Triggers -->
-        <div class="flex items-center space-x-3">
-            <button onclick="openBroadcastModal()" class="cyber-btn px-4 py-2 text-xs">
-                <i class="fa-solid fa-bolt"></i> TRIGGER BROADCAST
-            </button>
-            <button onclick="clearCycleLock()" class="cyber-btn-ghost px-3 py-2 text-xs border-amber-500/40 text-amber-400 hover:text-amber-300" title="Force release storage/.cycle.lock">
-                <i class="fa-solid fa-unlock-keyhole"></i> CLEAR LOCK
-            </button>
-            <button onclick="refreshAllTelemetry()" class="cyber-btn-ghost px-3 py-2 text-xs" title="Refresh Live State">
-                <i class="fa-solid fa-arrows-rotate" id="refresh-spin-icon"></i>
-            </button>
-        </div>
-    </header>
+    </aside>
 
     <!-- ========================================================================= -->
-    <!-- MAIN OBSERVABILITY & COMMAND CONSOLE                                      -->
+    <!-- MAIN WORKSPACE CONTAINER (OFFSET BY SIDEBAR)                              -->
     <!-- ========================================================================= -->
-    <main class="flex-1 p-6 space-y-6 max-w-[1920px] mx-auto w-full">
+    <div class="pl-64">
 
-        <!-- 1. HIGH-DENSITY TACTICAL METRIC HUD (KPI BLOCKS) -->
-        <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-            <!-- Metric 1: Total Evaluated -->
-            <div class="glass-panel reticle-box p-4 border-l-2 border-l-laserCyan">
-                <div class="text-[10px] font-telemetry tracking-widest text-slate-400 uppercase">INGESTED CANDIDATES</div>
-                <div class="text-3xl font-display font-bold text-white mt-1" id="kpi-total-candidates">42</div>
-                <div class="text-[11px] font-telemetry text-laserCyan mt-2 flex items-center justify-between">
-                    <span>QUEUE_STATUS</span>
-                    <span class="font-bold">IN_SYNC</span>
+        <!-- FIXED HEADER BAR -->
+        <header class="fixed top-0 left-64 right-0 h-20 bg-surface-container-lowest/90 backdrop-blur-xl z-40 flex items-center justify-between px-space-lg border-b border-outline-variant/60 shadow-sm">
+            <div class="flex items-center gap-space-md">
+                <div class="flex items-center gap-space-xs">
+                    <span class="font-mono text-sm text-primary font-bold">//:</span>
+                    <span class="font-headline text-2xl uppercase text-on-surface font-bold tracking-tight">AEGIS NEXUS</span>
+                </div>
+                <div class="flex items-center gap-space-xs px-space-sm py-0.5 rounded-full bg-surface-container border border-outline-variant/50">
+                    <span class="w-1.5 h-1.5 rounded-full bg-primary animate-pulse"></span>
+                    <span class="font-mono text-xs text-on-surface font-semibold uppercase">v2.6 AUTONOMOUS</span>
+                </div>
+                <div class="hidden sm:inline font-mono text-[11px] text-on-surface-variant px-space-sm py-0.5 rounded bg-surface-container-high">
+                    [SAHARA // PROD AUTO-MODE]
                 </div>
             </div>
 
-            <!-- Metric 2: Live Published -->
-            <div class="glass-panel reticle-box p-4 border-l-2 border-l-emeraldNominal">
-                <div class="text-[10px] font-telemetry tracking-widest text-slate-400 uppercase">LIVE BROADCASTS</div>
-                <div class="text-3xl font-display font-bold text-emeraldNominal mt-1" id="kpi-live-published">3</div>
-                <div class="text-[11px] font-telemetry text-emeraldNominal mt-2 flex items-center justify-between">
-                    <span>DELIVERED</span>
-                    <span class="font-bold">100% OK</span>
+            <div class="hidden xl:flex items-center gap-space-md px-space-md py-1.5 rounded-lg bg-surface-container/70 border border-outline-variant/40">
+                <div class="flex items-center gap-space-xs font-mono text-xs">
+                    <span class="text-on-surface-variant">CADENCE:</span>
+                    <span class="text-primary font-semibold" id="header-cadence-val">[12m 44s]</span>
+                </div>
+                <div class="flex items-center gap-space-xs font-mono text-xs">
+                    <span class="text-on-surface-variant">UPTIME:</span>
+                    <span class="text-emerald-700 font-semibold">[99.98%]</span>
+                </div>
+                <div class="flex items-center gap-space-xs font-mono text-xs">
+                    <span class="text-on-surface-variant">BUS_LATENCY:</span>
+                    <span class="text-primary font-semibold">[18ms]</span>
                 </div>
             </div>
 
-            <!-- Metric 3: Ready in Staging -->
-            <div class="glass-panel reticle-box p-4 border-l-2 border-l-electricAzure">
-                <div class="text-[10px] font-telemetry tracking-widest text-slate-400 uppercase">READY IN STAGING</div>
-                <div class="text-3xl font-display font-bold text-electricAzure mt-1" id="kpi-rendered-ready">2</div>
-                <div class="text-[11px] font-telemetry text-slate-400 mt-2 flex items-center justify-between">
-                    <span>9:16 + CAROUSELS</span>
-                    <span class="text-white font-bold">CACHED</span>
+            <!-- Fast Action Header Buttons -->
+            <div class="flex items-center gap-space-sm">
+                <button onclick="openBroadcastModal()" class="flex items-center gap-space-xs px-3 py-1.5 rounded-lg bg-primary text-white hover:bg-primary/90 font-mono text-xs uppercase font-semibold transition-all shadow-sm" type="button">
+                    <span class="material-symbols-outlined text-[16px]">bolt</span>
+                    <span class="hidden md:inline">TRIGGER CYCLE</span>
+                </button>
+                <button onclick="clearCycleLock()" class="flex items-center gap-space-xs px-3 py-1.5 rounded-lg bg-surface-container-high text-on-surface hover:bg-surface-dim font-mono text-xs uppercase font-semibold transition-all border border-outline-variant/50" type="button" title="Clear Cycle Lock">
+                    <span class="material-symbols-outlined text-[16px]">lock_open</span>
+                    <span class="hidden md:inline">CLEAR LOCK</span>
+                </button>
+                <button onclick="refreshAllTelemetry()" class="p-2 rounded-lg bg-surface-container hover:bg-surface-container-high text-on-surface transition-all border border-outline-variant/50" title="Refresh Live State">
+                    <span class="material-symbols-outlined text-[18px]" id="refresh-spin-icon">sync</span>
+                </button>
+
+                <div class="flex items-center gap-space-xs px-space-sm py-1 rounded-lg bg-surface-container border border-outline-variant/40">
+                    <span class="w-2 h-2 rounded-full bg-primary"></span>
+                    <span class="font-mono text-xs text-on-surface hidden lg:inline font-medium">LEAD COMMANDER</span>
                 </div>
             </div>
+        </header>
 
-            <!-- Metric 4: Simulated Broadcasts -->
-            <div class="glass-panel reticle-box p-4 border-l-2 border-l-spectralViolet">
-                <div class="text-[10px] font-telemetry tracking-widest text-slate-400 uppercase">AUTONOMOUS SIMULATED</div>
-                <div class="text-3xl font-display font-bold text-spectralViolet mt-1" id="kpi-simulated-count">25</div>
-                <div class="text-[11px] font-telemetry text-slate-400 mt-2 flex items-center justify-between">
-                    <span>META / THREADS</span>
-                    <span class="text-spectralViolet font-bold">ACTIVE</span>
-                </div>
-            </div>
+        <!-- MAIN SCROLLABLE CONTENT BODY -->
+        <main class="relative pt-20 w-full min-h-screen bg-background">
+            <div class="flex flex-col w-full text-on-surface">
 
-            <!-- Metric 5: Gate Interlocks -->
-            <div class="glass-panel reticle-box p-4 border-l-2 border-l-ionizedAmber">
-                <div class="text-[10px] font-telemetry tracking-widest text-slate-400 uppercase">GATE INTERLOCKS</div>
-                <div class="text-3xl font-display font-bold text-ionizedAmber mt-1" id="kpi-gate-blocked">11</div>
-                <div class="text-[11px] font-telemetry text-slate-400 mt-2 flex items-center justify-between">
-                    <span>HITL PROTECTED</span>
-                    <span class="text-ionizedAmber font-bold">SECURED</span>
-                </div>
-            </div>
-
-            <!-- Metric 6: Fleet Health -->
-            <div class="glass-panel reticle-box p-4 border-l-2 border-l-laserCyan">
-                <div class="text-[10px] font-telemetry tracking-widest text-slate-400 uppercase">FLEET DISPATCH RATE</div>
-                <div class="text-3xl font-display font-bold text-white mt-1">94.8%</div>
-                <div class="text-[11px] font-telemetry text-slate-400 mt-2 flex items-center justify-between">
-                    <span>RETRY_COUNT</span>
-                    <span class="text-emeraldNominal font-bold">0 FAILURES</span>
-                </div>
-            </div>
-        </div>
-
-        <!-- 2. MULTI-AGENT DAG VISUALIZER (8 AUTONOMOUS SUBAGENTS) -->
-        <div class="glass-panel p-5 border border-surfaceBorder">
-            <div class="flex items-center justify-between border-b border-surfaceBorder pb-3 mb-4">
-                <div class="flex items-center space-x-3">
-                    <span class="w-2.5 h-2.5 bg-laserCyan inline-block"></span>
-                    <h2 class="font-display font-bold text-sm tracking-wider uppercase text-white">
-                        MULTI-AGENT DAG TOPOLOGY // 8 AUTONOMOUS SUBAGENTS
-                    </h2>
-                </div>
-                <div class="font-telemetry text-[11px] text-slate-400 tracking-wider">
-                    TOPOLOGY: <span class="text-laserCyan">ASYNCHRONOUS DIRECTED ACYCLIC GRAPH</span> &bull; PROTOCOL: <span class="text-emeraldNominal">NOMINAL</span>
-                </div>
-            </div>
-
-            <!-- 8 Agents Flow Grid -->
-            <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-3" id="subagents-dag-container">
-                <!-- Subagent 1 -->
-                <div class="bg-void/90 p-3 border border-surfaceBorder border-t-2 border-t-laserCyan reticle-box flex flex-col justify-between">
-                    <div>
-                        <div class="flex items-center justify-between text-[10px] font-telemetry text-slate-400">
-                            <span>AGENT_01</span>
-                            <span class="text-emeraldNominal"><i class="fa-solid fa-circle text-[6px]"></i> IDLE</span>
-                        </div>
-                        <div class="font-display font-bold text-xs text-white mt-1">SCRAPER CORE</div>
-                        <div class="text-[10px] text-slate-400 font-body mt-1">Ingests HF, TechCrunch, ArXiv & GitHub</div>
-                    </div>
-                    <div class="mt-3 pt-2 border-t border-surfaceBorder/60 font-telemetry text-[10px] text-slate-400 flex justify-between">
-                        <span>LATENCY</span>
-                        <span class="text-laserCyan">412ms</span>
-                    </div>
-                </div>
-
-                <!-- Subagent 2 -->
-                <div class="bg-void/90 p-3 border border-surfaceBorder border-t-2 border-t-electricAzure reticle-box flex flex-col justify-between">
-                    <div>
-                        <div class="flex items-center justify-between text-[10px] font-telemetry text-slate-400">
-                            <span>AGENT_02</span>
-                            <span class="text-emeraldNominal"><i class="fa-solid fa-circle text-[6px]"></i> NOMINAL</span>
-                        </div>
-                        <div class="font-display font-bold text-xs text-white mt-1">CURATOR AGENT</div>
-                        <div class="text-[10px] text-slate-400 font-body mt-1">Gemini 3.8 Heuristic & Fact Verification</div>
-                    </div>
-                    <div class="mt-3 pt-2 border-t border-surfaceBorder/60 font-telemetry text-[10px] text-slate-400 flex justify-between">
-                        <span>LATENCY</span>
-                        <span class="text-laserCyan">1.24s</span>
-                    </div>
-                </div>
-
-                <!-- Subagent 3 -->
-                <div class="bg-void/90 p-3 border border-surfaceBorder border-t-2 border-t-spectralViolet reticle-box flex flex-col justify-between">
-                    <div>
-                        <div class="flex items-center justify-between text-[10px] font-telemetry text-slate-400">
-                            <span>AGENT_03</span>
-                            <span class="text-emeraldNominal"><i class="fa-solid fa-circle text-[6px]"></i> READY</span>
-                        </div>
-                        <div class="font-display font-bold text-xs text-white mt-1">SCRIPTWRITER</div>
-                        <div class="text-[10px] text-slate-400 font-body mt-1">Multi-format viral hook & body synthesis</div>
-                    </div>
-                    <div class="mt-3 pt-2 border-t border-surfaceBorder/60 font-telemetry text-[10px] text-slate-400 flex justify-between">
-                        <span>OUTPUT</span>
-                        <span class="text-laserCyan">120 WPM</span>
-                    </div>
-                </div>
-
-                <!-- Subagent 4 -->
-                <div class="bg-void/90 p-3 border border-surfaceBorder border-t-2 border-t-laserCyan reticle-box flex flex-col justify-between">
-                    <div>
-                        <div class="flex items-center justify-between text-[10px] font-telemetry text-slate-400">
-                            <span>AGENT_04</span>
-                            <span class="text-emeraldNominal"><i class="fa-solid fa-circle text-[6px]"></i> ACTIVE</span>
-                        </div>
-                        <div class="font-display font-bold text-xs text-white mt-1">NEURAL AUDIO</div>
-                        <div class="text-[10px] text-slate-400 font-body mt-1">Edge-TTS Christopher Neural Voice</div>
-                    </div>
-                    <div class="mt-3 pt-2 border-t border-surfaceBorder/60 font-telemetry text-[10px] text-slate-400 flex justify-between">
-                        <span>AUDIO</span>
-                        <span class="text-laserCyan">24kHz PCM</span>
-                    </div>
-                </div>
-
-                <!-- Subagent 5 -->
-                <div class="bg-void/90 p-3 border border-surfaceBorder border-t-2 border-t-laserCyan reticle-box flex flex-col justify-between">
-                    <div>
-                        <div class="flex items-center justify-between text-[10px] font-telemetry text-slate-400">
-                            <span>AGENT_05</span>
-                            <span class="text-emeraldNominal"><i class="fa-solid fa-circle text-[6px]"></i> IDLE</span>
-                        </div>
-                        <div class="font-display font-bold text-xs text-white mt-1">VIDEO SYNTH</div>
-                        <div class="text-[10px] text-slate-400 font-body mt-1">FFmpeg 9:16 vertical render & ducking</div>
-                    </div>
-                    <div class="mt-3 pt-2 border-t border-surfaceBorder/60 font-telemetry text-[10px] text-slate-400 flex justify-between">
-                        <span>ENCODER</span>
-                        <span class="text-laserCyan">H.264 MP4</span>
-                    </div>
-                </div>
-
-                <!-- Subagent 6 -->
-                <div class="bg-void/90 p-3 border border-surfaceBorder border-t-2 border-t-ionizedAmber reticle-box flex flex-col justify-between">
-                    <div>
-                        <div class="flex items-center justify-between text-[10px] font-telemetry text-slate-400">
-                            <span>AGENT_06</span>
-                            <span class="text-emeraldNominal"><i class="fa-solid fa-circle text-[6px]"></i> ARMED</span>
-                        </div>
-                        <div class="font-display font-bold text-xs text-white mt-1">QA GATEKEEPER</div>
-                        <div class="text-[10px] text-slate-400 font-body mt-1">Telegram HMAC cryptographic verification</div>
-                    </div>
-                    <div class="mt-3 pt-2 border-t border-surfaceBorder/60 font-telemetry text-[10px] text-slate-400 flex justify-between">
-                        <span>SIGN_MODE</span>
-                        <span class="text-ionizedAmber">SHA256</span>
-                    </div>
-                </div>
-
-                <!-- Subagent 7 -->
-                <div class="bg-void/90 p-3 border border-surfaceBorder border-t-2 border-t-emeraldNominal reticle-box flex flex-col justify-between">
-                    <div>
-                        <div class="flex items-center justify-between text-[10px] font-telemetry text-slate-400">
-                            <span>AGENT_07</span>
-                            <span class="text-emeraldNominal"><i class="fa-solid fa-circle text-[6px]"></i> DISPATCH</span>
-                        </div>
-                        <div class="font-display font-bold text-xs text-white mt-1">DISPATCH FLEET</div>
-                        <div class="text-[10px] text-slate-400 font-body mt-1">TikTok v2, Telegram, Meta & R2 CDN</div>
-                    </div>
-                    <div class="mt-3 pt-2 border-t border-surfaceBorder/60 font-telemetry text-[10px] text-slate-400 flex justify-between">
-                        <span>SUCCESS</span>
-                        <span class="text-emeraldNominal">100% LIVE</span>
-                    </div>
-                </div>
-
-                <!-- Subagent 8 -->
-                <div class="bg-void/90 p-3 border border-surfaceBorder border-t-2 border-t-electricAzure reticle-box flex flex-col justify-between">
-                    <div>
-                        <div class="flex items-center justify-between text-[10px] font-telemetry text-slate-400">
-                            <span>AGENT_08</span>
-                            <span class="text-emeraldNominal"><i class="fa-solid fa-circle text-[6px]"></i> HARVEST</span>
-                        </div>
-                        <div class="font-display font-bold text-xs text-white mt-1">ANALYTICS HARVEST</div>
-                        <div class="text-[10px] text-slate-400 font-body mt-1">Scrapes views, likes, retention telemetry</div>
-                    </div>
-                    <div class="mt-3 pt-2 border-t border-surfaceBorder/60 font-telemetry text-[10px] text-slate-400 flex justify-between">
-                        <span>POLL_RATE</span>
-                        <span class="text-electricAzure">300s</span>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- 3. MODEL CONTEXT PROTOCOL (MCP) INTEGRATION HUB & 6-STAGE EXECUTION PIPELINE -->
-        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-
-            <!-- Left: Model Context Protocol (MCP) Integration Hub -->
-            <div class="glass-panel p-5 border border-surfaceBorder">
-                <div class="flex items-center justify-between border-b border-surfaceBorder pb-3 mb-4">
-                    <div class="flex items-center space-x-3">
-                        <span class="w-2.5 h-2.5 bg-electricAzure inline-block"></span>
-                        <h2 class="font-display font-bold text-sm tracking-wider uppercase text-white">
-                            MCP INTEGRATION & TOOL CONDUIT HUB
-                        </h2>
-                    </div>
-                    <div class="font-telemetry text-[11px] text-slate-400">
-                        STANDARD: <span class="text-laserCyan">JSON-RPC / MCP v1.0</span>
-                    </div>
-                </div>
-
-                <div class="space-y-3" id="mcp-servers-list">
-                    <!-- MCP Server 1: Social Posting -->
-                    <div class="bg-void/80 p-3.5 border border-surfaceBorder flex items-center justify-between">
-                        <div class="flex items-center space-x-3">
-                            <div class="w-8 h-8 bg-laserCyan/10 border border-laserCyan/30 flex items-center justify-center text-laserCyan">
-                                <i class="fa-solid fa-share-nodes text-xs"></i>
+                <!-- TOP LEVEL HERO TELEMETRY STRIP -->
+                <section id="overview" class="w-full px-space-lg py-space-md bg-surface-container-lowest/80 backdrop-blur-xl border-b border-outline-variant/60 shadow-sm">
+                    <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-space-md max-w-[1760px] mx-auto">
+                        <div class="flex flex-wrap items-center gap-space-sm sm:gap-space-md">
+                            <div class="flex items-center gap-space-xs bg-primary-fixed/60 px-space-sm py-1 rounded-md border-l-4 border-primary">
+                                <span class="w-2 h-2 rounded-full bg-primary animate-ping"></span>
+                                <span class="font-mono text-xs font-bold text-on-primary-fixed uppercase tracking-wider">MISSION PIPELINE // ACTIVE</span>
                             </div>
-                            <div>
-                                <div class="font-display font-bold text-xs text-white">mcp_social_server</div>
-                                <div class="text-[11px] font-telemetry text-slate-400">Tools: publish_tiktok, publish_telegram, publish_meta</div>
+                            <div class="font-mono text-xs text-on-surface-variant">
+                                EXECUTION LOOP: <span class="text-primary font-bold" id="hero-cycle-id">CYCLE #834</span>
+                            </div>
+                            <div class="hidden sm:inline font-mono text-xs text-outline-variant">|</div>
+                            <div class="font-mono text-xs text-on-surface-variant">
+                                E2E CADENCE: <span class="text-on-surface font-semibold" id="hero-cadence-txt">1.84s LATENCY</span>
+                            </div>
+                            <div class="hidden md:inline font-mono text-xs text-outline-variant">|</div>
+                            <div class="font-mono text-xs text-on-surface-variant">
+                                DRIFT VEC: <span class="text-primary font-semibold">0.02 (STABLE)</span>
                             </div>
                         </div>
-                        <div class="text-right font-telemetry text-[11px]">
-                            <span class="px-2 py-0.5 bg-emeraldNominal/10 text-emeraldNominal border border-emeraldNominal/30 font-bold">CONNECTED</span>
-                            <div class="text-slate-500 mt-1">LATENCY: 18ms</div>
-                        </div>
-                    </div>
 
-                    <!-- MCP Server 2: Gemini AI Studio -->
-                    <div class="bg-void/80 p-3.5 border border-surfaceBorder flex items-center justify-between">
-                        <div class="flex items-center space-x-3">
-                            <div class="w-8 h-8 bg-electricAzure/10 border border-electricAzure/30 flex items-center justify-center text-electricAzure">
-                                <i class="fa-solid fa-brain text-xs"></i>
-                            </div>
-                            <div>
-                                <div class="font-display font-bold text-xs text-white">gemini-api</div>
-                                <div class="text-[11px] font-telemetry text-slate-400">Tools: eval_news_batch, generate_reel_script, viral_rank</div>
-                            </div>
-                        </div>
-                        <div class="text-right font-telemetry text-[11px]">
-                            <span class="px-2 py-0.5 bg-laserCyan/10 text-laserCyan border border-laserCyan/30 font-bold">HEURISTIC_ACTIVE</span>
-                            <div class="text-slate-500 mt-1">FALLBACK: READY</div>
-                        </div>
-                    </div>
-
-                    <!-- MCP Server 3: Cloudflare R2 CDN -->
-                    <div class="bg-void/80 p-3.5 border border-surfaceBorder flex items-center justify-between">
-                        <div class="flex items-center space-x-3">
-                            <div class="w-8 h-8 bg-spectralViolet/10 border border-spectralViolet/30 flex items-center justify-center text-spectralViolet">
-                                <i class="fa-solid fa-cloud-arrow-up text-xs"></i>
-                            </div>
-                            <div>
-                                <div class="font-display font-bold text-xs text-white">r2_storage_gateway</div>
-                                <div class="text-[11px] font-telemetry text-slate-400">Tools: upload_cdn_asset, generate_presigned_url, purge_cache</div>
-                            </div>
-                        </div>
-                        <div class="text-right font-telemetry text-[11px]">
-                            <span class="px-2 py-0.5 bg-emeraldNominal/10 text-emeraldNominal border border-emeraldNominal/30 font-bold">CONFIGURED (LIVE)</span>
-                            <div class="text-slate-500 mt-1">S3_API: v4_SIG</div>
-                        </div>
-                    </div>
-
-                    <!-- MCP Server 4: Staging Local Filesystem & SQLite -->
-                    <div class="bg-void/80 p-3.5 border border-surfaceBorder flex items-center justify-between">
-                        <div class="flex items-center space-x-3">
-                            <div class="w-8 h-8 bg-slate-800 border border-slate-700 flex items-center justify-center text-slate-300">
-                                <i class="fa-solid fa-database text-xs"></i>
-                            </div>
-                            <div>
-                                <div class="font-display font-bold text-xs text-white">local_staging_db</div>
-                                <div class="text-[11px] font-telemetry text-slate-400">Path: storage/published_history.db (42 post records)</div>
-                            </div>
-                        </div>
-                        <div class="text-right font-telemetry text-[11px]">
-                            <span class="px-2 py-0.5 bg-emeraldNominal/10 text-emeraldNominal border border-emeraldNominal/30 font-bold">MOUNTED</span>
-                            <div class="text-slate-500 mt-1">SQLITE3: WAL_MODE</div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Right: 6-Stage Autonomous Execution Pipeline Stepper -->
-            <div class="glass-panel p-5 border border-surfaceBorder">
-                <div class="flex items-center justify-between border-b border-surfaceBorder pb-3 mb-4">
-                    <div class="flex items-center space-x-3">
-                        <span class="w-2.5 h-2.5 bg-laserCyan inline-block"></span>
-                        <h2 class="font-display font-bold text-sm tracking-wider uppercase text-white">
-                            6-STAGE AUTONOMOUS PIPELINE STEPPER
-                        </h2>
-                    </div>
-                    <div class="font-telemetry text-[11px] text-slate-400">
-                        PIPELINE_STATE: <span class="text-emeraldNominal font-semibold" id="pipeline-current-phase">STANDBY_MONITOR</span>
-                    </div>
-                </div>
-
-                <div class="space-y-2.5">
-                    <!-- Stage 1 -->
-                    <div class="bg-void/80 p-3 border border-surfaceBorder flex items-center justify-between">
-                        <div class="flex items-center space-x-3">
-                            <span class="w-6 h-6 bg-laserCyan/20 text-laserCyan font-telemetry font-bold text-xs flex items-center justify-center border border-laserCyan/40">1</span>
-                            <div>
-                                <div class="font-display font-semibold text-xs text-white">Ingestion & Discovery</div>
-                                <div class="text-[11px] text-slate-400">Multi-source RSS, ArXiv AI papers, GitHub Trending</div>
-                            </div>
-                        </div>
-                        <span class="text-[10px] font-telemetry text-emeraldNominal font-bold">COMPLETED</span>
-                    </div>
-
-                    <!-- Stage 2 -->
-                    <div class="bg-void/80 p-3 border border-surfaceBorder flex items-center justify-between">
-                        <div class="flex items-center space-x-3">
-                            <span class="w-6 h-6 bg-electricAzure/20 text-electricAzure font-telemetry font-bold text-xs flex items-center justify-center border border-electricAzure/40">2</span>
-                            <div>
-                                <div class="font-display font-semibold text-xs text-white">Heuristic & Fact Curation</div>
-                                <div class="text-[11px] text-slate-400">Deduplication filter, novelty score & significance rating</div>
-                            </div>
-                        </div>
-                        <span class="text-[10px] font-telemetry text-emeraldNominal font-bold">COMPLETED</span>
-                    </div>
-
-                    <!-- Stage 3 -->
-                    <div class="bg-void/80 p-3 border border-surfaceBorder flex items-center justify-between">
-                        <div class="flex items-center space-x-3">
-                            <span class="w-6 h-6 bg-spectralViolet/20 text-spectralViolet font-telemetry font-bold text-xs flex items-center justify-center border border-spectralViolet/40">3</span>
-                            <div>
-                                <div class="font-display font-semibold text-xs text-white">Script & Prompt Synthesis</div>
-                                <div class="text-[11px] text-slate-400">Generates 3-part teleprompter script & visual diffusion prompt</div>
-                            </div>
-                        </div>
-                        <span class="text-[10px] font-telemetry text-emeraldNominal font-bold">COMPLETED</span>
-                    </div>
-
-                    <!-- Stage 4 -->
-                    <div class="bg-void/80 p-3 border border-surfaceBorder flex items-center justify-between">
-                        <div class="flex items-center space-x-3">
-                            <span class="w-6 h-6 bg-laserCyan/20 text-laserCyan font-telemetry font-bold text-xs flex items-center justify-center border border-laserCyan/40">4</span>
-                            <div>
-                                <div class="font-display font-semibold text-xs text-white">Multi-Modal Media Rendering</div>
-                                <div class="text-[11px] text-slate-400">Edge-TTS neural audio + FFmpeg 9:16 video compositor + Pillow</div>
-                            </div>
-                        </div>
-                        <span class="text-[10px] font-telemetry text-emeraldNominal font-bold">COMPLETED</span>
-                    </div>
-
-                    <!-- Stage 5 -->
-                    <div class="bg-void/80 p-3 border border-surfaceBorder flex items-center justify-between">
-                        <div class="flex items-center space-x-3">
-                            <span class="w-6 h-6 bg-ionizedAmber/20 text-ionizedAmber font-telemetry font-bold text-xs flex items-center justify-center border border-ionizedAmber/40">5</span>
-                            <div>
-                                <div class="font-display font-semibold text-xs text-white">Cryptographic HITL Gate</div>
-                                <div class="text-[11px] text-slate-400">Autonomous safety threshold evaluation with HMAC signoff</div>
-                            </div>
-                        </div>
-                        <span class="text-[10px] font-telemetry text-emeraldNominal font-bold">AUTO_PASSED</span>
-                    </div>
-
-                    <!-- Stage 6 -->
-                    <div class="bg-void/80 p-3 border border-surfaceBorder flex items-center justify-between">
-                        <div class="flex items-center space-x-3">
-                            <span class="w-6 h-6 bg-emeraldNominal/20 text-emeraldNominal font-telemetry font-bold text-xs flex items-center justify-center border border-emeraldNominal/40">6</span>
-                            <div>
-                                <div class="font-display font-semibold text-xs text-white">Omnichannel Fleet Dispatch</div>
-                                <div class="text-[11px] text-slate-400">Direct TikTok Content API v2, Telegram Channel & R2 Staging</div>
-                            </div>
-                        </div>
-                        <span class="text-[10px] font-telemetry text-emeraldNominal font-bold">VERIFIED_DISPATCHED</span>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- 4. OMNICHANNEL FLEET COMMAND GRID (TELEGRAM, TIKTOK, META, THREADS, R2) -->
-        <div class="glass-panel p-5 border border-surfaceBorder">
-            <div class="flex items-center justify-between border-b border-surfaceBorder pb-3 mb-4">
-                <div class="flex items-center space-x-3">
-                    <span class="w-2.5 h-2.5 bg-laserCyan inline-block"></span>
-                    <h2 class="font-display font-bold text-sm tracking-wider uppercase text-white">
-                        OMNICHANNEL FLEET COMMAND // DELIVERY GRID
-                    </h2>
-                </div>
-                <div class="font-telemetry text-[11px] text-slate-400">
-                    NETWORK_STATUS: <span class="text-emeraldNominal font-bold">5 NODES OPERATIONAL</span>
-                </div>
-            </div>
-
-            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
-                <!-- Telegram Channel -->
-                <div class="bg-void/90 p-4 border border-surfaceBorder border-t-2 border-t-[#229ED9] reticle-box flex flex-col justify-between">
-                    <div>
-                        <div class="flex items-center justify-between">
-                            <div class="flex items-center space-x-2 text-[#229ED9]">
-                                <i class="fa-brands fa-telegram text-base"></i>
-                                <span class="font-display font-bold text-xs text-white">TELEGRAM</span>
-                            </div>
-                            <span class="px-2 py-0.5 text-[9px] font-telemetry font-bold bg-emeraldNominal/10 text-emeraldNominal border border-emeraldNominal/30">LIVE_ACTIVE</span>
-                        </div>
-                        <div class="font-telemetry text-[11px] text-slate-300 mt-2 font-semibold">@Eraof_Ai</div>
-                        <div class="text-[10px] font-telemetry text-slate-400 mt-1">ID: -1002347209384</div>
-                        <div class="text-[11px] font-telemetry text-emeraldNominal mt-2">
-                            <i class="fa-solid fa-check-double"></i> 86 Videos, 677 Photos
-                        </div>
-                    </div>
-                    <div class="mt-4 pt-2 border-t border-surfaceBorder/60">
-                        <a href="https://t.me/Eraof_Ai" target="_blank" class="cyber-btn w-full py-1.5 text-[10px]">
-                            <i class="fa-solid fa-arrow-up-right-from-square"></i> VIEW CHANNEL
-                        </a>
-                    </div>
-                </div>
-
-                <!-- TikTok Posting API v2 -->
-                <div class="bg-void/90 p-4 border border-surfaceBorder border-t-2 border-t-[#FE2C55] reticle-box flex flex-col justify-between">
-                    <div>
-                        <div class="flex items-center justify-between">
-                            <div class="flex items-center space-x-2 text-[#FE2C55]">
-                                <i class="fa-brands fa-tiktok text-base"></i>
-                                <span class="font-display font-bold text-xs text-white">TIKTOK v2</span>
-                            </div>
-                            <span class="px-2 py-0.5 text-[9px] font-telemetry font-bold bg-emeraldNominal/10 text-emeraldNominal border border-emeraldNominal/30">API_LIVE</span>
-                        </div>
-                        <div class="font-telemetry text-[11px] text-slate-300 mt-2 font-semibold">@eraofai8</div>
-                        <div class="text-[10px] font-telemetry text-slate-400 mt-1">POST_ID: #10074</div>
-                        <div class="text-[11px] font-telemetry text-emeraldNominal mt-2">
-                            <i class="fa-solid fa-shield-halved"></i> STATUS: PUBLISH_COMPLETE
-                        </div>
-                    </div>
-                    <div class="mt-4 pt-2 border-t border-surfaceBorder/60">
-                        <div class="text-[10px] font-telemetry text-slate-400 text-center">MODE: SELF_ONLY (SANDBOX)</div>
-                    </div>
-                </div>
-
-                <!-- Meta (Facebook Page & Instagram Pro) -->
-                <div class="bg-void/90 p-4 border border-surfaceBorder border-t-2 border-t-[#1877F2] reticle-box flex flex-col justify-between">
-                    <div>
-                        <div class="flex items-center justify-between">
-                            <div class="flex items-center space-x-2 text-[#1877F2]">
-                                <i class="fa-brands fa-meta text-base"></i>
-                                <span class="font-display font-bold text-xs text-white">META GRAPH</span>
-                            </div>
-                            <span class="px-2 py-0.5 text-[9px] font-telemetry font-bold bg-spectralViolet/10 text-spectralViolet border border-spectralViolet/30">SIMULATED</span>
-                        </div>
-                        <div class="font-telemetry text-[11px] text-slate-300 mt-2 font-semibold">PAGE: Era of AI</div>
-                        <div class="text-[10px] font-telemetry text-slate-400 mt-1">PAGE_ID: 1399811016543093</div>
-                        <div class="text-[11px] font-telemetry text-slate-400 mt-2">
-                            <i class="fa-solid fa-arrows-rotate"></i> GRAPH API: v21.0
-                        </div>
-                    </div>
-                    <div class="mt-4 pt-2 border-t border-surfaceBorder/60">
-                        <div class="text-[10px] font-telemetry text-emeraldNominal text-center">AUTONOMOUS PASS: READY</div>
-                    </div>
-                </div>
-
-                <!-- Meta Threads API -->
-                <div class="bg-void/90 p-4 border border-surfaceBorder border-t-2 border-t-[#A05FF3] reticle-box flex flex-col justify-between">
-                    <div>
-                        <div class="flex items-center justify-between">
-                            <div class="flex items-center space-x-2 text-[#A05FF3]">
-                                <i class="fa-brands fa-threads text-base"></i>
-                                <span class="font-display font-bold text-xs text-white">THREADS</span>
-                            </div>
-                            <span class="px-2 py-0.5 text-[9px] font-telemetry font-bold bg-spectralViolet/10 text-spectralViolet border border-spectralViolet/30">SIMULATED</span>
-                        </div>
-                        <div class="font-telemetry text-[11px] text-slate-300 mt-2 font-semibold">@Eraof_Ai</div>
-                        <div class="text-[10px] font-telemetry text-slate-400 mt-1">CONTAINER: READY</div>
-                        <div class="text-[11px] font-telemetry text-slate-400 mt-2">
-                            <i class="fa-solid fa-layer-group"></i> THREAD_SERIES: READY
-                        </div>
-                    </div>
-                    <div class="mt-4 pt-2 border-t border-surfaceBorder/60">
-                        <div class="text-[10px] font-telemetry text-emeraldNominal text-center">AUTONOMOUS PASS: READY</div>
-                    </div>
-                </div>
-
-                <!-- Cloudflare R2 CDN -->
-                <div class="bg-void/90 p-4 border border-surfaceBorder border-t-2 border-t-[#F38020] reticle-box flex flex-col justify-between">
-                    <div>
-                        <div class="flex items-center justify-between">
-                            <div class="flex items-center space-x-2 text-[#F38020]">
-                                <i class="fa-solid fa-cloud text-base"></i>
-                                <span class="font-display font-bold text-xs text-white">CLOUDFLARE R2</span>
-                            </div>
-                            <span class="px-2 py-0.5 text-[9px] font-telemetry font-bold bg-emeraldNominal/10 text-emeraldNominal border border-emeraldNominal/30">CDN_LIVE</span>
-                        </div>
-                        <div class="font-telemetry text-[11px] text-slate-300 mt-2 font-semibold">ai-broadcaster-staging</div>
-                        <div class="text-[10px] font-telemetry text-slate-400 mt-1">BUCKET: READY</div>
-                        <div class="text-[11px] font-telemetry text-emeraldNominal mt-2">
-                            <i class="fa-solid fa-link"></i> PUBLIC_URL: ACTIVE
-                        </div>
-                    </div>
-                    <div class="mt-4 pt-2 border-t border-surfaceBorder/60">
-                        <div class="text-[10px] font-telemetry text-slate-400 text-center">S3_ENDPOINT: CONNECTED</div>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- 5. MEDIA STAGE & TACTICAL INSPECTION DECK -->
-        <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
-
-            <!-- 5A. 9:16 Vertical Smartphone Reels Player & Carousel Deck (5 cols) -->
-            <div class="lg:col-span-5 glass-panel p-5 border border-surfaceBorder flex flex-col items-center">
-                <div class="w-full flex items-center justify-between border-b border-surfaceBorder pb-3 mb-4">
-                    <div class="flex items-center space-x-3">
-                        <span class="w-2.5 h-2.5 bg-laserCyan inline-block"></span>
-                        <h2 class="font-display font-bold text-sm tracking-wider uppercase text-white">
-                            MEDIA STAGE // 9:16 REELS & CAROUSELS
-                        </h2>
-                    </div>
-                    <div class="flex items-center space-x-2 font-telemetry text-[10px]">
-                        <button onclick="switchMediaMode('video')" id="tab-media-video" class="px-2 py-1 bg-laserCyan text-void font-bold">VIDEO REEL</button>
-                        <button onclick="switchMediaMode('carousel')" id="tab-media-carousel" class="px-2 py-1 bg-void text-slate-400 border border-surfaceBorder">7-SLIDE CAROUSEL</button>
-                    </div>
-                </div>
-
-                <!-- Video Reel Player Container -->
-                <div id="media-video-container" class="reel-screen-container flex flex-col justify-between p-2">
-                    <!-- Top Video Overlay Info -->
-                    <div class="z-20 flex items-center justify-between bg-black/60 backdrop-blur px-2.5 py-1 text-[10px] font-telemetry text-laserCyan">
-                        <span><i class="fa-solid fa-film"></i> 1080x1920 (9:16)</span>
-                        <span id="video-timer-badge">00:00 / 00:15</span>
-                    </div>
-
-                    <!-- HTML5 Video Player -->
-                    <video id="reel-player" class="absolute inset-0 w-full h-full object-cover z-10" playsinline loop>
-                        <source src="/media/output_clip_claude37.mp4" type="video/mp4">
-                        Your browser does not support HTML5 vertical video.
-                    </video>
-
-                    <!-- Playback Controls Bar -->
-                    <div class="z-20 mt-auto bg-black/75 backdrop-blur p-2 space-y-1.5 border border-white/10">
-                        <div class="flex items-center justify-between">
-                            <button onclick="toggleVideoPlay()" id="video-play-btn" class="text-laserCyan hover:text-white px-2 py-1 text-xs">
-                                <i class="fa-solid fa-play"></i>
+                        <div class="flex items-center gap-space-xs">
+                            <button onclick="openBroadcastModal()" class="px-space-md py-1.5 rounded-lg bg-primary hover:bg-primary/90 text-white font-mono text-xs uppercase font-semibold transition-all flex items-center gap-space-xs shadow-sm hover:shadow" type="button">
+                                <span class="material-symbols-outlined text-[16px]">sync</span>
+                                <span>FORCE DISPATCH ITERATION</span>
                             </button>
-                            <button onclick="toggleVideoMute()" id="video-mute-btn" class="text-slate-300 hover:text-white px-2 py-1 text-xs">
-                                <i class="fa-solid fa-volume-high"></i>
-                            </button>
-                            <button onclick="restartVideo()" class="text-slate-300 hover:text-white px-2 py-1 text-xs">
-                                <i class="fa-solid fa-rotate-left"></i>
+                            <button onclick="switchConsoleTab('terminal')" class="px-space-sm py-1.5 rounded-lg bg-surface-container-high hover:bg-surface-dim text-on-surface font-mono text-xs uppercase font-medium transition-all flex items-center gap-space-xs border border-outline-variant/60" type="button">
+                                <span class="material-symbols-outlined text-[16px]">terminal</span>
+                                <span class="hidden sm:inline">VIEW LOGS</span>
                             </button>
                         </div>
-                        <input type="range" id="video-seekbar" min="0" max="100" value="0" class="w-full accent-laserCyan cursor-pointer h-1" oninput="seekVideo(this.value)">
                     </div>
-                </div>
+                </section>
 
-                <!-- 7-Slide Carousel Inspector (Hidden by default) -->
-                <div id="media-carousel-container" class="hidden w-full space-y-4">
-                    <div class="aspect-square bg-void border border-surfaceBorder relative flex items-center justify-center overflow-hidden">
-                        <img id="carousel-main-slide" src="https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=1080&q=80" class="w-full h-full object-cover" alt="Carousel Slide">
-                        <div class="absolute bottom-0 inset-x-0 bg-black/70 backdrop-blur p-3 text-xs font-telemetry text-white border-t border-surfaceBorder" id="carousel-slide-caption">
-                            Slide 1 of 7: Autonomous Web Navigation Architecture
-                        </div>
-                    </div>
-                    <!-- Slide Thumbnails Strip -->
-                    <div class="flex items-center justify-center space-x-2 font-telemetry text-xs">
-                        <button onclick="setCarouselSlide(1)" class="w-8 h-8 bg-laserCyan text-void font-bold flex items-center justify-center border border-laserCyan">1</button>
-                        <button onclick="setCarouselSlide(2)" class="w-8 h-8 bg-void text-slate-300 flex items-center justify-center border border-surfaceBorder">2</button>
-                        <button onclick="setCarouselSlide(3)" class="w-8 h-8 bg-void text-slate-300 flex items-center justify-center border border-surfaceBorder">3</button>
-                        <button onclick="setCarouselSlide(4)" class="w-8 h-8 bg-void text-slate-300 flex items-center justify-center border border-surfaceBorder">4</button>
-                        <button onclick="setCarouselSlide(5)" class="w-8 h-8 bg-void text-slate-300 flex items-center justify-center border border-surfaceBorder">5</button>
-                        <button onclick="setCarouselSlide(6)" class="w-8 h-8 bg-void text-slate-300 flex items-center justify-center border border-surfaceBorder">6</button>
-                        <button onclick="setCarouselSlide(7)" class="w-8 h-8 bg-void text-slate-300 flex items-center justify-center border border-surfaceBorder">7</button>
-                    </div>
-                </div>
-            </div>
+                <div class="w-full max-w-[1760px] mx-auto px-space-md lg:px-space-lg py-space-lg space-y-space-xl">
 
-            <!-- 5B. Script Teleprompter, Prompts & HITL Gate Actions (7 cols) -->
-            <div class="lg:col-span-7 glass-panel p-5 border border-surfaceBorder flex flex-col justify-between">
-                <div>
-                    <div class="flex items-center justify-between border-b border-surfaceBorder pb-3 mb-4">
-                        <div class="flex items-center space-x-3">
-                            <span class="w-2.5 h-2.5 bg-laserCyan inline-block"></span>
-                            <h2 class="font-display font-bold text-sm tracking-wider uppercase text-white" id="inspected-post-headline">
-                                Claude 3.7 Sonnet Hybrid Reasoning Architecture Released
-                            </h2>
-                        </div>
-                        <span class="px-2.5 py-0.5 text-[10px] font-telemetry font-bold bg-laserCyan/10 text-laserCyan border border-laserCyan/30" id="inspected-post-badge">
-                            REEL // PENDING_GATE
-                        </span>
-                    </div>
-
-                    <!-- Script Teleprompter Deck -->
-                    <div class="space-y-3 font-telemetry">
-                        <!-- Hook Narration -->
-                        <div class="bg-void/80 p-3 border-l-2 border-l-laserCyan border border-surfaceBorder">
-                            <div class="text-[10px] text-laserCyan tracking-widest uppercase font-bold flex items-center justify-between">
-                                <span>HOOK NARRATION (0-3s RETENTION)</span>
-                                <span class="text-slate-500">EDGE-TTS</span>
+                    <!-- ========================================================================= -->
+                    <!-- SECTION 1: LIVE MULTI-AGENT DIRECTED ACYCLIC GRAPH (DAG) CANVAS           -->
+                    <!-- ========================================================================= -->
+                    <section id="dag-topology" class="relative w-full bg-surface-container-lowest rounded-xl p-space-md lg:p-space-lg shadow-sm border border-outline-variant/60 overflow-hidden reticle-corner">
+                        <!-- Graph Header & Control Bar -->
+                        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-space-sm pb-space-md border-b border-outline-variant/60">
+                            <div>
+                                <div class="flex items-center gap-space-xs font-mono text-xs text-primary font-semibold mb-0.5 tracking-wider">
+                                    <span class="material-symbols-outlined text-[16px]">account_tree</span>
+                                    <span>AUTONOMOUS BROADCASTER TOPOLOGY // LIVE ORCHESTRATION PIPELINE</span>
+                                </div>
+                                <h2 class="font-headline text-2xl text-on-surface uppercase font-bold tracking-tight">
+                                    Directed Acyclic Graph (DAG) Execution Matrix
+                                </h2>
                             </div>
-                            <p class="text-xs text-white font-body mt-1 leading-relaxed" id="inspected-post-hook">
-                                Hybrid reasoning just fundamentally changed software architecture.
-                            </p>
+                            <div class="flex items-center gap-space-sm">
+                                <div class="px-space-sm py-1 rounded-md bg-surface-container text-on-surface font-mono text-xs flex items-center gap-space-xs border border-outline-variant/50">
+                                    <span class="w-2 h-2 rounded-full bg-emerald-600 animate-pulse"></span>
+                                    <span>NODES: 7/7 CONCURRENT</span>
+                                </div>
+                                <div class="px-space-sm py-1 rounded-md bg-surface-container text-on-surface-variant font-mono text-xs border border-outline-variant/50">
+                                    FRAME: NVENC 60FPS
+                                </div>
+                            </div>
                         </div>
 
-                        <!-- Body Narration -->
-                        <div class="bg-void/80 p-3 border-l-2 border-l-electricAzure border border-surfaceBorder">
-                            <div class="text-[10px] text-electricAzure tracking-widest uppercase font-bold flex items-center justify-between">
-                                <span>BODY NARRATION (DENSE TECHNICAL ANALYSIS)</span>
-                                <span class="text-slate-500">120 WPM</span>
+                        <!-- Canvas Area: Real CSS + SVG Grid & Node Layout -->
+                        <div class="relative w-full mt-space-md pt-4 pb-6 overflow-x-auto">
+                            <!-- SVG Vector Links (Animated Warm Terracotta / Sand Lines) -->
+                            <div class="hidden xl:block absolute inset-0 pointer-events-none z-0">
+                                <svg class="w-full h-full" fill="none" preserveAspectRatio="none" viewBox="0 0 1400 240" xmlns="http://www.w3.org/2000/svg">
+                                    <defs>
+                                        <linearGradient id="terracottaLineGrad" x1="0%" x2="100%" y1="0%" y2="0%">
+                                            <stop offset="0%" stop-color="#c2652a" stop-opacity="0.3"></stop>
+                                            <stop offset="50%" stop-color="#c2652a" stop-opacity="0.9"></stop>
+                                            <stop offset="100%" stop-color="#e08850" stop-opacity="0.5"></stop>
+                                        </linearGradient>
+                                    </defs>
+                                    <path class="animate-pulse" d="M 175 110 L 260 110" stroke="url(#terracottaLineGrad)" stroke-dasharray="4 4" stroke-width="2"></path>
+                                    <path d="M 375 110 L 460 110" stroke="url(#terracottaLineGrad)" stroke-dasharray="4 4" stroke-width="2"></path>
+                                    <path d="M 575 110 L 660 110" stroke="url(#terracottaLineGrad)" stroke-dasharray="4 4" stroke-width="2"></path>
+                                    <path d="M 775 110 L 860 110" stroke="url(#terracottaLineGrad)" stroke-dasharray="4 4" stroke-width="2"></path>
+                                    <path d="M 975 110 L 1060 110" stroke="url(#terracottaLineGrad)" stroke-dasharray="4 4" stroke-width="2"></path>
+                                    <path d="M 1175 110 L 1260 110" stroke="url(#terracottaLineGrad)" stroke-dasharray="4 4" stroke-width="2"></path>
+                                    <circle class="animate-ping" cx="217" cy="110" fill="#c2652a" r="3.5" style="animation-duration: 2s;"></circle>
+                                    <circle class="animate-ping" cx="617" cy="110" fill="#d97736" r="3.5" style="animation-duration: 1.5s;"></circle>
+                                    <circle class="animate-ping" cx="1017" cy="110" fill="#c2652a" r="3.5" style="animation-duration: 2.4s;"></circle>
+                                </svg>
                             </div>
-                            <p class="text-xs text-slate-200 font-body mt-1 leading-relaxed" id="inspected-post-body">
-                                Anthropic officially announced Claude 3.7 Sonnet, introducing dynamically selectable reasoning tokens while retaining instant standard throughput. Benchmark data shows state-of-the-art results on SWE-bench Verified at 70.3%, allowing autonomous coding loops to self-correct in real time.
-                            </p>
+
+                            <!-- 7 Agent Nodes Grid -->
+                            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7 gap-space-sm relative z-10 min-w-[1100px] xl:min-w-0">
+                                <!-- NODE 1: Harvester -->
+                                <div class="bg-surface-container-low/80 hover:bg-surface-container rounded-lg p-space-sm transition-all flex flex-col justify-between border border-outline-variant/60 shadow-sm">
+                                    <div>
+                                        <div class="flex items-center justify-between gap-1 pb-1.5 border-b border-outline-variant/40">
+                                            <span class="font-mono text-xs text-primary font-bold">01 // SCRAPER</span>
+                                            <span class="px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-800 font-mono text-[10px] font-semibold flex items-center gap-1">
+                                                <span class="w-1.5 h-1.5 rounded-full bg-emerald-600"></span>IDLE
+                                            </span>
+                                        </div>
+                                        <div class="mt-2 font-headline text-lg leading-snug text-on-surface font-bold">Harvester Engine</div>
+                                        <p class="font-body text-xs text-on-surface-variant mt-1 leading-relaxed">Monitors 17 RSS Feeds & ArXiv digests.</p>
+                                    </div>
+                                    <div class="mt-3 pt-2 border-t border-outline-variant/40 space-y-1 font-mono text-xs">
+                                        <div class="flex justify-between text-on-surface-variant"><span>Fetch:</span><span class="text-on-surface font-medium">42s ago</span></div>
+                                        <div class="flex justify-between text-on-surface-variant"><span>Load:</span><span class="text-primary font-semibold">142 kb/s</span></div>
+                                        <div class="flex justify-between text-on-surface-variant"><span>Latency:</span><span class="text-on-surface">120ms</span></div>
+                                    </div>
+                                </div>
+
+                                <!-- NODE 2: Curator -->
+                                <div class="bg-surface-container-low/80 hover:bg-surface-container rounded-lg p-space-sm transition-all flex flex-col justify-between border border-outline-variant/60 shadow-sm">
+                                    <div>
+                                        <div class="flex items-center justify-between gap-1 pb-1.5 border-b border-outline-variant/40">
+                                            <span class="font-mono text-xs text-primary font-bold">02 // CURATOR</span>
+                                            <span class="px-1.5 py-0.5 rounded bg-primary-fixed text-on-primary-fixed-variant font-mono text-[10px] font-bold flex items-center gap-1">
+                                                <span class="w-1.5 h-1.5 rounded-full bg-primary animate-pulse"></span>ACTIVE
+                                            </span>
+                                        </div>
+                                        <div class="mt-2 font-headline text-lg leading-snug text-on-surface font-bold">Heuristic Curator</div>
+                                        <p class="font-body text-xs text-on-surface-variant mt-1 leading-relaxed">40-pt ranking matrix & novelty evaluation.</p>
+                                    </div>
+                                    <div class="mt-3 pt-2 border-t border-outline-variant/40 space-y-1 font-mono text-xs">
+                                        <div class="flex justify-between text-on-surface-variant"><span>Top Score:</span><span class="text-primary font-bold">38.5 / 40</span></div>
+                                        <div class="flex justify-between text-on-surface-variant"><span>Cutoff:</span><span class="text-on-surface">32.0 min</span></div>
+                                        <div class="flex justify-between text-on-surface-variant"><span>Latency:</span><span class="text-on-surface">84ms</span></div>
+                                    </div>
+                                </div>
+
+                                <!-- NODE 3: Scriptwriter -->
+                                <div class="bg-surface-container-low/80 hover:bg-surface-container rounded-lg p-space-sm transition-all flex flex-col justify-between border border-outline-variant/60 shadow-sm">
+                                    <div>
+                                        <div class="flex items-center justify-between gap-1 pb-1.5 border-b border-outline-variant/40">
+                                            <span class="font-mono text-xs text-tertiary font-bold">03 // WRITER</span>
+                                            <span class="px-1.5 py-0.5 rounded bg-tertiary-fixed text-on-tertiary-fixed-variant font-mono text-[10px] font-bold flex items-center gap-1">
+                                                <span class="w-1.5 h-1.5 rounded-full bg-tertiary animate-pulse"></span>THINKING
+                                            </span>
+                                        </div>
+                                        <div class="mt-2 font-headline text-lg leading-snug text-on-surface font-bold">Canonical Script</div>
+                                        <p class="font-body text-xs text-on-surface-variant mt-1 leading-relaxed">Gemini 3.8 Flash (2k reasoning budget).</p>
+                                    </div>
+                                    <div class="mt-3 pt-2 border-t border-outline-variant/40 space-y-1 font-mono text-xs">
+                                        <div class="flex justify-between text-on-surface-variant"><span>Speed:</span><span class="text-tertiary font-bold">114 t/s</span></div>
+                                        <div class="flex justify-between text-on-surface-variant"><span>Archetype:</span><span class="text-on-surface font-semibold text-xs truncate">Paradox Hook</span></div>
+                                        <div class="flex justify-between text-on-surface-variant"><span>Words:</span><span class="text-on-surface">142 tokens</span></div>
+                                    </div>
+                                </div>
+
+                                <!-- NODE 4: Media Synthesis -->
+                                <div class="bg-surface-container-low/80 hover:bg-surface-container rounded-lg p-space-sm transition-all flex flex-col justify-between border border-outline-variant/60 shadow-sm">
+                                    <div>
+                                        <div class="flex items-center justify-between gap-1 pb-1.5 border-b border-outline-variant/40">
+                                            <span class="font-mono text-xs text-primary font-bold">04 // SYNTHESIS</span>
+                                            <span class="px-1.5 py-0.5 rounded bg-primary-fixed text-on-primary-fixed-variant font-mono text-[10px] font-bold flex items-center gap-1">
+                                                <span class="w-1.5 h-1.5 rounded-full bg-primary animate-spin"></span>82%
+                                            </span>
+                                        </div>
+                                        <div class="mt-2 font-headline text-lg leading-snug text-on-surface font-bold">Neural Engine</div>
+                                        <p class="font-body text-xs text-on-surface-variant mt-1 leading-relaxed">9:16 Video + Edge-TTS + 7 Slide PIL Deck.</p>
+                                    </div>
+                                    <div class="mt-3 pt-2 border-t border-outline-variant/40 space-y-1 font-mono text-xs">
+                                        <div class="w-full bg-surface-container-highest rounded-full h-1.5 mt-1 overflow-hidden">
+                                            <div class="bg-primary h-1.5 rounded-full transition-all duration-500" style="width: 82%"></div>
+                                        </div>
+                                        <div class="flex justify-between text-on-surface-variant pt-1"><span>Voice:</span><span class="text-on-surface">GuyNeural</span></div>
+                                        <div class="flex justify-between text-on-surface-variant"><span>Render:</span><span class="text-primary font-semibold">60fps NVENC</span></div>
+                                    </div>
+                                </div>
+
+                                <!-- NODE 5: Quality Gate -->
+                                <div class="bg-surface-container-low/80 hover:bg-surface-container rounded-lg p-space-sm transition-all flex flex-col justify-between border border-outline-variant/60 shadow-sm">
+                                    <div>
+                                        <div class="flex items-center justify-between gap-1 pb-1.5 border-b border-outline-variant/40">
+                                            <span class="font-mono text-xs text-amber-700 font-bold">05 // GATE</span>
+                                            <span class="px-1.5 py-0.5 rounded bg-amber-100 text-amber-900 font-mono text-[10px] font-bold flex items-center gap-1">
+                                                <span class="w-1.5 h-1.5 rounded-full bg-amber-600 animate-pulse"></span>VERIFYING
+                                            </span>
+                                        </div>
+                                        <div class="mt-2 font-headline text-lg leading-snug text-on-surface font-bold">Pre-Publish Gate</div>
+                                        <p class="font-body text-xs text-on-surface-variant mt-1 leading-relaxed">8 Invariant Checks: Hallucinations & Citations.</p>
+                                    </div>
+                                    <div class="mt-3 pt-2 border-t border-outline-variant/40 space-y-1 font-mono text-xs">
+                                        <div class="flex justify-between text-on-surface-variant"><span>Grounding:</span><span class="text-amber-800 font-bold">98.4%</span></div>
+                                        <div class="flex justify-between text-on-surface-variant"><span>Banned Hits:</span><span class="text-emerald-700 font-bold">0 / 250</span></div>
+                                        <div class="flex justify-between text-on-surface-variant"><span>Passed:</span><span class="text-primary font-bold">8 / 8 Checks</span></div>
+                                    </div>
+                                </div>
+
+                                <!-- NODE 6: Self-Healing -->
+                                <div class="bg-surface-container-low/80 hover:bg-surface-container rounded-lg p-space-sm transition-all flex flex-col justify-between border border-outline-variant/60 shadow-sm">
+                                    <div>
+                                        <div class="flex items-center justify-between gap-1 pb-1.5 border-b border-outline-variant/40">
+                                            <span class="font-mono text-xs text-secondary font-bold">06 // HEALER</span>
+                                            <span class="px-1.5 py-0.5 rounded bg-secondary-fixed text-on-secondary-fixed-variant font-mono text-[10px] font-bold flex items-center gap-1">
+                                                <span class="w-1.5 h-1.5 rounded-full bg-secondary"></span>SYNCED
+                                            </span>
+                                        </div>
+                                        <div class="mt-2 font-headline text-lg leading-snug text-on-surface font-bold">Self-Healing Unit</div>
+                                        <p class="font-body text-xs text-on-surface-variant mt-1 leading-relaxed">Vector Memory & Runtime Rollback Engine.</p>
+                                    </div>
+                                    <div class="mt-3 pt-2 border-t border-outline-variant/40 space-y-1 font-mono text-xs">
+                                        <div class="flex justify-between text-on-surface-variant"><span>Memory:</span><span class="text-on-surface font-medium">Chroma v2</span></div>
+                                        <div class="flex justify-between text-on-surface-variant"><span>Drift:</span><span class="text-primary font-bold">0.02 delta</span></div>
+                                        <div class="flex justify-between text-on-surface-variant"><span>Rollback:</span><span class="text-emerald-700 font-semibold">STANDBY</span></div>
+                                    </div>
+                                </div>
+
+                                <!-- NODE 7: Omnichannel Dispatcher -->
+                                <div class="bg-surface-container-low/80 hover:bg-surface-container rounded-lg p-space-sm transition-all flex flex-col justify-between border border-outline-variant/60 shadow-sm">
+                                    <div>
+                                        <div class="flex items-center justify-between gap-1 pb-1.5 border-b border-outline-variant/40">
+                                            <span class="font-mono text-xs text-primary font-bold">07 // DISPATCH</span>
+                                            <span class="px-1.5 py-0.5 rounded bg-primary-fixed text-on-primary-fixed-variant font-mono text-[10px] font-bold flex items-center gap-1">
+                                                <span class="w-1.5 h-1.5 rounded-full bg-primary animate-ping"></span>BROADCAST
+                                            </span>
+                                        </div>
+                                        <div class="mt-2 font-headline text-lg leading-snug text-on-surface font-bold">Dispatcher Hub</div>
+                                        <p class="font-body text-xs text-on-surface-variant mt-1 leading-relaxed">Multi-Threaded distribution to TG, TT & Meta.</p>
+                                    </div>
+                                    <div class="mt-3 pt-2 border-t border-outline-variant/40 space-y-1 font-mono text-xs">
+                                        <div class="flex justify-between text-on-surface-variant"><span>Threads:</span><span class="text-primary font-bold">5 Active</span></div>
+                                        <div class="flex justify-between text-on-surface-variant"><span>Storage:</span><span class="text-on-surface">R2 Synced</span></div>
+                                        <div class="flex justify-between text-on-surface-variant"><span>Status:</span><span class="text-primary font-bold">STREAMING</span></div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </section>
+
+                    <!-- ========================================================================= -->
+                    <!-- SECTION 2: MCP (MODEL CONTEXT PROTOCOL) INTEGRATION HUB                   -->
+                    <!-- ========================================================================= -->
+                    <section id="mcp-bus" class="space-y-space-md">
+                        <!-- Section Banner & RPC Status Pill -->
+                        <div class="flex flex-col md:flex-row md:items-center justify-between gap-space-sm bg-surface-container-lowest p-space-md rounded-xl border border-outline-variant/60 shadow-sm">
+                            <div class="flex items-center gap-space-md">
+                                <div class="w-10 h-10 rounded-lg bg-primary-fixed flex items-center justify-center text-primary">
+                                    <span class="material-symbols-outlined text-[24px]">hub</span>
+                                </div>
+                                <div>
+                                    <div class="flex items-center gap-space-xs font-mono text-xs text-primary font-semibold">
+                                        <span>PROTOCOL LEVEL // MCP RUNTIME BRIDGE</span>
+                                        <span class="w-1 h-1 rounded-full bg-primary"></span>
+                                        <span class="text-on-surface-variant">JSON-RPC 2.0 PROTOCOL</span>
+                                    </div>
+                                    <div class="font-headline text-xl text-on-surface font-bold">
+                                        Autonomous Tool Telemetry & Server Context Matrix
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="flex flex-wrap items-center gap-space-xs sm:gap-space-sm font-mono text-xs">
+                                <div class="px-space-sm py-1 rounded bg-surface-container text-primary font-semibold border border-outline-variant/50">
+                                    PORT: <span class="text-on-surface font-normal">:8080/mcp</span>
+                                </div>
+                                <div class="px-space-sm py-1 rounded bg-surface-container text-on-surface-variant border border-outline-variant/50">
+                                    TRANSPORT: <span class="text-primary font-semibold">Stdio / SSE bridge</span>
+                                </div>
+                                <div class="px-space-sm py-1 rounded bg-emerald-100 text-emerald-800 font-mono text-xs font-bold flex items-center gap-1">
+                                    <span class="w-1.5 h-1.5 rounded-full bg-emerald-600"></span>mcp_social_server // HEALTHY
+                                </div>
+                            </div>
                         </div>
 
-                        <!-- Call to Action -->
-                        <div class="bg-void/80 p-3 border-l-2 border-l-emeraldNominal border border-surfaceBorder">
-                            <div class="text-[10px] text-emeraldNominal tracking-widest uppercase font-bold flex items-center justify-between">
-                                <span>CALL TO ACTION (AUDIENCE HOOK)</span>
-                                <span class="text-slate-500">CTA_TRIGGER</span>
+                        <!-- 4 MCP Tool Telemetry Cards -->
+                        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-space-md">
+                            <!-- Tool 1: Telegram Bot API -->
+                            <div class="bg-surface-container-lowest rounded-xl p-space-md relative overflow-hidden group hover:bg-surface-container-low transition-all border border-outline-variant/60 shadow-sm">
+                                <div class="flex items-center justify-between pb-2 border-b border-outline-variant/40">
+                                    <code class="font-mono text-xs text-primary font-bold">publish_to_telegram</code>
+                                    <span class="text-emerald-700 font-mono text-xs font-bold bg-emerald-50 px-1.5 py-0.5 rounded">200 OK</span>
+                                </div>
+                                <p class="font-body text-xs text-on-surface-variant mt-2 leading-relaxed">
+                                    Direct multipart push to Channel <span class="text-primary font-mono font-bold">@Eraof_Ai</span> with inline captioning.
+                                </p>
+                                <div class="mt-4 space-y-1.5 font-mono text-xs">
+                                    <div class="flex justify-between"><span class="text-on-surface-variant">Target ID:</span><span class="text-on-surface font-semibold">-1002347209384</span></div>
+                                    <div class="flex justify-between"><span class="text-on-surface-variant">Live Reels:</span><span class="text-primary font-bold">86 Videos</span></div>
+                                    <div class="flex justify-between"><span class="text-on-surface-variant">Latency:</span><span class="text-on-surface">150ms</span></div>
+                                    <div class="flex justify-between"><span class="text-on-surface-variant">Auth Handshake:</span><span class="text-emerald-700 font-semibold">VALID TOKEN</span></div>
+                                </div>
+                                <div class="mt-4 pt-2 border-t border-outline-variant/40 flex items-center justify-between font-mono text-xs text-on-surface-variant">
+                                    <span>LAST: LIVE VERIFIED</span>
+                                    <a href="https://t.me/Eraof_Ai" target="_blank" class="text-primary font-bold hover:underline">OPEN →</a>
+                                </div>
                             </div>
-                            <p class="text-xs text-slate-300 font-body mt-1 leading-relaxed" id="inspected-post-cta">
-                                Will fine-grained test-time compute make all standard single-pass LLMs obsolete?
-                            </p>
+
+                            <!-- Tool 2: TikTok API v2 -->
+                            <div class="bg-surface-container-lowest rounded-xl p-space-md relative overflow-hidden group hover:bg-surface-container-low transition-all border border-outline-variant/60 shadow-sm">
+                                <div class="flex items-center justify-between pb-2 border-b border-outline-variant/40">
+                                    <code class="font-mono text-xs text-primary font-bold">publish_to_tiktok</code>
+                                    <span class="text-amber-800 font-mono text-xs font-bold bg-amber-50 px-1.5 py-0.5 rounded">SANDBOX ON</span>
+                                </div>
+                                <p class="font-body text-xs text-on-surface-variant mt-2 leading-relaxed">
+                                    Content Posting API v2 via chunked direct upload protocol with private staging.
+                                </p>
+                                <div class="mt-4 space-y-1.5 font-mono text-xs">
+                                    <div class="flex justify-between"><span class="text-on-surface-variant">Account:</span><span class="text-primary font-mono font-bold">@eraofai8</span></div>
+                                    <div class="flex justify-between"><span class="text-on-surface-variant">Privacy Scope:</span><span class="text-amber-800 font-mono font-bold">SELF_ONLY</span></div>
+                                    <div class="flex justify-between"><span class="text-on-surface-variant">Chunk Size:</span><span class="text-on-surface">5 MB / block</span></div>
+                                    <div class="flex justify-between"><span class="text-on-surface-variant">Latency:</span><span class="text-on-surface">280ms</span></div>
+                                </div>
+                                <div class="mt-4 pt-2 border-t border-outline-variant/40 flex items-center justify-between font-mono text-xs text-on-surface-variant">
+                                    <span>POST_ID #10074 COMPLETE</span>
+                                    <span class="text-primary font-bold">VERIFY →</span>
+                                </div>
+                            </div>
+
+                            <!-- Tool 3: Cloudflare R2 -->
+                            <div class="bg-surface-container-lowest rounded-xl p-space-md relative overflow-hidden group hover:bg-surface-container-low transition-all border border-outline-variant/60 shadow-sm">
+                                <div class="flex items-center justify-between pb-2 border-b border-outline-variant/40">
+                                    <code class="font-mono text-xs text-primary font-bold">r2_storage</code>
+                                    <span class="text-emerald-700 font-mono text-xs font-bold bg-emerald-50 px-1.5 py-0.5 rounded">ONLINE</span>
+                                </div>
+                                <p class="font-body text-xs text-on-surface-variant mt-2 leading-relaxed">
+                                    S3-compatible immutable CDN store for MP4 master assets and PIL slide decks.
+                                </p>
+                                <div class="mt-4 space-y-1.5 font-mono text-xs">
+                                    <div class="flex justify-between"><span class="text-on-surface-variant">Bucket:</span><span class="text-primary font-mono font-bold">ai-broadcaster-staging</span></div>
+                                    <div class="flex justify-between"><span class="text-on-surface-variant">Region:</span><span class="text-on-surface">auto / Global</span></div>
+                                    <div class="flex justify-between"><span class="text-on-surface-variant">Usage:</span><span class="text-primary font-bold">4.8 GB / 100 GB</span></div>
+                                    <div class="flex justify-between"><span class="text-on-surface-variant">Latency:</span><span class="text-on-surface">42ms</span></div>
+                                </div>
+                                <div class="mt-4 pt-2 border-t border-outline-variant/40 flex items-center justify-between font-mono text-xs text-on-surface-variant">
+                                    <span>ZERO EGRESS COST</span>
+                                    <span class="text-primary font-bold">EXPLORE →</span>
+                                </div>
+                            </div>
+
+                            <!-- Tool 4: Gemini Director -->
+                            <div class="bg-surface-container-lowest rounded-xl p-space-md relative overflow-hidden group hover:bg-surface-container-low transition-all border border-outline-variant/60 shadow-sm">
+                                <div class="flex items-center justify-between pb-2 border-b border-outline-variant/40">
+                                    <code class="font-mono text-xs text-tertiary font-bold">gemini_director</code>
+                                    <span class="text-tertiary font-mono text-xs font-bold bg-tertiary-fixed px-1.5 py-0.5 rounded">3.8 FLASH</span>
+                                </div>
+                                <p class="font-body text-xs text-on-surface-variant mt-2 leading-relaxed">
+                                    Reasoning brain orchestrating hook formulation, pacing, and 8-point quality scrutiny.
+                                </p>
+                                <div class="mt-4 space-y-1.5 font-mono text-xs">
+                                    <div class="flex justify-between"><span class="text-on-surface-variant">Context Limit:</span><span class="text-on-surface">1,048,576 toks</span></div>
+                                    <div class="flex justify-between"><span class="text-on-surface-variant">RPM Rate:</span><span class="text-tertiary font-bold">18 / 60 RPM</span></div>
+                                    <div class="flex justify-between"><span class="text-on-surface-variant">Temperature:</span><span class="text-on-surface">0.35 (Precise)</span></div>
+                                    <div class="flex justify-between"><span class="text-on-surface-variant">Latency:</span><span class="text-on-surface">310ms</span></div>
+                                </div>
+                                <div class="mt-4 pt-2 border-t border-outline-variant/40 flex items-center justify-between font-mono text-xs text-on-surface-variant">
+                                    <span>THINKING ENGINE</span>
+                                    <span class="text-tertiary font-bold">WEIGHTS →</span>
+                                </div>
+                            </div>
                         </div>
 
-                        <!-- Diffusion Visual Prompt -->
-                        <div class="bg-void/80 p-3 border-l-2 border-l-spectralViolet border border-surfaceBorder">
-                            <div class="text-[10px] text-spectralViolet tracking-widest uppercase font-bold">
-                                SYNTHESIZED DIFFUSION PROMPT
+                        <!-- MCP Interactive JSON-RPC Call Drawer -->
+                        <div class="bg-surface-container-lowest rounded-xl p-space-md border border-outline-variant/60 shadow-sm">
+                            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-space-xs pb-space-sm border-b border-outline-variant/40">
+                                <div class="flex items-center gap-space-xs font-mono text-xs text-on-surface">
+                                    <span class="material-symbols-outlined text-[16px] text-primary">data_object</span>
+                                    <span class="font-mono text-on-surface font-bold">LATEST MCP INVOCATION ENVELOPE:</span>
+                                    <span class="text-primary font-mono font-bold">id: "rpc-834-tiktok-dispatch"</span>
+                                </div>
+                                <div class="flex items-center gap-space-sm font-mono text-xs">
+                                    <span class="text-on-surface-variant">RESPONSE STATUS:</span>
+                                    <span class="text-emerald-700 font-mono font-bold bg-emerald-50 px-2 py-0.5 rounded">{"jsonrpc": "2.0", "result": {"status": "PUBLISH_COMPLETE"}}</span>
+                                </div>
                             </div>
-                            <p class="text-[11px] text-slate-400 font-telemetry mt-1 leading-relaxed" id="inspected-post-prompt">
-                                9:16 vertical aspect ratio, ultra-photorealistic cinematic render of an AI neural processor glowing with emerald and obsidian photonic waveguides, rapid camera dive into crystalline semiconductor dies, volumetric atmospheric rays, zero baked-in typography, 8k resolution.
-                            </p>
+                            <div class="mt-space-sm bg-surface-container-low rounded-lg p-space-sm font-mono text-xs overflow-x-auto text-on-surface leading-relaxed border border-outline-variant/40">
+                                <pre class="font-mono text-xs leading-relaxed"><span class="text-primary font-bold">{</span>
+  <span class="text-on-surface-variant font-semibold">"jsonrpc"</span>: <span class="text-emerald-800">"2.0"</span>,
+  <span class="text-on-surface-variant font-semibold">"method"</span>: <span class="text-primary">"tools/call"</span>,
+  <span class="text-on-surface-variant font-semibold">"params"</span>: {
+    <span class="text-on-surface-variant font-semibold">"name"</span>: <span class="text-primary font-bold">"publish_to_tiktok"</span>,
+    <span class="text-on-surface-variant font-semibold">"arguments"</span>: {
+      <span class="text-on-surface-variant font-semibold">"video_url"</span>: <span class="text-tertiary">"https://r2.broadcaster.internal/stage/CYC-834/qwen2_5_coder_master.mp4"</span>,
+      <span class="text-on-surface-variant font-semibold">"caption"</span>: <span class="text-on-surface">"Claude 3.7 Sonnet Hybrid Reasoning Architecture Released #AI #SoftwareEngineering"</span>,
+      <span class="text-on-surface-variant font-semibold">"privacy_level"</span>: <span class="text-amber-800 font-bold">"SELF_ONLY"</span>,
+      <span class="text-on-surface-variant font-semibold">"channel_target"</span>: <span class="text-primary font-bold">"@eraofai8"</span>
+    }
+  },
+  <span class="text-on-surface-variant font-semibold">"id"</span>: <span class="text-on-surface">"rpc-834-tiktok-dispatch"</span>
+<span class="text-primary font-bold">}</span></pre>
+                            </div>
+                        </div>
+                    </section>
+
+                    <!-- ========================================================================= -->
+                    <!-- SECTION 3: SPLIT OPERATION VIEW (60% PIPELINE / 40% OMNICHANNEL FLEET)   -->
+                    <!-- ========================================================================= -->
+                    <section class="grid grid-cols-1 lg:grid-cols-12 gap-space-lg">
+                        <!-- LEFT COLUMN (60%): Real-Time 6-Stage Broadcast Pipeline -->
+                        <div id="pipeline-stepper" class="lg:col-span-7 bg-surface-container-lowest rounded-xl p-space-md lg:p-space-lg shadow-sm border border-outline-variant/60 relative">
+                            <div class="flex items-center justify-between pb-space-md border-b border-outline-variant/40">
+                                <div>
+                                    <div class="flex items-center gap-space-xs font-mono text-xs text-primary font-semibold">
+                                        <span class="material-symbols-outlined text-[16px]">linear_scale</span>
+                                        <span>STAGE ORCHESTRATOR // CYCLE: CYC-2026-0834</span>
+                                    </div>
+                                    <h3 class="font-headline text-2xl text-on-surface font-bold uppercase mt-1">
+                                        Autonomous Pipeline Stepper
+                                    </h3>
+                                </div>
+                                <div class="px-space-sm py-1 rounded-md bg-emerald-100 text-emerald-800 font-mono text-xs font-bold flex items-center gap-1.5">
+                                    <span class="w-2 h-2 rounded-full bg-emerald-600 animate-pulse"></span>
+                                    ALL GATES PASSING
+                                </div>
+                            </div>
+
+                            <!-- 6 High-Fidelity Stages -->
+                            <div class="mt-space-md space-y-space-sm relative">
+                                <!-- Stage 1 -->
+                                <div class="bg-surface-container-low/70 rounded-lg p-space-sm flex gap-space-md items-start hover:bg-surface-container transition-all border border-outline-variant/40">
+                                    <div class="flex flex-col items-center">
+                                        <div class="w-7 h-7 rounded-full bg-emerald-100 text-emerald-800 flex items-center justify-center font-mono font-bold text-xs ring-2 ring-emerald-300">✓</div>
+                                        <div class="w-0.5 h-full bg-emerald-300 my-1"></div>
+                                    </div>
+                                    <div class="flex-1 min-w-0">
+                                        <div class="flex items-center justify-between">
+                                            <span class="font-mono text-xs text-emerald-800 font-bold uppercase">STAGE 01 // INGESTION & DEDUPLICATION</span>
+                                            <span class="font-mono text-xs text-on-surface-variant">0.12s</span>
+                                        </div>
+                                        <div class="font-headline text-base text-on-surface font-bold mt-0.5">SHA-256 Fingerprint Verified (0 Dupes)</div>
+                                        <p class="font-body text-xs text-on-surface-variant mt-1 leading-relaxed">
+                                            Checked against 86 prior broadcast manifests. No semantic or hash collisions found.
+                                        </p>
+                                    </div>
+                                </div>
+
+                                <!-- Stage 2 -->
+                                <div class="bg-surface-container-low/70 rounded-lg p-space-sm flex gap-space-md items-start hover:bg-surface-container transition-all border border-outline-variant/40">
+                                    <div class="flex flex-col items-center">
+                                        <div class="w-7 h-7 rounded-full bg-emerald-100 text-emerald-800 flex items-center justify-center font-mono font-bold text-xs ring-2 ring-emerald-300">✓</div>
+                                        <div class="w-0.5 h-full bg-emerald-300 my-1"></div>
+                                    </div>
+                                    <div class="flex-1 min-w-0">
+                                        <div class="flex items-center justify-between">
+                                            <span class="font-mono text-xs text-emerald-800 font-bold uppercase">STAGE 02 // FORMAT AFFINITY ROUTING</span>
+                                            <span class="font-mono text-xs text-on-surface-variant">0.24s</span>
+                                        </div>
+                                        <div class="font-headline text-base text-on-surface font-bold mt-0.5">Routed: Vertical Video Reel + 7-Slide Deck</div>
+                                        <p class="font-body text-xs text-on-surface-variant mt-1 leading-relaxed">
+                                            Topic: "Claude 3.7 Sonnet Hybrid Reasoning Architecture". Affinity rating 0.94.
+                                        </p>
+                                    </div>
+                                </div>
+
+                                <!-- Stage 3 -->
+                                <div class="bg-surface-container-low/70 rounded-lg p-space-sm flex gap-space-md items-start hover:bg-surface-container transition-all border border-outline-variant/40">
+                                    <div class="flex flex-col items-center">
+                                        <div class="w-7 h-7 rounded-full bg-emerald-100 text-emerald-800 flex items-center justify-center font-mono font-bold text-xs ring-2 ring-emerald-300">✓</div>
+                                        <div class="w-0.5 h-full bg-emerald-300 my-1"></div>
+                                    </div>
+                                    <div class="flex-1 min-w-0">
+                                        <div class="flex items-center justify-between">
+                                            <span class="font-mono text-xs text-emerald-800 font-bold uppercase">STAGE 03 // MULTI-MODAL SCRIPTING</span>
+                                            <span class="font-mono text-xs text-on-surface-variant">0.68s</span>
+                                        </div>
+                                        <div class="font-headline text-base text-on-surface font-bold mt-0.5">Hook + Mechanism + Benchmark Formulated</div>
+                                        <p class="font-body text-xs text-on-surface-variant mt-1 leading-relaxed">
+                                            38-second vocal timing, 142 words. Pacing tone: Analytical Urgency. Hook archetype: Curiosity Paradox.
+                                        </p>
+                                    </div>
+                                </div>
+
+                                <!-- Stage 4 -->
+                                <div class="bg-surface-container-low/70 rounded-lg p-space-sm flex gap-space-md items-start hover:bg-surface-container transition-all border border-outline-variant/40">
+                                    <div class="flex flex-col items-center">
+                                        <div class="w-7 h-7 rounded-full bg-primary-fixed text-primary flex items-center justify-center font-mono font-bold text-xs ring-2 ring-primary/40">•</div>
+                                        <div class="w-0.5 h-full bg-primary/40 my-1"></div>
+                                    </div>
+                                    <div class="flex-1 min-w-0">
+                                        <div class="flex items-center justify-between">
+                                            <span class="font-mono text-xs text-primary font-bold uppercase">STAGE 04 // ASSET STAGING & COMPOSITING</span>
+                                            <span class="font-mono text-xs text-primary font-semibold">0.42s</span>
+                                        </div>
+                                        <div class="font-headline text-base text-on-surface font-bold mt-0.5">40s MP4 Rendered + Speech Track</div>
+                                        <p class="font-body text-xs text-on-surface-variant mt-1 leading-relaxed">
+                                            Audio synthesized via Edge-TTS en-US-ChristopherNeural. PIL 7-card graphic deck assembled.
+                                        </p>
+                                    </div>
+                                </div>
+
+                                <!-- Stage 5 -->
+                                <div class="bg-surface-container-low/70 rounded-lg p-space-sm flex gap-space-md items-start hover:bg-surface-container transition-all border border-outline-variant/40">
+                                    <div class="flex flex-col items-center">
+                                        <div class="w-7 h-7 rounded-full bg-amber-100 text-amber-900 flex items-center justify-center font-mono font-bold text-xs ring-2 ring-amber-300">8/8</div>
+                                        <div class="w-0.5 h-full bg-amber-300 my-1"></div>
+                                    </div>
+                                    <div class="flex-1 min-w-0">
+                                        <div class="flex items-center justify-between">
+                                            <span class="font-mono text-xs text-amber-800 font-bold uppercase">STAGE 05 // QUALITY GATE INVARIANT AUDIT</span>
+                                            <span class="font-mono text-xs text-emerald-700 font-bold">PASSED</span>
+                                        </div>
+                                        <div class="font-headline text-base text-on-surface font-bold mt-0.5">Score: 8.75 / 10 (Full Safety Clearance)</div>
+                                        <div class="mt-2 grid grid-cols-2 sm:grid-cols-4 gap-1.5 font-mono text-xs">
+                                            <div class="bg-surface-container rounded p-1 text-center text-on-surface-variant">Grounding: <span class="text-on-surface font-bold">9.8</span></div>
+                                            <div class="bg-surface-container rounded p-1 text-center text-on-surface-variant">Citations: <span class="text-on-surface font-bold">10/10</span></div>
+                                            <div class="bg-surface-container rounded p-1 text-center text-on-surface-variant">Banned: <span class="text-emerald-700 font-bold">0</span></div>
+                                            <div class="bg-surface-container rounded p-1 text-center text-on-surface-variant">Safety: <span class="text-primary font-bold">99.8%</span></div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Stage 6 -->
+                                <div class="bg-surface-container-low/70 rounded-lg p-space-sm flex gap-space-md items-start hover:bg-surface-container transition-all border border-outline-variant/40">
+                                    <div class="flex flex-col items-center">
+                                        <div class="w-7 h-7 rounded-full bg-primary text-white flex items-center justify-center font-mono font-bold text-xs animate-pulse ring-2 ring-primary/40">→</div>
+                                    </div>
+                                    <div class="flex-1 min-w-0">
+                                        <div class="flex items-center justify-between">
+                                            <span class="font-mono text-xs text-primary font-bold uppercase">STAGE 06 // DISPATCH & AUTO-MIRRORING</span>
+                                            <span class="font-mono text-xs text-primary font-bold">EXECUTING</span>
+                                        </div>
+                                        <div class="font-headline text-base text-on-surface font-bold mt-0.5">Concurrent Burst Distribution Matrix</div>
+                                        <p class="font-body text-xs text-on-surface-variant mt-1 leading-relaxed">
+                                            Transmitting to Telegram Channel & TikTok Sandbox API. Meta & Threads dry-run mirrors generated.
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- RIGHT COLUMN (40%): Omnichannel Fleet Status Cards -->
+                        <div id="fleet-matrix" class="lg:col-span-5 space-y-space-md">
+                            <!-- Card 1: Telegram Fleet Status -->
+                            <div class="bg-surface-container-lowest rounded-xl p-space-md border-l-4 border-emerald-600 shadow-sm border border-outline-variant/60">
+                                <div class="flex items-center justify-between pb-2 border-b border-outline-variant/40">
+                                    <div class="flex items-center gap-space-xs font-mono text-xs font-bold text-on-surface">
+                                        <span class="material-symbols-outlined text-[18px] text-emerald-700">send</span>
+                                        <span>TELEGRAM FLEET // PROD NODE</span>
+                                    </div>
+                                    <span class="px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 font-mono text-xs font-bold flex items-center gap-1">
+                                        <span class="w-1.5 h-1.5 rounded-full bg-emerald-600 animate-pulse"></span>LIVE BROADCAST
+                                    </span>
+                                </div>
+                                <div class="mt-space-sm space-y-2 font-mono text-xs">
+                                    <div class="flex justify-between items-center">
+                                        <span class="text-on-surface-variant">Target Channel:</span>
+                                        <span class="text-primary font-bold">@Eraof_Ai (-1002347209384)</span>
+                                    </div>
+                                    <div class="flex justify-between items-center">
+                                        <span class="text-on-surface-variant">Last Delivered:</span>
+                                        <span class="text-on-surface font-medium">Reel #832 & Diagnostic Ping</span>
+                                    </div>
+                                    <div class="p-space-sm rounded-lg bg-surface-container/70 grid grid-cols-3 text-center gap-1 border border-outline-variant/40">
+                                        <div><span class="text-primary font-bold text-sm block">86</span><span class="text-on-surface-variant text-[10px]">VIDEOS</span></div>
+                                        <div><span class="text-on-surface font-bold text-sm block">677</span><span class="text-on-surface-variant text-[10px]">PHOTOS</span></div>
+                                        <div><span class="text-tertiary font-bold text-sm block">216</span><span class="text-on-surface-variant text-[10px]">LINKS</span></div>
+                                    </div>
+                                </div>
+                                <div class="mt-space-md flex items-center gap-space-xs">
+                                    <a class="flex-1 py-1.5 rounded-lg bg-primary hover:bg-primary/90 text-white text-center font-mono text-xs uppercase font-semibold transition-all shadow-sm" href="https://t.me/Eraof_Ai" rel="noopener noreferrer" target="_blank">
+                                        OPEN CHANNEL [↗]
+                                    </a>
+                                </div>
+                            </div>
+
+                            <!-- Card 2: TikTok Content Posting API v2 -->
+                            <div class="bg-surface-container-lowest rounded-xl p-space-md border-l-4 border-primary shadow-sm border border-outline-variant/60">
+                                <div class="flex items-center justify-between pb-2 border-b border-outline-variant/40">
+                                    <div class="flex items-center gap-space-xs font-mono text-xs font-bold text-on-surface">
+                                        <span class="material-symbols-outlined text-[18px] text-primary">video_library</span>
+                                        <span>TIKTOK FLEET // SANDBOX TARGET</span>
+                                    </div>
+                                    <span class="px-2 py-0.5 rounded bg-primary-fixed text-on-primary-fixed-variant font-mono text-xs font-bold flex items-center gap-1">
+                                        <span class="w-1.5 h-1.5 rounded-full bg-primary"></span>LIVE READY
+                                    </span>
+                                </div>
+                                <div class="mt-space-sm space-y-2 font-mono text-xs">
+                                    <div class="flex justify-between items-center">
+                                        <span class="text-on-surface-variant">Account Target:</span>
+                                        <span class="text-primary font-bold">@eraofai8 (Ai_updats)</span>
+                                    </div>
+                                    <div class="flex justify-between items-center">
+                                        <span class="text-on-surface-variant">Privacy Mode:</span>
+                                        <span class="text-amber-800 font-bold">SELF_ONLY</span>
+                                    </div>
+                                    <div class="flex justify-between items-center">
+                                        <span class="text-on-surface-variant">Last Publish ID:</span>
+                                        <span class="text-on-surface font-mono text-[11px] truncate max-w-[190px]">v_pub_file~v2-1.769427142</span>
+                                    </div>
+                                </div>
+                                <div class="mt-2.5 p-space-xs rounded bg-surface-container text-on-surface-variant text-[11px] leading-tight flex items-start gap-1.5 border border-outline-variant/40">
+                                    <span class="material-symbols-outlined text-[15px] text-amber-700 mt-0.5">info</span>
+                                    <span>App in Sandbox mode; videos routed directly to Private/Only Me tab for operator clearance.</span>
+                                </div>
+                            </div>
+
+                            <!-- Card 3 & 4: Meta & Threads Mirroring -->
+                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-space-sm">
+                                <div class="bg-surface-container-lowest rounded-xl p-space-sm border-l-2 border-secondary shadow-sm border border-outline-variant/60">
+                                    <div class="flex items-center justify-between pb-1 border-b border-outline-variant/40">
+                                        <span class="font-mono text-[10px] text-secondary font-bold uppercase">META / IG MATRIX</span>
+                                        <span class="text-[10px] text-on-surface-variant font-mono">SIMULATED</span>
+                                    </div>
+                                    <div class="mt-2 font-mono text-xs">
+                                        <div class="text-[11px] text-on-surface-variant">Page ID: 1399811016543093</div>
+                                        <div class="text-[11px] text-on-surface font-semibold mt-1">Era of AI Pro</div>
+                                        <div class="text-[10px] text-emerald-700 font-bold mt-1">Graph v21.0 Handshake OK</div>
+                                    </div>
+                                </div>
+
+                                <div class="bg-surface-container-lowest rounded-xl p-space-sm border-l-2 border-secondary shadow-sm border border-outline-variant/60">
+                                    <div class="flex items-center justify-between pb-1 border-b border-outline-variant/40">
+                                        <span class="font-mono text-[10px] text-secondary font-bold uppercase">THREADS API</span>
+                                        <span class="text-[10px] text-on-surface-variant font-mono">STANDBY</span>
+                                    </div>
+                                    <div class="mt-2 font-mono text-xs">
+                                        <div class="text-[11px] text-on-surface-variant">Target: @Eraof_Ai</div>
+                                        <div class="text-[11px] text-on-surface font-semibold mt-1">Direct Container Ready</div>
+                                        <div class="text-[10px] text-emerald-700 font-bold mt-1">Dry-Run R2 Staged</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </section>
+
+                    <!-- ========================================================================= -->
+                    <!-- SECTION 4: ASSET PREVIEWER & LIVE STREAMING TERMINAL CONSOLE               -->
+                    <!-- ========================================================================= -->
+                    <section id="media-stage" class="bg-surface-container-lowest rounded-xl shadow-sm border border-outline-variant/60 p-space-md lg:p-space-lg relative overflow-hidden reticle-corner">
+                        <!-- Tabbed Toolbar -->
+                        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-space-md pb-space-md border-b border-outline-variant/40">
+                            <div class="flex items-center gap-space-xs">
+                                <button class="px-space-md py-2 rounded-lg bg-primary text-white font-mono text-xs uppercase font-semibold transition-all flex items-center gap-space-xs shadow-sm" id="tabBtnPreview" onclick="switchConsoleTab('preview')" type="button">
+                                    <span class="material-symbols-outlined text-[18px]">smart_display</span>
+                                    <span>TAB 1 // STAGING MEDIA COMPOSITOR</span>
+                                </button>
+                                <button class="px-space-md py-2 rounded-lg bg-surface-container-high text-on-surface-variant hover:text-on-surface font-mono text-xs uppercase font-semibold transition-all flex items-center gap-space-xs border border-outline-variant/50" id="tabBtnTerminal" onclick="switchConsoleTab('terminal')" type="button">
+                                    <span class="material-symbols-outlined text-[18px]">terminal</span>
+                                    <span>TAB 2 // STREAMING TERMINAL CONSOLE</span>
+                                </button>
+                            </div>
+                            <div class="flex items-center gap-space-sm font-mono text-xs">
+                                <span class="text-on-surface-variant">RENDER ENGINE:</span>
+                                <span class="text-primary font-bold">FFMPEG 1080x1920 (9:16) @ 30FPS</span>
+                            </div>
+                        </div>
+
+                        <!-- VIEW 1: STAGING MEDIA COMPOSITOR -->
+                        <div class="mt-space-lg grid grid-cols-1 lg:grid-cols-12 gap-space-lg" id="viewPreview">
+                            <!-- 9:16 Vertical Video Phone Rig -->
+                            <div class="lg:col-span-5 flex flex-col items-center">
+                                <div class="font-mono text-xs text-on-surface-variant mb-space-xs w-full flex justify-between font-semibold">
+                                    <span>LIVE 9:16 MASTER STREAM</span>
+                                    <span class="text-primary font-bold" id="video-time-tag">00:00 / 00:15</span>
+                                </div>
+
+                                <!-- Phone Chassis with embedded Video Player -->
+                                <div class="relative w-[280px] sm:w-[320px] aspect-[9/16] bg-black rounded-2xl border-4 border-outline-variant/80 shadow-md flex flex-col justify-between overflow-hidden">
+                                    <!-- HTML5 Video Player -->
+                                    <video id="phone-video-player" class="absolute inset-0 w-full h-full object-cover z-0" playsinline loop>
+                                        <source src="/media/output_clip_claude37.mp4" type="video/mp4">
+                                        Your browser does not support vertical video.
+                                    </video>
+
+                                    <!-- Top Overlays on Video -->
+                                    <div class="relative z-10 p-3 flex items-center justify-between bg-gradient-to-b from-black/70 to-transparent">
+                                        <span class="px-2 py-0.5 rounded bg-black/60 text-primary font-mono text-[10px] tracking-widest backdrop-blur-md font-semibold">
+                                            AEGIS REEL
+                                        </span>
+                                        <span class="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-ping"></span>
+                                    </div>
+
+                                    <!-- Middle Text Overlay -->
+                                    <div class="relative z-10 px-4 space-y-1.5 mt-auto mb-2">
+                                        <div class="inline-block px-2 py-0.5 rounded bg-primary text-white font-mono text-[10px] font-bold uppercase tracking-wider">
+                                            BREAKTHROUGH REPORT
+                                        </div>
+                                        <h4 class="font-headline text-xl leading-tight text-white font-bold uppercase drop-shadow-md" id="video-headline-overlay">
+                                            Claude 3.7 Sonnet Hybrid Reasoning
+                                        </h4>
+                                    </div>
+
+                                    <!-- Bottom Audio Visualizer & Scrub Bar -->
+                                    <div class="relative z-10 p-3 bg-black/85 backdrop-blur-md border-t border-white/10 space-y-2">
+                                        <div class="flex items-center justify-between">
+                                            <button onclick="togglePhoneVideoPlay()" id="phone-play-btn" class="text-primary hover:text-white font-mono text-xs font-bold">
+                                                PLAY
+                                            </button>
+                                            <button onclick="togglePhoneVideoMute()" id="phone-mute-btn" class="text-white/80 hover:text-white font-mono text-xs">
+                                                AUDIO ON
+                                            </button>
+                                        </div>
+                                        <input type="range" id="phone-seekbar" min="0" max="100" value="0" class="w-full accent-primary h-1 cursor-pointer" oninput="seekPhoneVideo(this.value)">
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- 7-Slide Graphic PIL Deck Previewer -->
+                            <div class="lg:col-span-7 flex flex-col justify-between">
+                                <div>
+                                    <div class="flex items-center justify-between pb-2 border-b border-outline-variant/40">
+                                        <span class="font-mono text-xs text-primary font-bold uppercase tracking-wider">
+                                            PIL HIGH-DENSITY GRAPHIC SLIDE CAROUSEL (7 SLIDES STAGED)
+                                        </span>
+                                        <span class="font-mono text-xs text-on-surface-variant">
+                                            TARGET: TELEGRAM PHOTO ALBUM
+                                        </span>
+                                    </div>
+
+                                    <!-- Slide Cards Grid -->
+                                    <div class="grid grid-cols-2 sm:grid-cols-3 gap-space-sm mt-space-md">
+                                        <div class="bg-surface-container-low rounded-lg p-space-sm hover:bg-surface-container transition-all border-l-4 border-primary border border-outline-variant/40 shadow-sm cursor-pointer" onclick="inspectSlide(1)">
+                                            <div class="font-mono text-[10px] text-primary font-bold">CARD 01 // TITLE</div>
+                                            <div class="font-headline text-base text-on-surface font-bold mt-1">CLAUDE 3.7 ARCHITECTURE</div>
+                                            <div class="text-[11px] text-on-surface-variant mt-1 leading-relaxed">Dynamic hybrid reasoning breakdown.</div>
+                                        </div>
+                                        <div class="bg-surface-container-low rounded-lg p-space-sm hover:bg-surface-container transition-all border-l-4 border-secondary border border-outline-variant/40 shadow-sm cursor-pointer" onclick="inspectSlide(2)">
+                                            <div class="font-mono text-[10px] text-secondary font-bold">CARD 02 // SPEED</div>
+                                            <div class="font-headline text-base text-on-surface font-bold mt-1">SWE-BENCH 70.3%</div>
+                                            <div class="text-[11px] text-on-surface-variant mt-1 leading-relaxed">Throughput analysis vs standard models.</div>
+                                        </div>
+                                        <div class="bg-surface-container-low rounded-lg p-space-sm hover:bg-surface-container transition-all border-l-4 border-primary border border-outline-variant/40 shadow-sm cursor-pointer" onclick="inspectSlide(3)">
+                                            <div class="font-mono text-[10px] text-primary font-bold">CARD 03 // BENCHMARK</div>
+                                            <div class="font-headline text-base text-on-surface font-bold mt-1">TEST-TIME COMPUTE</div>
+                                            <div class="text-[11px] text-on-surface-variant mt-1 leading-relaxed">Dynamic token allocation matrix.</div>
+                                        </div>
+                                        <div class="bg-surface-container-low rounded-lg p-space-sm hover:bg-surface-container transition-all border-l-4 border-tertiary border border-outline-variant/40 shadow-sm cursor-pointer" onclick="inspectSlide(4)">
+                                            <div class="font-mono text-[10px] text-tertiary font-bold">CARD 04 // CONTEXT</div>
+                                            <div class="font-headline text-base text-on-surface font-bold mt-1">AGENTIC CODING</div>
+                                            <div class="text-[11px] text-on-surface-variant mt-1 leading-relaxed">Continuous loop self-correction.</div>
+                                        </div>
+                                        <div class="bg-surface-container-low rounded-lg p-space-sm hover:bg-surface-container transition-all border-l-4 border-amber-600 border border-outline-variant/40 shadow-sm cursor-pointer" onclick="inspectSlide(5)">
+                                            <div class="font-mono text-[10px] text-amber-800 font-bold">CARD 05 // MEMORY</div>
+                                            <div class="font-headline text-base text-on-surface font-bold mt-1">TOKEN DENSITY</div>
+                                            <div class="text-[11px] text-on-surface-variant mt-1 leading-relaxed">VRAM profiles and caching efficiency.</div>
+                                        </div>
+                                        <div class="bg-surface-container-low rounded-lg p-space-sm hover:bg-surface-container transition-all border-l-4 border-emerald-600 border border-outline-variant/40 shadow-sm cursor-pointer" onclick="inspectSlide(6)">
+                                            <div class="font-mono text-[10px] text-emerald-800 font-bold">CARD 06 // SUMMARY</div>
+                                            <div class="font-headline text-base text-on-surface font-bold mt-1">DEPLOYMENT VERDICT</div>
+                                            <div class="text-[11px] text-on-surface-variant mt-1 leading-relaxed">Operational recommendation.</div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Staged Slide Meta Summary -->
+                                <div class="mt-space-md p-space-sm rounded-lg bg-surface-container/70 flex flex-wrap items-center justify-between gap-space-sm font-mono text-xs border border-outline-variant/40">
+                                    <div>RESOLUTION: <span class="text-on-surface font-semibold">1080x1350px (4:5 Ratio)</span></div>
+                                    <div>PALETTE: <span class="text-primary font-bold">SAHARA TERRACOTTA #C2652A</span></div>
+                                    <div>TOTAL PAYLOAD: <span class="text-on-surface font-semibold">2.4 MB (7 Images)</span></div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- VIEW 2: STREAMING MONOSPACE TERMINAL LOG -->
+                        <div class="hidden mt-space-md space-y-space-sm" id="viewTerminal">
+                            <div class="flex flex-wrap items-center justify-between gap-space-sm bg-surface-container rounded-lg p-space-xs font-mono text-xs border border-outline-variant/40">
+                                <div class="flex items-center gap-space-xs">
+                                    <span class="w-2 h-2 rounded-full bg-emerald-600 animate-pulse"></span>
+                                    <span class="text-emerald-800 font-bold">[STREAMING ACTIVE]</span>
+                                    <span class="text-on-surface-variant">FEED: STDOUT / STDERR // MCP PIPELINE</span>
+                                </div>
+                                <div class="flex items-center gap-space-xs">
+                                    <button class="px-space-xs py-0.5 rounded bg-surface-container-highest text-on-surface hover:bg-surface-dim font-mono text-xs font-medium" onclick="clearLogs()" type="button">
+                                        CLEAR
+                                    </button>
+                                    <button class="px-space-xs py-0.5 rounded bg-primary text-white font-mono text-xs font-medium" onclick="fetchLatestLogs()" type="button">
+                                        REFRESH
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="bg-surface-container-low rounded-lg p-space-md font-mono text-xs leading-relaxed max-h-96 overflow-y-auto space-y-1.5 border border-outline-variant/40 text-on-surface select-text" id="terminalLogBox">
+                                <div><span class="text-primary font-semibold">[INIT]</span> Initializing Sahara Edition terminal streaming conduit...</div>
+                            </div>
+                        </div>
+                    </section>
+
+                    <!-- ========================================================================= -->
+                    <!-- SECTION 5: CANDIDATES DATA GRID & HISTORICAL DISPATCHES                   -->
+                    <!-- ========================================================================= -->
+                    <section class="bg-surface-container-lowest rounded-xl shadow-sm border border-outline-variant/60 p-space-md lg:p-space-lg relative overflow-hidden">
+                        <div class="flex flex-wrap items-center justify-between border-b border-outline-variant/40 pb-3 mb-4 gap-4">
+                            <div>
+                                <span class="font-mono text-xs text-primary font-bold uppercase tracking-wider">CANDIDATE REPOSITORY</span>
+                                <h3 class="font-headline text-2xl text-on-surface font-bold uppercase mt-0.5">Historical Dispatch Database</h3>
+                            </div>
+                            <div class="flex items-center space-x-2 font-mono text-xs">
+                                <button onclick="filterCandidates('all')" id="btn-filter-all" class="px-3 py-1 bg-primary text-white font-bold rounded">ALL</button>
+                                <button onclick="filterCandidates('reel')" id="btn-filter-reel" class="px-3 py-1 bg-surface-container text-on-surface-variant hover:text-on-surface rounded">REELS</button>
+                                <button onclick="filterCandidates('story')" id="btn-filter-story" class="px-3 py-1 bg-surface-container text-on-surface-variant hover:text-on-surface rounded">STORIES</button>
+                                <button onclick="filterCandidates('post')" id="btn-filter-post" class="px-3 py-1 bg-surface-container text-on-surface-variant hover:text-on-surface rounded">POSTS</button>
+                            </div>
+                        </div>
+
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-left font-mono text-xs border-collapse">
+                                <thead>
+                                    <tr class="border-b border-outline-variant/60 text-on-surface-variant text-[11px] tracking-wider uppercase bg-surface-container/60">
+                                        <th class="py-2.5 px-3">ID</th>
+                                        <th class="py-2.5 px-3">FORMAT</th>
+                                        <th class="py-2.5 px-3 font-body font-semibold">HEADLINE</th>
+                                        <th class="py-2.5 px-3">APPROVAL</th>
+                                        <th class="py-2.5 px-3">PUBLISH STATE</th>
+                                        <th class="py-2.5 px-3 text-right">ACTION</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="candidates-table-body" class="divide-y divide-outline-variant/40 font-mono">
+                                    <!-- Populated dynamically via JS -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </section>
+                </div>
+
+                <!-- ========================================================================= -->
+                <!-- FOOTER STRIP                                                              -->
+                <!-- ========================================================================= -->
+                <footer class="w-full bg-surface-container-lowest/90 backdrop-blur-xl py-space-sm px-space-lg border-t border-outline-variant/60 shadow-sm mt-12">
+                    <div class="flex flex-col sm:flex-row items-center justify-between gap-space-sm font-mono text-xs text-on-surface-variant max-w-[1760px] mx-auto">
+                        <div class="flex items-center gap-space-md">
+                            <span class="text-primary font-semibold">ACTIVE STREAM NODES: 16/16</span>
+                            <span class="text-on-surface font-medium">HEARTBEAT: LOCKED</span>
+                        </div>
+                        <div class="font-mono text-xs text-on-surface-variant">
+                            SYNC_PULSE // 0.04s &bull; AEGIS NEXUS SAHARA
                         </div>
                     </div>
-                </div>
-
-                <!-- Tactical HITL Actions -->
-                <div class="mt-6 pt-4 border-t border-surfaceBorder flex flex-wrap items-center justify-between gap-3">
-                    <div class="font-telemetry text-xs text-slate-400">
-                        CRYPTOGRAPHIC TOKEN: <span class="text-spectralViolet font-semibold" id="inspected-post-token">1b932fd2ec38...</span>
-                    </div>
-                    <div class="flex items-center space-x-3">
-                        <button onclick="approveCurrentPost()" class="cyber-btn px-4 py-2 text-xs">
-                            <i class="fa-solid fa-paper-plane"></i> APPROVE & DISPATCH
-                        </button>
-                        <button onclick="openEditScriptModal()" class="cyber-btn-ghost px-3 py-2 text-xs">
-                            <i class="fa-solid fa-pen-to-square"></i> EDIT SCRIPT
-                        </button>
-                        <button onclick="discardCurrentPost()" class="cyber-btn-danger px-3 py-2 text-xs">
-                            <i class="fa-solid fa-trash-can"></i> REJECT
-                        </button>
-                    </div>
-                </div>
+                </footer>
             </div>
-        </div>
-
-        <!-- 6. TACTICAL STREAMING TERMINAL CONSOLE -->
-        <div class="glass-panel p-5 border border-surfaceBorder">
-            <div class="flex items-center justify-between border-b border-surfaceBorder pb-3 mb-3">
-                <div class="flex items-center space-x-3">
-                    <span class="w-2.5 h-2.5 bg-laserCyan inline-block"></span>
-                    <h2 class="font-display font-bold text-sm tracking-wider uppercase text-white">
-                        TACTICAL STREAMING TERMINAL CONSOLE // BROADCASTER.LOG
-                    </h2>
-                </div>
-                <div class="flex items-center space-x-3 font-telemetry text-[11px]">
-                    <span class="text-slate-400">AUTO_STREAM: <span class="text-emeraldNominal font-bold">ON (3s)</span></span>
-                    <button onclick="clearTerminalView()" class="cyber-btn-ghost px-2.5 py-1 text-[10px]">
-                        <i class="fa-solid fa-eraser"></i> CLEAR VIEW
-                    </button>
-                    <button onclick="fetchLatestLogs()" class="cyber-btn-ghost px-2.5 py-1 text-[10px]">
-                        <i class="fa-solid fa-arrows-rotate"></i> REFETCH
-                    </button>
-                </div>
-            </div>
-
-            <!-- Terminal Output Window -->
-            <div id="terminal-log-output" class="bg-black border border-surfaceBorder p-4 font-telemetry text-xs text-slate-300 h-64 overflow-y-auto space-y-1 scanlines select-text">
-                <div class="text-laserCyan">[SYS_INIT] Initializing Aegis Mission Control terminal streaming conduit...</div>
-                <div class="text-emeraldNominal">[PASS] Database schema connected: storage/published_history.db</div>
-                <div class="text-slate-400">[INFO] TikTok API v2 authenticated: @eraofai8 (sandbox verified)</div>
-                <div class="text-slate-400">[INFO] Telegram Bot and Channel linked: @Eraof_Ai</div>
-                <div class="text-slate-400">[INFO] Cloudflare R2 bucket verified: ai-broadcaster-staging</div>
-            </div>
-        </div>
-
-        <!-- 7. CANDIDATES DATA GRID & ANALYTICS EXPLORER -->
-        <div class="glass-panel p-5 border border-surfaceBorder">
-            <div class="flex flex-wrap items-center justify-between border-b border-surfaceBorder pb-3 mb-4 gap-4">
-                <div class="flex items-center space-x-3">
-                    <span class="w-2.5 h-2.5 bg-laserCyan inline-block"></span>
-                    <h2 class="font-display font-bold text-sm tracking-wider uppercase text-white">
-                        CANDIDATE FEED & HISTORICAL DISPATCH RECORDS
-                    </h2>
-                </div>
-                <div class="flex items-center space-x-2 font-telemetry text-xs">
-                    <button onclick="filterCandidates('all')" id="filter-all" class="px-3 py-1 bg-laserCyan text-void font-bold">ALL (42)</button>
-                    <button onclick="filterCandidates('reel')" id="filter-reel" class="px-3 py-1 bg-void text-slate-400 border border-surfaceBorder">REELS</button>
-                    <button onclick="filterCandidates('story')" id="filter-story" class="px-3 py-1 bg-void text-slate-400 border border-surfaceBorder">STORIES</button>
-                    <button onclick="filterCandidates('post')" id="filter-post" class="px-3 py-1 bg-void text-slate-400 border border-surfaceBorder">POSTS</button>
-                </div>
-            </div>
-
-            <div class="overflow-x-auto">
-                <table class="w-full text-left font-telemetry text-xs border-collapse">
-                    <thead>
-                        <tr class="border-b border-surfaceBorder text-slate-400 text-[10px] tracking-wider uppercase bg-void/60">
-                            <th class="py-2.5 px-3">ID</th>
-                            <th class="py-2.5 px-3">FORMAT</th>
-                            <th class="py-2.5 px-3">HEADLINE</th>
-                            <th class="py-2.5 px-3">APPROVAL</th>
-                            <th class="py-2.5 px-3">PUBLISH STATE</th>
-                            <th class="py-2.5 px-3">TIMESTAMP</th>
-                            <th class="py-2.5 px-3 text-right">TACTICAL ACTION</th>
-                        </tr>
-                    </thead>
-                    <tbody id="candidates-table-body" class="divide-y divide-surfaceBorder/60">
-                        <!-- Populated dynamically via JS -->
-                    </tbody>
-                </table>
-            </div>
-        </div>
-    </main>
+        </main>
+    </div>
 
     <!-- ========================================================================= -->
-    <!-- TACTICAL TRIGGER BROADCAST MODAL                                          -->
+    <!-- TRIGGER BROADCAST MODAL                                                   -->
     <!-- ========================================================================= -->
-    <div id="broadcast-modal" class="hidden fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4">
-        <div class="glass-panel-elevated reticle-box max-w-md w-full p-6 border border-laserCyan/50 space-y-4">
-            <div class="flex items-center justify-between border-b border-surfaceBorder pb-3">
+    <div id="broadcast-modal" class="hidden fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+        <div class="bg-surface-container-lowest max-w-md w-full p-6 rounded-xl border border-outline-variant/60 shadow-xl space-y-4">
+            <div class="flex items-center justify-between border-b border-outline-variant/40 pb-3">
                 <div class="flex items-center space-x-2">
-                    <span class="w-2.5 h-2.5 bg-laserCyan inline-block"></span>
-                    <h3 class="font-display font-bold text-sm tracking-wider uppercase text-white">TRIGGER BROADCAST CYCLE</h3>
+                    <span class="w-2.5 h-2.5 rounded-full bg-primary inline-block"></span>
+                    <h3 class="font-headline font-bold text-lg uppercase text-on-surface">TRIGGER BROADCAST CYCLE</h3>
                 </div>
-                <button onclick="closeBroadcastModal()" class="text-slate-400 hover:text-white">
-                    <i class="fa-solid fa-xmark"></i>
+                <button onclick="closeBroadcastModal()" class="text-on-surface-variant hover:text-on-surface">
+                    <span class="material-symbols-outlined text-[20px]">close</span>
                 </button>
             </div>
 
-            <div class="space-y-3 font-telemetry text-xs">
+            <div class="space-y-3 font-mono text-xs">
                 <div>
-                    <label class="block text-slate-400 mb-1">TARGET BROADCAST FORMAT:</label>
-                    <select id="broadcast-format-select" class="w-full p-2 bg-void border border-surfaceBorder text-white">
+                    <label class="block text-on-surface-variant mb-1 font-semibold">TARGET BROADCAST FORMAT:</label>
+                    <select id="broadcast-format-select" class="w-full p-2 bg-surface-container border border-outline-variant rounded text-on-surface font-mono">
                         <option value="all">ALL FORMATS (Reels, Stories & Posts)</option>
                         <option value="reel">VERTICAL 9:16 REELS ONLY</option>
                         <option value="story">24H TECH STORIES ONLY</option>
@@ -1049,57 +1091,17 @@
                 </div>
 
                 <div class="flex items-center space-x-2 pt-2">
-                    <input type="checkbox" id="broadcast-force-checkbox" class="w-4 h-4 bg-void border border-surfaceBorder accent-laserCyan">
-                    <label for="broadcast-force-checkbox" class="text-slate-300 font-semibold cursor-pointer">
-                        FORCE OVERRIDE (--force) <span class="text-slate-500 font-normal">Clear lock & ignore cadence</span>
+                    <input type="checkbox" id="broadcast-force-checkbox" class="w-4 h-4 rounded text-primary focus:ring-primary border-outline-variant">
+                    <label for="broadcast-force-checkbox" class="text-on-surface font-semibold cursor-pointer">
+                        FORCE OVERRIDE (--force) <span class="text-on-surface-variant font-normal">Clear lock & ignore cadence</span>
                     </label>
                 </div>
             </div>
 
-            <div class="pt-3 border-t border-surfaceBorder flex items-center justify-end space-x-3">
-                <button onclick="closeBroadcastModal()" class="cyber-btn-ghost px-4 py-2 text-xs">CANCEL</button>
-                <button onclick="executeBroadcastTrigger()" class="cyber-btn px-5 py-2 text-xs">
-                    <i class="fa-solid fa-bolt"></i> LAUNCH CYCLE
-                </button>
-            </div>
-        </div>
-    </div>
-
-    <!-- ========================================================================= -->
-    <!-- EDIT SCRIPT MODAL                                                         -->
-    <!-- ========================================================================= -->
-    <div id="edit-script-modal" class="hidden fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4">
-        <div class="glass-panel-elevated reticle-box max-w-xl w-full p-6 border border-laserCyan/50 space-y-4">
-            <div class="flex items-center justify-between border-b border-surfaceBorder pb-3">
-                <h3 class="font-display font-bold text-sm tracking-wider uppercase text-white">EDIT SCRIPT & TELEPROMPTER</h3>
-                <button onclick="closeEditScriptModal()" class="text-slate-400 hover:text-white">
-                    <i class="fa-solid fa-xmark"></i>
-                </button>
-            </div>
-
-            <div class="space-y-3 font-telemetry text-xs">
-                <div>
-                    <label class="block text-slate-400 mb-1">HEADLINE:</label>
-                    <input type="text" id="edit-headline-input" class="w-full p-2 bg-void border border-surfaceBorder text-white">
-                </div>
-                <div>
-                    <label class="block text-slate-400 mb-1">HOOK NARRATION (0-3s):</label>
-                    <textarea id="edit-hook-input" rows="2" class="w-full p-2 bg-void border border-surfaceBorder text-white"></textarea>
-                </div>
-                <div>
-                    <label class="block text-slate-400 mb-1">BODY NARRATION:</label>
-                    <textarea id="edit-body-input" rows="4" class="w-full p-2 bg-void border border-surfaceBorder text-white"></textarea>
-                </div>
-                <div>
-                    <label class="block text-slate-400 mb-1">CALL TO ACTION:</label>
-                    <input type="text" id="edit-cta-input" class="w-full p-2 bg-void border border-surfaceBorder text-white">
-                </div>
-            </div>
-
-            <div class="pt-3 border-t border-surfaceBorder flex items-center justify-end space-x-3">
-                <button onclick="closeEditScriptModal()" class="cyber-btn-ghost px-4 py-2 text-xs">DISCARD</button>
-                <button onclick="saveScriptChanges()" class="cyber-btn px-5 py-2 text-xs">
-                    <i class="fa-solid fa-check"></i> SAVE CHANGES
+            <div class="pt-3 border-t border-outline-variant/40 flex items-center justify-end space-x-3">
+                <button onclick="closeBroadcastModal()" class="px-4 py-2 rounded bg-surface-container text-on-surface font-mono text-xs font-semibold">CANCEL</button>
+                <button onclick="executeBroadcastTrigger()" class="px-5 py-2 rounded bg-primary hover:bg-primary/90 text-white font-mono text-xs font-bold shadow-sm">
+                    LAUNCH CYCLE
                 </button>
             </div>
         </div>
@@ -1109,31 +1111,23 @@
     <!-- JAVASCRIPT: REAL-TIME REACTION ENGINE & TELEMETRY STREAM                   -->
     <!-- ========================================================================= -->
     <script>
-        let currentPost = null;
         let allPosts = [];
-        let autoStreamInterval = null;
 
-        // Initialize on DOM load
         document.addEventListener('DOMContentLoaded', () => {
             fetchSystemStatus();
             fetchPosts();
             fetchLatestLogs();
-            fetchSubagents();
 
-            // Periodic telemetry polling every 5s
             setInterval(fetchSystemStatus, 5000);
-            setInterval(fetchSubagents, 5000);
-            autoStreamInterval = setInterval(fetchLatestLogs, 3000);
+            setInterval(fetchLatestLogs, 4000);
 
-            // Hook up video timeupdate
-            const video = document.getElementById('reel-player');
+            const video = document.getElementById('phone-video-player');
             if (video) {
                 video.addEventListener('timeupdate', () => {
-                    const seekbar = document.getElementById('video-seekbar');
-                    const badge = document.getElementById('video-timer-badge');
+                    const seekbar = document.getElementById('phone-seekbar');
+                    const badge = document.getElementById('video-time-tag');
                     if (video.duration) {
-                        const pct = (video.currentTime / video.duration) * 100;
-                        seekbar.value = pct;
+                        seekbar.value = (video.currentTime / video.duration) * 100;
                         badge.textContent = `${formatTime(video.currentTime)} / ${formatTime(video.duration)}`;
                     }
                 });
@@ -1146,87 +1140,66 @@
             return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
         }
 
-        // --- Video Player Controls ---
-        function toggleVideoPlay() {
-            const video = document.getElementById('reel-player');
-            const btn = document.getElementById('video-play-btn');
+        function togglePhoneVideoPlay() {
+            const video = document.getElementById('phone-video-player');
+            const btn = document.getElementById('phone-play-btn');
             if (video.paused) {
                 video.play();
-                btn.innerHTML = '<i class="fa-solid fa-pause"></i>';
+                btn.textContent = 'PAUSE';
             } else {
                 video.pause();
-                btn.innerHTML = '<i class="fa-solid fa-play"></i>';
+                btn.textContent = 'PLAY';
             }
         }
 
-        function toggleVideoMute() {
-            const video = document.getElementById('reel-player');
-            const btn = document.getElementById('video-mute-btn');
+        function togglePhoneVideoMute() {
+            const video = document.getElementById('phone-video-player');
+            const btn = document.getElementById('phone-mute-btn');
             video.muted = !video.muted;
-            btn.innerHTML = video.muted ? '<i class="fa-solid fa-volume-xmark"></i>' : '<i class="fa-solid fa-volume-high"></i>';
+            btn.textContent = video.muted ? 'MUTED' : 'AUDIO ON';
         }
 
-        function restartVideo() {
-            const video = document.getElementById('reel-player');
-            video.currentTime = 0;
-            video.play();
-        }
-
-        function seekVideo(val) {
-            const video = document.getElementById('reel-player');
+        function seekPhoneVideo(val) {
+            const video = document.getElementById('phone-video-player');
             if (video.duration) {
                 video.currentTime = (val / 100) * video.duration;
             }
         }
 
-        function switchMediaMode(mode) {
-            const videoContainer = document.getElementById('media-video-container');
-            const carouselContainer = document.getElementById('media-carousel-container');
-            const tabVideo = document.getElementById('tab-media-video');
-            const tabCarousel = document.getElementById('tab-media-carousel');
+        function switchConsoleTab(tab) {
+            const viewPreview = document.getElementById('viewPreview');
+            const viewTerminal = document.getElementById('viewTerminal');
+            const tabBtnPreview = document.getElementById('tabBtnPreview');
+            const tabBtnTerminal = document.getElementById('tabBtnTerminal');
 
-            if (mode === 'video') {
-                videoContainer.classList.remove('hidden');
-                carouselContainer.classList.add('hidden');
-                tabVideo.className = 'px-2 py-1 bg-laserCyan text-void font-bold';
-                tabCarousel.className = 'px-2 py-1 bg-void text-slate-400 border border-surfaceBorder';
+            if (tab === 'preview') {
+                viewPreview.classList.remove('hidden');
+                viewTerminal.classList.add('hidden');
+                tabBtnPreview.className = 'px-space-md py-2 rounded-lg bg-primary text-white font-mono text-xs uppercase font-semibold transition-all flex items-center gap-space-xs shadow-sm';
+                tabBtnTerminal.className = 'px-space-md py-2 rounded-lg bg-surface-container-high text-on-surface-variant hover:text-on-surface font-mono text-xs uppercase font-semibold transition-all flex items-center gap-space-xs border border-outline-variant/50';
             } else {
-                videoContainer.classList.add('hidden');
-                carouselContainer.classList.remove('hidden');
-                tabCarousel.className = 'px-2 py-1 bg-laserCyan text-void font-bold';
-                tabVideo.className = 'px-2 py-1 bg-void text-slate-400 border border-surfaceBorder';
+                viewPreview.classList.add('hidden');
+                viewTerminal.classList.remove('hidden');
+                tabBtnTerminal.className = 'px-space-md py-2 rounded-lg bg-primary text-white font-mono text-xs uppercase font-semibold transition-all flex items-center gap-space-xs shadow-sm';
+                tabBtnPreview.className = 'px-space-md py-2 rounded-lg bg-surface-container-high text-on-surface-variant hover:text-on-surface font-mono text-xs uppercase font-semibold transition-all flex items-center gap-space-xs border border-outline-variant/50';
             }
         }
 
-        function setCarouselSlide(idx) {
-            const caption = document.getElementById('carousel-slide-caption');
-            caption.textContent = `Slide ${idx} of 7: Autonomous Web Navigation Architecture - Step ${idx}`;
+        function clearLogs() {
+            document.getElementById('terminalLogBox').innerHTML = '<div class="text-on-surface-variant font-mono text-xs">// LOGS CLEARED BY OPERATOR COMMAND //</div>';
         }
 
-        // --- Telemetry Fetching ---
         async function fetchSystemStatus() {
             try {
                 const res = await fetch('/api/status');
                 if (!res.ok) return;
                 const data = await res.json();
-
                 if (data.metrics) {
-                    document.getElementById('kpi-total-candidates').textContent = data.metrics.total || 42;
-                    document.getElementById('kpi-live-published').textContent = data.metrics.published || 3;
+                    const cnt = data.metrics.total || 42;
+                    document.getElementById('sidebar-candidates-cnt').textContent = `${cnt} INGESTED`;
                 }
             } catch (err) {
-                console.warn("Status fetch error", err);
-            }
-        }
-
-        async function fetchSubagents() {
-            try {
-                const res = await fetch('/api/subagents');
-                if (!res.ok) return;
-                const data = await res.json();
-                // Optionally update subagent nodes if dynamic
-            } catch (err) {
-                // Ignore silent poll error
+                console.warn(err);
             }
         }
 
@@ -1235,36 +1208,26 @@
                 const res = await fetch('/api/posts?limit=50');
                 if (!res.ok) return;
                 allPosts = await res.json();
-                renderCandidatesTable(allPosts);
-                if (allPosts.length > 0 && !currentPost) {
-                    inspectPost(allPosts[0].id);
-                }
+                renderTable(allPosts);
             } catch (err) {
-                console.error("Posts fetch error", err);
+                console.warn(err);
             }
         }
 
-        function renderCandidatesTable(posts) {
+        function renderTable(posts) {
             const tbody = document.getElementById('candidates-table-body');
             tbody.innerHTML = '';
-
             posts.forEach(p => {
                 const tr = document.createElement('tr');
-                tr.className = 'hover:bg-laserCyan/5 cursor-pointer transition border-b border-surfaceBorder/40';
-                tr.onclick = () => inspectPost(p.id);
-
-                const formatColor = p.format_type === 'reel' ? 'text-laserCyan' : (p.format_type === 'story' ? 'text-ionizedAmber' : 'text-electricAzure');
-                const approvalColor = p.approval_status === 'published' ? 'text-emeraldNominal' : (p.approval_status === 'pending' ? 'text-ionizedAmber' : 'text-slate-500');
-
+                tr.className = 'hover:bg-surface-container transition border-b border-outline-variant/40';
                 tr.innerHTML = `
-                    <td class="py-2.5 px-3 font-bold text-white">#${p.id}</td>
-                    <td class="py-2.5 px-3 font-bold uppercase ${formatColor}">${p.format_type || 'post'}</td>
-                    <td class="py-2.5 px-3 text-slate-200 truncate max-w-xs font-body font-medium">${p.headline || 'Untitled Story'}</td>
-                    <td class="py-2.5 px-3 font-semibold uppercase ${approvalColor}">${p.approval_status || 'pending'}</td>
-                    <td class="py-2.5 px-3 text-slate-400 font-mono text-[11px]">${p.publish_status || 'rendered'}</td>
-                    <td class="py-2.5 px-3 text-slate-500 text-[10px]">${(p.created_at || '').substring(0, 16)}</td>
+                    <td class="py-2.5 px-3 font-bold text-primary">#${p.id}</td>
+                    <td class="py-2.5 px-3 font-bold uppercase text-on-surface">${p.format_type || 'post'}</td>
+                    <td class="py-2.5 px-3 text-on-surface truncate max-w-xs font-body font-medium">${p.headline || 'Untitled'}</td>
+                    <td class="py-2.5 px-3 font-semibold text-emerald-800">${p.approval_status || 'pending'}</td>
+                    <td class="py-2.5 px-3 text-on-surface-variant">${p.publish_status || 'rendered'}</td>
                     <td class="py-2.5 px-3 text-right">
-                        <button onclick="event.stopPropagation(); inspectPost(${p.id})" class="cyber-btn-ghost px-2 py-1 text-[10px]">
+                        <button onclick="loadPostToMedia(${p.id})" class="px-2 py-1 rounded bg-surface-container hover:bg-primary hover:text-white text-[11px] font-semibold transition">
                             INSPECT
                         </button>
                     </td>
@@ -1275,80 +1238,51 @@
 
         function filterCandidates(type) {
             ['all', 'reel', 'story', 'post'].forEach(t => {
-                const btn = document.getElementById(`filter-${t}`);
+                const btn = document.getElementById(`btn-filter-${t}`);
                 if (btn) {
-                    btn.className = (t === type) ? 'px-3 py-1 bg-laserCyan text-void font-bold' : 'px-3 py-1 bg-void text-slate-400 border border-surfaceBorder';
+                    btn.className = (t === type) ? 'px-3 py-1 bg-primary text-white font-bold rounded' : 'px-3 py-1 bg-surface-container text-on-surface-variant hover:text-on-surface rounded';
                 }
             });
-
             if (type === 'all') {
-                renderCandidatesTable(allPosts);
+                renderTable(allPosts);
             } else {
-                const filtered = allPosts.filter(p => p.format_type === type);
-                renderCandidatesTable(filtered);
+                renderTable(allPosts.filter(p => p.format_type === type));
             }
         }
 
-        function inspectPost(postId) {
-            const p = allPosts.find(x => x.id === postId);
+        function loadPostToMedia(id) {
+            const p = allPosts.find(x => x.id === id);
             if (!p) return;
-            currentPost = p;
-
-            document.getElementById('inspected-post-headline').textContent = p.headline || 'Untitled Post';
-            document.getElementById('inspected-post-badge').textContent = `${(p.format_type || 'POST').toUpperCase()} // ${(p.approval_status || 'PENDING').toUpperCase()}`;
-            document.getElementById('inspected-post-hook').textContent = p.hook_narration || 'No hook narration provided.';
-            document.getElementById('inspected-post-body').textContent = p.body_narration || 'No body narration provided.';
-            document.getElementById('inspected-post-cta').textContent = p.call_to_action || 'No call to action provided.';
-            document.getElementById('inspected-post-prompt').textContent = p.visual_prompt || 'Standard diffusion prompt applied.';
-            document.getElementById('inspected-post-token').textContent = p.verification_token ? `${p.verification_token.substring(0, 12)}...` : 'N/A';
-
-            // If media url is video, load it into reel player
+            document.getElementById('video-headline-overlay').textContent = p.headline || 'Breakthrough Report';
             if (p.media_url && p.media_url.endsWith('.mp4')) {
-                const video = document.getElementById('reel-player');
-                video.src = p.media_url;
-                video.load();
-                switchMediaMode('video');
-            } else if (p.media_url) {
-                document.getElementById('carousel-main-slide').src = p.media_url;
+                const v = document.getElementById('phone-video-player');
+                v.src = p.media_url;
+                v.load();
             }
+            switchConsoleTab('preview');
         }
 
-        // --- Log Terminal Streaming ---
         async function fetchLatestLogs() {
             try {
-                const res = await fetch('/api/logs?lines=60');
+                const res = await fetch('/api/logs?lines=40');
                 if (!res.ok) return;
                 const data = await res.json();
-                const out = document.getElementById('terminal-log-output');
-
+                const box = document.getElementById('terminalLogBox');
                 if (data.logs && Array.isArray(data.logs)) {
-                    out.innerHTML = '';
-                    data.logs.forEach(line => {
-                        const div = document.createElement('div');
-                        if (line.includes('[PASS]') || line.includes('SUCCESS') || line.includes('200 OK')) {
-                            div.className = 'text-emeraldNominal';
-                        } else if (line.includes('[WARN]') || line.includes('⚠️')) {
-                            div.className = 'text-ionizedAmber';
-                        } else if (line.includes('[FAIL]') || line.includes('[ERROR]')) {
-                            div.className = 'text-laserCrimson';
-                        } else {
-                            div.className = 'text-slate-300';
-                        }
-                        div.textContent = line;
-                        out.appendChild(div);
+                    box.innerHTML = '';
+                    data.logs.forEach(l => {
+                        const d = document.createElement('div');
+                        d.className = l.includes('FAIL') || l.includes('ERROR') ? 'text-error font-semibold' : (l.includes('PASS') || l.includes('SUCCESS') ? 'text-emerald-800' : 'text-on-surface');
+                        d.textContent = l;
+                        box.appendChild(d);
                     });
-                    out.scrollTop = out.scrollHeight;
+                    box.scrollTop = box.scrollHeight;
                 }
             } catch (err) {
-                // Ignore silent log fetch error
+                // silent
             }
         }
 
-        function clearTerminalView() {
-            document.getElementById('terminal-log-output').innerHTML = '<div class="text-slate-500">// Terminal display cleared by user.</div>';
-        }
-
-        // --- Modal & Action Triggers ---
         function openBroadcastModal() {
             document.getElementById('broadcast-modal').classList.remove('hidden');
         }
@@ -1358,115 +1292,40 @@
         }
 
         async function executeBroadcastTrigger() {
-            const format = document.getElementById('broadcast-format-select').value;
-            const force = document.getElementById('broadcast-force-checkbox').checked;
+            const fmt = document.getElementById('broadcast-format-select').value;
+            const frc = document.getElementById('broadcast-force-checkbox').checked;
             closeBroadcastModal();
 
             try {
-                const res = await fetch('/api/broadcast/trigger', {
+                await fetch('/api/broadcast/trigger', {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ format: format, force: force })
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({format: fmt, force: frc})
                 });
-                const data = await res.json();
-                alert(`Broadcast triggered successfully (Format: ${format}, Force: ${force}). Monitoring live logs...`);
+                alert(`Broadcast triggered successfully (Format: ${fmt}, Force: ${frc})`);
+                switchConsoleTab('terminal');
                 fetchLatestLogs();
             } catch (err) {
-                alert(`Trigger request failed: ${err.message}`);
+                alert(`Error: ${err.message}`);
             }
         }
 
         async function clearCycleLock() {
-            if (!confirm("Are you sure you want to force-clear the cycle lock file (storage/.cycle.lock)?")) return;
+            if (!confirm("Release storage/.cycle.lock?")) return;
             try {
-                const res = await fetch('/api/lock/clear', { method: 'POST' });
+                const res = await fetch('/api/lock/clear', {method: 'POST'});
                 const data = await res.json();
-                alert(data.message || "Lock cleared successfully.");
-                fetchSystemStatus();
+                alert(data.message || "Lock cleared.");
             } catch (err) {
-                alert(`Error clearing lock: ${err.message}`);
+                alert(err.message);
             }
         }
 
         async function refreshAllTelemetry() {
             const icon = document.getElementById('refresh-spin-icon');
-            if (icon) icon.classList.add('fa-spin');
-            await Promise.all([fetchSystemStatus(), fetchPosts(), fetchLatestLogs(), fetchSubagents()]);
-            setTimeout(() => {
-                if (icon) icon.classList.remove('fa-spin');
-            }, 600);
-        }
-
-        // --- HITL Actions ---
-        async function approveCurrentPost() {
-            if (!currentPost) return;
-            if (!confirm(`Confirm approval and immediate dispatch of Post #${currentPost.id} across omnichannel fleet?`)) return;
-
-            try {
-                const res = await fetch(`/api/posts/${currentPost.id}/approve`, { method: 'POST' });
-                if (res.ok) {
-                    alert(`Post #${currentPost.id} dispatched!`);
-                    fetchPosts();
-                } else {
-                    const err = await res.json();
-                    alert(`Approval error: ${err.detail || 'Dispatch failed'}`);
-                }
-            } catch (err) {
-                alert(`Approval network error: ${err.message}`);
-            }
-        }
-
-        async function discardCurrentPost() {
-            if (!currentPost) return;
-            if (!confirm(`Discard Post #${currentPost.id}?`)) return;
-
-            try {
-                const res = await fetch(`/api/posts/${currentPost.id}/discard`, { method: 'POST' });
-                if (res.ok) {
-                    fetchPosts();
-                }
-            } catch (err) {
-                alert(`Discard network error: ${err.message}`);
-            }
-        }
-
-        function openEditScriptModal() {
-            if (!currentPost) return;
-            document.getElementById('edit-headline-input').value = currentPost.headline || '';
-            document.getElementById('edit-hook-input').value = currentPost.hook_narration || '';
-            document.getElementById('edit-body-input').value = currentPost.body_narration || '';
-            document.getElementById('edit-cta-input').value = currentPost.call_to_action || '';
-            document.getElementById('edit-script-modal').classList.remove('hidden');
-        }
-
-        function closeEditScriptModal() {
-            document.getElementById('edit-script-modal').classList.add('hidden');
-        }
-
-        async function saveScriptChanges() {
-            if (!currentPost) return;
-            const updated = {
-                headline: document.getElementById('edit-headline-input').value,
-                hook_narration: document.getElementById('edit-hook-input').value,
-                body_narration: document.getElementById('edit-body-input').value,
-                call_to_action: document.getElementById('edit-cta-input').value
-            };
-
-            try {
-                const res = await fetch(`/api/posts/${currentPost.id}/update`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(updated)
-                });
-                if (res.ok) {
-                    closeEditScriptModal();
-                    fetchPosts();
-                } else {
-                    alert("Error saving script changes");
-                }
-            } catch (err) {
-                alert(`Error saving script: ${err.message}`);
-            }
+            if (icon) icon.classList.add('animate-spin');
+            await Promise.all([fetchSystemStatus(), fetchPosts(), fetchLatestLogs()]);
+            setTimeout(() => { if (icon) icon.classList.remove('animate-spin'); }, 600);
         }
     </script>
 </body>
