@@ -192,54 +192,58 @@
     <!-- ========================================================================= -->
     <div class="pl-64">
 
-        <!-- FIXED HEADER BAR -->
-        <header class="fixed top-0 left-64 right-0 h-20 bg-surface-container-lowest/90 backdrop-blur-xl z-40 flex items-center justify-between px-space-lg border-b border-outline-variant/60 shadow-sm">
-            <div class="flex items-center gap-space-md">
-                <div class="flex items-center gap-space-xs">
-                    <span class="font-mono text-sm text-primary font-bold">//:</span>
-                    <span class="font-headline text-2xl uppercase text-on-surface font-bold tracking-tight">AEGIS NEXUS</span>
+        <!-- FIXED HEADER BAR (MODERN 3-ZONE TELEMETRY LAYOUT) -->
+        <header class="fixed top-0 left-64 right-0 h-20 bg-surface-container-lowest/95 backdrop-blur-xl z-40 flex items-center justify-between px-6 border-b border-outline-variant/60 shadow-sm">
+            <!-- Left Zone: Brand & Status Identity -->
+            <div class="flex items-center gap-4 whitespace-nowrap">
+                <div class="flex items-center gap-2 whitespace-nowrap">
+                    <span class="font-mono text-sm text-primary font-bold select-none">//:</span>
+                    <span class="font-headline text-2xl uppercase text-on-surface font-bold tracking-tight whitespace-nowrap">AEGIS NEXUS</span>
                 </div>
-                <div class="flex items-center gap-space-xs px-space-sm py-0.5 rounded-full bg-surface-container border border-outline-variant/50">
-                    <span class="w-1.5 h-1.5 rounded-full bg-primary animate-pulse"></span>
-                    <span class="font-mono text-xs text-on-surface font-semibold uppercase">v2.6 AUTONOMOUS</span>
-                </div>
-                <div class="hidden sm:inline font-mono text-[11px] text-on-surface-variant px-space-sm py-0.5 rounded bg-surface-container-high">
-                    [SAHARA // PROD AUTO-MODE]
-                </div>
-            </div>
-
-            <div class="hidden xl:flex items-center gap-space-md px-space-md py-1.5 rounded-lg bg-surface-container/70 border border-outline-variant/40">
-                <div class="flex items-center gap-space-xs font-mono text-xs">
-                    <span class="text-on-surface-variant">CADENCE:</span>
-                    <span class="text-primary font-semibold" id="header-cadence-val">[12m 44s]</span>
-                </div>
-                <div class="flex items-center gap-space-xs font-mono text-xs">
-                    <span class="text-on-surface-variant">UPTIME:</span>
-                    <span class="text-emerald-700 font-semibold">[99.98%]</span>
-                </div>
-                <div class="flex items-center gap-space-xs font-mono text-xs">
-                    <span class="text-on-surface-variant">BUS_LATENCY:</span>
-                    <span class="text-primary font-semibold">[18ms]</span>
+                <div class="flex items-center gap-2 px-3 py-1 rounded-full bg-surface-container border border-outline-variant/50 text-xs font-mono font-semibold">
+                    <span class="w-2 h-2 rounded-full bg-primary animate-pulse"></span>
+                    <span class="text-on-surface">v2.6</span>
+                    <span class="text-outline-variant">|</span>
+                    <span class="text-primary font-bold uppercase tracking-wider">AUTONOMOUS</span>
                 </div>
             </div>
 
-            <!-- Fast Action Header Buttons -->
-            <div class="flex items-center gap-space-sm">
-                <button onclick="openBroadcastModal()" class="flex items-center gap-space-xs px-3 py-1.5 rounded-lg bg-primary text-white hover:bg-primary/90 font-mono text-xs uppercase font-semibold transition-all shadow-sm" type="button">
+            <!-- Center Zone: Telemetry Capsule HUD -->
+            <div class="hidden lg:flex items-center gap-5 px-5 py-2 rounded-full bg-surface-container/70 border border-outline-variant/40 backdrop-blur-md shadow-xs">
+                <div class="flex items-center gap-2 font-mono text-xs">
+                    <span class="text-on-surface-variant uppercase text-[10px] tracking-wider font-semibold">Cadence</span>
+                    <span class="text-primary font-bold" id="header-cadence-val">12m 44s</span>
+                </div>
+                <span class="w-px h-3.5 bg-outline-variant/60"></span>
+                <div class="flex items-center gap-2 font-mono text-xs">
+                    <span class="text-on-surface-variant uppercase text-[10px] tracking-wider font-semibold">Uptime</span>
+                    <span class="text-emerald-700 font-bold">99.98%</span>
+                </div>
+                <span class="w-px h-3.5 bg-outline-variant/60"></span>
+                <div class="flex items-center gap-2 font-mono text-xs">
+                    <span class="text-on-surface-variant uppercase text-[10px] tracking-wider font-semibold">Latency</span>
+                    <span class="text-primary font-bold">18ms</span>
+                </div>
+            </div>
+
+            <!-- Right Zone: Fast Action Actuators & Operator Profile -->
+            <div class="flex items-center gap-2.5 whitespace-nowrap">
+                <button onclick="openBroadcastModal()" class="flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-primary hover:bg-primary/90 text-white font-mono text-xs uppercase font-bold transition-all shadow-sm" type="button">
                     <span class="material-symbols-outlined text-[16px]">bolt</span>
-                    <span class="hidden md:inline">TRIGGER CYCLE</span>
+                    <span>TRIGGER CYCLE</span>
                 </button>
-                <button onclick="clearCycleLock()" class="flex items-center gap-space-xs px-3 py-1.5 rounded-lg bg-surface-container-high text-on-surface hover:bg-surface-dim font-mono text-xs uppercase font-semibold transition-all border border-outline-variant/50" type="button" title="Clear Cycle Lock">
+                <button onclick="clearCycleLock()" class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-surface-container-high hover:bg-surface-dim text-on-surface font-mono text-xs uppercase font-semibold transition-all border border-outline-variant/50" type="button" title="Clear Cycle Lock">
                     <span class="material-symbols-outlined text-[16px]">lock_open</span>
-                    <span class="hidden md:inline">CLEAR LOCK</span>
+                    <span class="hidden sm:inline">CLEAR LOCK</span>
                 </button>
-                <button onclick="refreshAllTelemetry()" class="p-2 rounded-lg bg-surface-container hover:bg-surface-container-high text-on-surface transition-all border border-outline-variant/50" title="Refresh Live State">
+                <button onclick="refreshAllTelemetry()" class="p-1.5 rounded-lg bg-surface-container hover:bg-surface-container-high text-on-surface transition-all border border-outline-variant/50" title="Refresh Live State">
                     <span class="material-symbols-outlined text-[18px]" id="refresh-spin-icon">sync</span>
                 </button>
-
-                <div class="flex items-center gap-space-xs px-space-sm py-1 rounded-lg bg-surface-container border border-outline-variant/40">
-                    <span class="w-2 h-2 rounded-full bg-primary"></span>
-                    <span class="font-mono text-xs text-on-surface hidden lg:inline font-medium">LEAD COMMANDER</span>
+                <span class="w-px h-5 bg-outline-variant/50 hidden md:inline"></span>
+                <div class="flex items-center gap-2 pl-1 pr-3 py-1 rounded-full bg-surface-container border border-outline-variant/40">
+                    <span class="w-6 h-6 rounded-full bg-primary-fixed text-primary font-mono font-bold text-[10px] flex items-center justify-center">LC</span>
+                    <span class="font-mono text-xs text-on-surface font-medium hidden xl:inline">LEAD COMMANDER</span>
+                    <span class="w-2 h-2 rounded-full bg-emerald-600"></span>
                 </div>
             </div>
         </header>
