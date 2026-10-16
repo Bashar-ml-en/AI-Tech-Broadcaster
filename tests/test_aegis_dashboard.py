@@ -81,3 +81,44 @@ def test_aegis_broadcast_trigger():
     assert data["status"] == "triggered"
     assert data["format"] == "reel"
     assert data["force"] is True
+
+
+def test_aegis_platforms_reach_and_ledger():
+    client = TestClient(app)
+    reach_resp = client.get("/api/platforms/reach")
+    assert reach_resp.status_code == 200
+    reach_data = reach_resp.json()
+    assert "total_posts" in reach_data
+    assert "platforms" in reach_data
+    for plat in ("telegram", "tiktok", "facebook", "instagram", "threads"):
+        assert plat in reach_data["platforms"]
+        p_info = reach_data["platforms"][plat]
+        assert "reached_count" in p_info
+        assert "unreached_count" in p_info
+        assert p_info["reached_count"] + p_info["unreached_count"] == reach_data["total_posts"]
+
+    ledger_resp = client.get("/api/platforms/telegram/ledger")
+    assert ledger_resp.status_code == 200
+    ledger_data = ledger_resp.json()
+    assert ledger_data["platform"] == "telegram"
+    assert "reached_posts" in ledger_data
+    assert "unreached_posts" in ledger_data
+    assert "subagent" in ledger_data
+
+
+def test_aegis_subagent_action_and_mcp_execute():
+    client = TestClient(app)
+    sa_resp = client.post("/api/subagents/SA-06/action", json={"action": "diagnostics"})
+    assert sa_resp.status_code == 200
+    assert sa_resp.json()["status"] == "ok"
+
+    mcp_resp = client.post(
+        "/api/mcp/execute",
+        json={"tool": "get_platform_reach_ledger", "params": {"platform": "tiktok"}}
+    )
+    assert mcp_resp.status_code == 200
+    mcp_data = mcp_resp.json()
+    assert mcp_data["jsonrpc"] == "2.0"
+    assert mcp_data["tool"] == "get_platform_reach_ledger"
+    assert "result" in mcp_data
+

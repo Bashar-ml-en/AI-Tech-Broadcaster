@@ -45,6 +45,8 @@ logger = logging.getLogger("quality_gate")
 ALLOWED_FEED_DOMAINS = {
     "openai.com",
     "google.com",
+    "blog.google",
+    "research.google",
     "deepmind.google",
     "anthropic.com",
     "mistral.ai",

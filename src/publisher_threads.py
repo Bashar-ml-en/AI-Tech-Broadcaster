@@ -44,10 +44,50 @@ THREADS_GRAPH_BASE = "https://graph.threads.net/v1.0"
 THREADS_BASE = "https://graph.threads.net"
 
 
+def reload_threads_credentials() -> Dict[str, Any]:
+    """Reload Threads credentials from config/.env and auto-discover user_id if token is set."""
+    global THREADS_USER_ID, THREADS_ACCESS_TOKEN
+    load_dotenv(dotenv_path=env_path, override=True)
+    THREADS_USER_ID = os.getenv("THREADS_USER_ID", "").strip()
+    THREADS_ACCESS_TOKEN = os.getenv("THREADS_ACCESS_TOKEN", "").strip()
+    if THREADS_ACCESS_TOKEN and not THREADS_USER_ID:
+        resolve_threads_user_id()
+    return {
+        "configured": is_threads_configured(),
+        "user_id": THREADS_USER_ID or "unconfigured",
+    }
+
+
+def resolve_threads_user_id(client: Optional[httpx.Client] = None) -> Optional[str]:
+    """Auto-discover THREADS_USER_ID via GET /v1.0/me when THREADS_ACCESS_TOKEN is present."""
+    global THREADS_USER_ID
+    tok = THREADS_ACCESS_TOKEN or os.getenv("THREADS_ACCESS_TOKEN", "").strip()
+    if not tok or "YOUR_" in tok or "THREADS" in tok or len(tok) <= 20:
+        return None
+    if THREADS_USER_ID and "YOUR_" not in THREADS_USER_ID:
+        return THREADS_USER_ID
+    try:
+        c = client or httpx.Client(timeout=10.0)
+        resp = c.get(
+            f"{THREADS_GRAPH_BASE}/me",
+            params={"fields": "id,username", "access_token": tok}
+        )
+        if resp.status_code == 200:
+            uid = resp.json().get("id")
+            if uid:
+                THREADS_USER_ID = str(uid)
+                return THREADS_USER_ID
+    except Exception as e:
+        logger.warning("[Threads] Failed to auto-discover THREADS_USER_ID: %s", e)
+    return None
+
+
 def is_threads_configured() -> bool:
     """Check if Threads User ID and Access Token are configured and valid."""
-    tok = THREADS_ACCESS_TOKEN
-    uid = THREADS_USER_ID
+    tok = THREADS_ACCESS_TOKEN or os.getenv("THREADS_ACCESS_TOKEN", "").strip()
+    uid = THREADS_USER_ID or os.getenv("THREADS_USER_ID", "").strip()
+    if tok and "YOUR_" not in tok and "THREADS" not in tok and len(tok) > 20 and not uid:
+        uid = resolve_threads_user_id() or ""
     return bool(
         tok and "YOUR_" not in tok and "THREADS" not in tok and len(tok) > 20 and
         uid and "YOUR_" not in uid

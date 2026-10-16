@@ -883,9 +883,48 @@ def _record_post_in_db(
     captions: Dict[str, Any],
     payload: Dict[str, Any]
 ) -> Optional[int]:
-    """Helper to insert rendered broadcast candidate into SQLite DB."""
+    """Helper to insert or update rendered broadcast candidate into SQLite DB without UNIQUE constraint crashes."""
     try:
         content_hash = hashlib.sha256(f"{source_url}:{format_type}:{headline}".encode()).hexdigest()
+        params = {
+            "source_url": source_url,
+            "headline": headline,
+            "format_type": format_type,
+            "media_url": media_url,
+            "content_hash": content_hash,
+            "hook": hook,
+            "body": body,
+            "cta": cta,
+            "visual": f"Autonomous {format_type} broadcast asset",
+            "captions": json.dumps(captions),
+            "payload": json.dumps(payload)
+        }
+        with sqlite3.connect(DATABASE_PATH) as conn:
+            conn.row_factory = sqlite3.Row
+            existing = conn.execute("SELECT id FROM posts WHERE source_url = ?", (source_url,)).fetchone()
+            if existing:
+                post_id = existing["id"]
+                conn.execute(
+                    """UPDATE posts SET
+                        headline = :headline,
+                        format_type = :format_type,
+                        media_url = :media_url,
+                        approval_status = 'auto',
+                        publish_status = 'rendered',
+                        content_hash = :content_hash,
+                        hook_narration = :hook,
+                        body_narration = :body,
+                        call_to_action = :cta,
+                        visual_prompt = :visual,
+                        captions_json = :captions,
+                        post_payload = :payload,
+                        last_error = NULL
+                    WHERE id = :id""",
+                    {**params, "id": post_id}
+                )
+                conn.commit()
+                return post_id
+
         write_res = tool_sqlite_write_query(
             """INSERT INTO posts (
                 source_url, headline, format_type, media_url, approval_status,
@@ -896,23 +935,11 @@ def _record_post_in_db(
                 'rendered', :content_hash, :hook, :body,
                 :cta, :visual, :captions, :payload
             )""",
-            {
-                "source_url": source_url,
-                "headline": headline,
-                "format_type": format_type,
-                "media_url": media_url,
-                "content_hash": content_hash,
-                "hook": hook,
-                "body": body,
-                "cta": cta,
-                "visual": f"Autonomous {format_type} broadcast asset",
-                "captions": json.dumps(captions),
-                "payload": json.dumps(payload)
-            }
+            params
         )
         return write_res.get("last_row_id")
     except Exception as db_err:
-        logger.warning("Database insert failed for %s (%s): %s", headline, format_type, db_err)
+        logger.warning("Database insert/upsert failed for %s (%s): %s", headline, format_type, db_err)
         return None
 
 
@@ -920,7 +947,11 @@ def update_publish_outcome(post_id: int, dispatch_result: Dict[str, Any]) -> Non
     """Update SQLite record with the aggregated dispatch outcome."""
     overall = dispatch_result.get("overall", "failed")
     results = dispatch_result.get("results", [])
-    errors = [r.get("error_message") or r.get("error_code") for r in results if r.get("error_message") or r.get("error_code")]
+    errors = [
+        r.get("error_message") or r.get("error_code")
+        for r in results
+        if r.get("status") == "failed" and (r.get("error_message") or r.get("error_code"))
+    ]
     last_error = "; ".join(str(e) for e in errors) if errors else None
 
     with sqlite3.connect(DATABASE_PATH) as conn:

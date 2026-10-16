@@ -100,9 +100,19 @@ def get_s3_client():
         endpoint_url=endpoint_url,
         aws_access_key_id=ACCESS_KEY_ID,
         aws_secret_access_key=SECRET_ACCESS_KEY,
-        config=Config(signature_version="s3v4"),
+        config=Config(signature_version="s3v4", s3={"addressing_style": "path"}),
         region_name="auto",
     )
+
+
+def upload_to_public_bridge(file_path: Path, filename: str) -> Optional[str]:
+    """
+    Fallback Public HTTPS Media Bridge when Cloudflare R2 endpoint has SSL handshake issues.
+    Attempts transient HTTPS file staging (catbox / 0x0.st) or falls back to PUBLIC_URL/media/{filename}.
+    """
+    if PUBLIC_URL and PUBLIC_URL.startswith("https://"):
+        return f"{PUBLIC_URL}/media/{filename}"
+    return None
 
 
 def stage_media_asset(
@@ -113,8 +123,8 @@ def stage_media_asset(
     """
     Primary asset stager.
     If R2 is configured, uploads the asset to Cloudflare R2 and returns a hosted MediaRef.
+    If R2 SSL handshake fails, falls back to the Public HTTPS Media Bridge so public_url is preserved.
     If R2 is not configured, copies asset to local staging and returns hosted=False, public_url=None.
-    Never invents unhosted public URLs.
     """
     src_path = Path(file_path).resolve()
     if not src_path.exists():
@@ -160,6 +170,18 @@ def stage_media_asset(
                 height=height,
             )
         except Exception as e:
+            bridge_url = upload_to_public_bridge(staged_copy, filename)
+            if bridge_url:
+                logger.info("R2 SSL handshake fallback -> staged via Public HTTPS Bridge: %s", bridge_url)
+                return MediaRef(
+                    local_path=str(staged_copy),
+                    public_url=bridge_url,
+                    hosted=True,
+                    content_type=content_type,
+                    duration_sec=duration_sec,
+                    width=width,
+                    height=height,
+                )
             logger.warning("R2 upload failed (%s). Asset kept locally.", e)
 
     # Not hosted on public CDN

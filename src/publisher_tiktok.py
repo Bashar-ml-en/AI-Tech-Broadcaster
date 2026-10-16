@@ -336,16 +336,34 @@ def poll_publish_status(
     return {"success": False, "status": "TIMEOUT", "fail_reason": f"Publish timed out after {max_wait_sec}s"}
 
 
+def reload_tiktok_credentials() -> Dict[str, Any]:
+    """Reload TikTok credentials from config/.env and storage/tiktok_token.json."""
+    global TIKTOK_CLIENT_KEY, TIKTOK_CLIENT_SECRET, TIKTOK_ACCESS_TOKEN, TIKTOK_REFRESH_TOKEN, TIKTOK_OPEN_ID
+    load_dotenv(dotenv_path=env_path, override=True)
+    TIKTOK_CLIENT_KEY = os.getenv("TIKTOK_CLIENT_KEY", "").strip()
+    TIKTOK_CLIENT_SECRET = os.getenv("TIKTOK_CLIENT_SECRET", "").strip()
+    TIKTOK_ACCESS_TOKEN = os.getenv("TIKTOK_ACCESS_TOKEN", "").strip()
+    TIKTOK_REFRESH_TOKEN = os.getenv("TIKTOK_REFRESH_TOKEN", "").strip()
+    TIKTOK_OPEN_ID = os.getenv("TIKTOK_OPEN_ID", "").strip()
+    tok = ensure_tiktok_token()
+    return {
+        "configured": is_tiktok_configured(),
+        "has_active_token": bool(tok),
+        "open_id": load_persisted_token().get("open_id") or TIKTOK_OPEN_ID,
+    }
+
+
 def publish_to_tiktok(
     post_record: dict,
     media: Optional[MediaRef] = None,
-    client: Optional[httpx.Client] = None
+    client: Optional[httpx.Client] = None,
+    allow_format_conversion: bool = False
 ) -> PlatformResult:
     """
     Publish a Reel to TikTok Content Posting API v2 using direct chunked FILE_UPLOAD.
 
     Conforms to P5 specifications:
-    - Only 'reel' format is eligible.
+    - Only 'reel' format is eligible unless allow_format_conversion=True (when video has been synthesized).
     - Gracefully selects privacy_level (prefers PUBLIC_TO_EVERYONE, falls back to SELF_ONLY).
     - Sets is_aigc: true on every post.
     - Chunked PUT upload with Content-Range headers.
@@ -354,8 +372,8 @@ def publish_to_tiktok(
     format_type = post_record.get("format_type", "post")
     publish_mode = os.getenv("PUBLISH_MODE", "simulate").lower()
 
-    # Rule 1: Only 'reel' format supported by TikTok
-    if format_type != "reel":
+    # Rule 1: Only 'reel' format supported by TikTok unless converted by PublishingSubagent
+    if format_type != "reel" and not allow_format_conversion:
         return PlatformResult(
             platform="tiktok",
             status="skipped",

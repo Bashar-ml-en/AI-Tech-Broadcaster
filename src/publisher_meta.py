@@ -41,9 +41,23 @@ META_GRAPH_VERSION = os.getenv("META_GRAPH_VERSION", "v20.0").strip()
 GRAPH_BASE_URL = f"https://graph.facebook.com/{META_GRAPH_VERSION}"
 
 
+def reload_meta_credentials() -> Dict[str, Any]:
+    """Reload Meta credentials from config/.env and environment variables."""
+    global META_PAGE_ACCESS_TOKEN, META_PAGE_ID, META_INSTAGRAM_ACCOUNT_ID
+    load_dotenv(dotenv_path=env_path, override=True)
+    META_PAGE_ACCESS_TOKEN = os.getenv("META_PAGE_ACCESS_TOKEN", "").strip()
+    META_PAGE_ID = os.getenv("META_PAGE_ID", "1399811016543093").strip()
+    META_INSTAGRAM_ACCOUNT_ID = os.getenv("META_INSTAGRAM_ACCOUNT_ID", "").strip()
+    return {
+        "configured": is_meta_configured(),
+        "page_id": META_PAGE_ID,
+        "instagram_account_id": META_INSTAGRAM_ACCOUNT_ID or "auto-discover",
+    }
+
+
 def is_meta_configured() -> bool:
     """Check if Meta Page Access Token is configured and not a placeholder."""
-    tok = META_PAGE_ACCESS_TOKEN
+    tok = META_PAGE_ACCESS_TOKEN or os.getenv("META_PAGE_ACCESS_TOKEN", "").strip()
     return bool(tok and "META" not in tok and "YOUR_" not in tok and len(tok) > 20)
 
 
@@ -81,14 +95,15 @@ def get_instagram_id(client: Optional[httpx.Client] = None) -> Optional[str]:
 
     url = f"{GRAPH_BASE_URL}/{META_PAGE_ID}"
     params = {
-        "fields": "instagram_business_account",
+        "fields": "instagram_business_account,connected_instagram_account",
         "access_token": META_PAGE_ACCESS_TOKEN
     }
     try:
         c = client or httpx.Client(timeout=15.0)
         resp = c.get(url, params=params)
         if resp.status_code == 200:
-            ig_data = resp.json().get("instagram_business_account", {})
+            body = resp.json()
+            ig_data = body.get("instagram_business_account") or body.get("connected_instagram_account") or {}
             ig_id = ig_data.get("id")
             if ig_id:
                 META_INSTAGRAM_ACCOUNT_ID = ig_id
@@ -215,6 +230,85 @@ def publish_instagram_reel(
         media_id = pub_resp.json().get("id")
         permalink = fetch_permalink(media_id, c) or f"https://www.instagram.com/reel/{media_id}/"
 
+        return PlatformResult(
+            platform="instagram",
+            status="published",
+            mode="live",
+            remote_id=media_id,
+            permalink=permalink,
+            attempts=1,
+            latency_ms=int((time.time() - start_t) * 1000)
+        )
+    except Exception as e:
+        return PlatformResult(
+            platform="instagram",
+            status="failed",
+            mode="live",
+            error_code="NETWORK_EXCEPTION",
+            error_message=str(e),
+            attempts=1,
+            latency_ms=int((time.time() - start_t) * 1000)
+        )
+
+
+def publish_instagram_photo(
+    image_url: str,
+    caption: str,
+    client: Optional[httpx.Client] = None
+) -> PlatformResult:
+    """Publish a single photo post to Instagram Feed."""
+    start_t = time.time()
+    ig_id = get_instagram_id(client)
+    if not ig_id:
+        return PlatformResult(
+            platform="instagram",
+            status="failed",
+            mode="live",
+            error_code="IG_ACCOUNT_NOT_FOUND",
+            error_message="Instagram Business Account ID not connected",
+            attempts=1,
+            latency_ms=int((time.time() - start_t) * 1000)
+        )
+
+    c = client or httpx.Client(timeout=45.0)
+    try:
+        c_resp = c.post(
+            f"{GRAPH_BASE_URL}/{ig_id}/media",
+            data={
+                "image_url": image_url,
+                "caption": caption,
+                "access_token": META_PAGE_ACCESS_TOKEN
+            }
+        )
+        if c_resp.status_code != 200:
+            return PlatformResult(
+                platform="instagram",
+                status="failed",
+                mode="live",
+                error_code="IG_PHOTO_CONTAINER_FAILED",
+                error_message=c_resp.text,
+                attempts=1,
+                latency_ms=int((time.time() - start_t) * 1000)
+            )
+
+        creation_id = c_resp.json().get("id")
+        pub_resp = c.post(
+            f"{GRAPH_BASE_URL}/{ig_id}/media_publish",
+            data={"creation_id": creation_id, "access_token": META_PAGE_ACCESS_TOKEN}
+        )
+        if pub_resp.status_code != 200:
+            return PlatformResult(
+                platform="instagram",
+                status="failed",
+                mode="live",
+                error_code="IG_PHOTO_PUBLISH_FAILED",
+                error_message=pub_resp.text,
+                attempts=1,
+                latency_ms=int((time.time() - start_t) * 1000)
+            )
+
+        media_id = pub_resp.json().get("id")
+        permalink = fetch_permalink(media_id, c) or f"https://www.instagram.com/p/{media_id}/"
         return PlatformResult(
             platform="instagram",
             status="published",
@@ -446,12 +540,14 @@ def publish_instagram_story(
 def publish_facebook_reel(
     video_url: str,
     description: str,
-    client: Optional[httpx.Client] = None
+    client: Optional[httpx.Client] = None,
+    local_path: Optional[str] = None
 ) -> PlatformResult:
     """
     Publish a 9:16 vertical video reel to Facebook Page via /{page_id}/video_reels.
     Phase 1: upload_phase=start
-    Phase 2: upload_phase=finish with video_state=PUBLISHED
+    Phase 2: upload binary (direct local file or public URL stream)
+    Phase 3: upload_phase=finish with video_state=PUBLISHED
     """
     start_t = time.time()
     c = client or httpx.Client(timeout=60.0)
@@ -478,19 +574,25 @@ def publish_facebook_reel(
         video_id = init_resp.json().get("video_id")
         upload_url = init_resp.json().get("upload_url")
 
-        # Upload binary if local or send hosted video URL
+        # Upload binary from local disk if available, else stream from public URL
         if upload_url:
-            # Transfer from public URL or binary
-            stream_resp = c.get(video_url)
-            if stream_resp.status_code == 200:
+            video_bytes: Optional[bytes] = None
+            if local_path and Path(local_path).exists():
+                video_bytes = Path(local_path).read_bytes()
+            elif video_url and video_url.startswith("http"):
+                stream_resp = c.get(video_url)
+                if stream_resp.status_code == 200:
+                    video_bytes = stream_resp.content
+
+            if video_bytes:
                 c.post(
                     upload_url,
                     headers={
                         "Authorization": f"OAuth {META_PAGE_ACCESS_TOKEN}",
                         "offset": "0",
-                        "file_size": str(len(stream_resp.content))
+                        "file_size": str(len(video_bytes))
                     },
-                    content=stream_resp.content
+                    content=video_bytes
                 )
 
         # Phase 2: Finish and publish
@@ -540,20 +642,46 @@ def publish_facebook_reel(
 def publish_facebook_photo(
     image_url: str,
     caption: str,
-    client: Optional[httpx.Client] = None
+    client: Optional[httpx.Client] = None,
+    local_path: Optional[str] = None
 ) -> PlatformResult:
-    """Publish a photo directly to Facebook Page feed."""
+    """Publish a photo directly to Facebook Page feed via URL or multipart binary upload."""
     start_t = time.time()
     c = client or httpx.Client(timeout=45.0)
     try:
-        resp = c.post(
-            f"{GRAPH_BASE_URL}/{META_PAGE_ID}/photos",
-            data={
-                "url": image_url,
-                "message": caption,
-                "access_token": META_PAGE_ACCESS_TOKEN
-            }
-        )
+        if local_path and Path(local_path).exists() and (not image_url or not image_url.startswith("http")):
+            p = Path(local_path)
+            with open(p, "rb") as f:
+                resp = c.post(
+                    f"{GRAPH_BASE_URL}/{META_PAGE_ID}/photos",
+                    data={
+                        "message": caption,
+                        "access_token": META_PAGE_ACCESS_TOKEN
+                    },
+                    files={"source": (p.name, f, "image/png")}
+                )
+        else:
+            resp = c.post(
+                f"{GRAPH_BASE_URL}/{META_PAGE_ID}/photos",
+                data={
+                    "url": image_url,
+                    "message": caption,
+                    "access_token": META_PAGE_ACCESS_TOKEN
+                }
+            )
+            # If public URL fetch by Facebook failed and we have a local file, retry with direct binary upload
+            if resp.status_code != 200 and local_path and Path(local_path).exists():
+                p = Path(local_path)
+                with open(p, "rb") as f:
+                    resp = c.post(
+                        f"{GRAPH_BASE_URL}/{META_PAGE_ID}/photos",
+                        data={
+                            "message": caption,
+                            "access_token": META_PAGE_ACCESS_TOKEN
+                        },
+                        files={"source": (p.name, f, "image/png")}
+                    )
+
         if resp.status_code == 200:
             data = resp.json()
             post_id = data.get("post_id") or data.get("id")
@@ -645,7 +773,7 @@ def publish_to_instagram(
         elif public_url.endswith(".mp4"):
             return publish_instagram_reel(public_url, caption, client=c)
         else:
-            return publish_instagram_story(public_url, client=c)
+            return publish_instagram_photo(public_url, caption, client=c)
     elif format_type == "story":
         return publish_instagram_story(public_url, client=c)
 
@@ -663,7 +791,8 @@ def publish_to_instagram(
 def publish_to_facebook(
     post_record: Dict[str, Any],
     media_refs: Optional[List[MediaRef]] = None,
-    client: Optional[httpx.Client] = None
+    client: Optional[httpx.Client] = None,
+    allow_local_binary: bool = False
 ) -> PlatformResult:
     """Publish content specifically to Facebook Page."""
     format_type = post_record.get("format_type", "post")
@@ -691,7 +820,11 @@ def publish_to_facebook(
             }
         )
 
-    if not primary_media or not primary_media.get("public_url") or not primary_media.get("hosted"):
+    local_path = primary_media.get("local_path") if primary_media else None
+    has_local_file = bool(allow_local_binary and local_path and Path(local_path).exists())
+    has_public_url = bool(primary_media and primary_media.get("public_url") and primary_media.get("hosted"))
+
+    if not has_public_url and not has_local_file:
         return PlatformResult(
             platform="facebook",
             status="skipped",
@@ -702,13 +835,13 @@ def publish_to_facebook(
             latency_ms=5
         )
 
-    public_url = primary_media["public_url"]
+    public_url = (primary_media.get("public_url") or "") if primary_media else ""
     c = client or httpx.Client(timeout=60.0)
 
     if format_type in ("reel", "video"):
-        return publish_facebook_reel(public_url, caption, client=c)
+        return publish_facebook_reel(public_url, caption, client=c, local_path=local_path)
     elif format_type in ("post", "story"):
-        return publish_facebook_photo(public_url, caption, client=c)
+        return publish_facebook_photo(public_url, caption, client=c, local_path=local_path)
 
     return PlatformResult(
         platform="facebook",

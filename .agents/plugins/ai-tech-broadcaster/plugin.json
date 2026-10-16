@@ -1,0 +1,11 @@
+{
+  "name": "ai-tech-broadcaster",
+  "displayName": "Aegis Nexus Omnichannel Broadcaster",
+  "version": "2.8.0",
+  "description": "Autonomous AI news broadcaster, 9:16 Reel synthesizer, and omnichannel Publishing & Reach-Recovery Subagent suite for Telegram, TikTok, Facebook, Instagram, and Threads.",
+  "suggestedPrompts": [
+    "Audit the platform reach ledger and heal all unreached broadcasts across Telegram, TikTok, Facebook, Instagram, and Threads",
+    "Synthesize a 9:16 vertical AI news Reel with 3-tier TTS voiceover and publish it live",
+    "Diagnose and repair any NO_PUBLIC_MEDIA or RENDER_FAILED posts in storage/published_history.db"
+  ]
+}
