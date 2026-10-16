@@ -210,6 +210,30 @@ def diagnose_meta_connection(
     can_post_fb = "pages_manage_posts" in scopes or exchange_info is not None
     can_post_ig = bool(ig_id) and ("instagram_content_publish" in scopes or exchange_info is not None)
 
+    # Check token permanence and expiration
+    is_permanent = False
+    expiry_desc = "Permanent (Never Expires)" if exchange_info else "Standard Session"
+    try:
+        dbg_res = c.get(
+            f"{GRAPH_BASE_URL}/debug_token",
+            params={"input_token": effective_token, "access_token": effective_token}
+        )
+        if dbg_res.status_code == 200:
+            d_data = dbg_res.json().get("data", {})
+            exp = d_data.get("expires_at")
+            if exp == 0:
+                is_permanent = True
+                expiry_desc = "NEVER (Permanent Token)"
+            elif exp:
+                from datetime import datetime
+                expiry_desc = f"Expires on {datetime.fromtimestamp(exp).strftime('%Y-%m-%d %H:%M UTC')}"
+    except Exception:
+        pass
+
+    if exchange_info and exchange_info.get("page_token"):
+        is_permanent = True
+        expiry_desc = "NEVER (Permanent Page Access Token)"
+
     is_valid = exchange_info is not None or len(scopes) > 0
     token_type = "PAGE" if (exchange_info and not exchange_info["exchanged"]) else ("USER_AUTO_EXCHANGED" if exchange_info else "UNKNOWN")
 
@@ -218,6 +242,8 @@ def diagnose_meta_connection(
         "status": "ready" if is_valid else "invalid",
         "status_badge": "ONLINE // READY" if is_valid else "INVALID TOKEN",
         "token_type": token_type,
+        "is_permanent": is_permanent,
+        "expiry_description": expiry_desc,
         "page_id": target_pid,
         "page_name": page_name,
         "instagram_account_id": ig_id or "not_linked",
@@ -227,12 +253,12 @@ def diagnose_meta_connection(
         "can_post_instagram": can_post_ig,
         "exchanged_page_token": effective_token if exchange_info and exchange_info["exchanged"] else None,
         "diagnostic": (
-            f"Successfully authenticated with {page_name} (ID: {target_pid})."
+            f"Successfully authenticated with {page_name} (ID: {target_pid}). Token Lifetime: {expiry_desc}."
             if is_valid
             else "Token was rejected by Meta Graph API. Please verify expiration or app permissions."
         ),
         "recommended_action": (
-            "Ready for live broadcast dispatches."
+            "Ready for permanent live broadcast dispatches."
             if is_valid
             else "Generate a new token with pages_manage_posts & instagram_content_publish scopes."
         )

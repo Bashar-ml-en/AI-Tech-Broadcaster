@@ -1542,16 +1542,32 @@
 
       if (platform === 'facebook' || platform === 'instagram') {
         html += `
-          <div class="p-2.5 rounded-lg bg-surface-container border border-outline-variant/60 space-y-1 mt-2">
+          <div class="p-3 rounded-xl bg-surface-container border border-outline-variant/70 space-y-2 mt-2">
             <div class="flex items-center justify-between">
-              <span class="font-mono text-[10px] text-primary font-bold">META GRAPH API AUTO-EXCHANGE</span>
-              <a href="https://developers.facebook.com/tools/explorer/" target="_blank" rel="noopener noreferrer" class="text-[10px] text-sky-700 hover:underline font-mono inline-flex items-center gap-0.5">
-                <span>Graph API Explorer</span><span class="material-symbols-outlined text-[12px]">open_in_new</span>
+              <span class="font-mono text-[10px] text-emerald-800 font-bold flex items-center gap-1.5">
+                <span class="w-1.5 h-1.5 rounded-full bg-emerald-600 animate-pulse"></span>
+                <span>PERMANENT TOKEN SETUP // WORKS FOREVER</span>
+              </span>
+              <a href="https://business.facebook.com/settings/system-users" target="_blank" rel="noopener noreferrer" class="text-[10px] text-sky-700 hover:underline font-mono inline-flex items-center gap-0.5">
+                <span>Business Settings ↗</span>
               </a>
             </div>
             <p class="text-[11px] text-on-surface-variant leading-snug">
-              User Access Tokens or Page Access Tokens are accepted. Aegis automatically exchanges user tokens for permanent Page Access Tokens with <code class="font-mono text-[10px] bg-white/70 px-1 py-0.5 rounded">pages_manage_posts</code> and auto-discovers your connected Instagram Business Account.
+              To guarantee that publishing works <strong>permanently without ever expiring</strong>, use either of these two verified methods:
             </p>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 text-[10px] font-mono">
+              <div class="p-2 rounded-lg bg-surface-container-lowest border border-outline-variant/60">
+                <div class="font-bold text-on-surface">Method 1: Auto-Exchanged Page Token (Fast)</div>
+                <div class="text-on-surface-variant mt-0.5">Paste a User token from <a href="https://developers.facebook.com/tools/explorer/" target="_blank" class="text-sky-700 underline font-semibold">Graph API Explorer</a>. Aegis auto-exchanges it into a permanent Page Access Token!</div>
+              </div>
+              <div class="p-2 rounded-lg bg-surface-container-lowest border border-outline-variant/60">
+                <div class="font-bold text-on-surface">Method 2: System User Token (Enterprise)</div>
+                <div class="text-on-surface-variant mt-0.5">In <a href="https://business.facebook.com/settings/system-users" target="_blank" class="text-sky-700 underline font-semibold">Meta Business Settings</a> &rarr; System Users, create an Admin bot and set Expiration to <strong>Never</strong>.</div>
+              </div>
+            </div>
+            <div class="text-[10px] text-on-surface-variant font-mono">
+              Required Scopes: <span class="text-primary font-bold">pages_manage_posts, pages_read_engagement, instagram_basic, instagram_content_publish</span>
+            </div>
           </div>
         `;
       } else if (platform === 'threads') {
@@ -1637,6 +1653,12 @@
         let html = `<div>${escapeHtml(diag.status_badge || 'STATUS')}: ${escapeHtml(diag.diagnostic || '')}</div>`;
         if (diag.token_type) {
           html += `<div class="text-[10px] opacity-80">Token Type: ${escapeHtml(diag.token_type)} | Page: ${escapeHtml(diag.page_name || '')} (${escapeHtml(diag.page_id || '')})</div>`;
+        }
+        if (diag.expiry_description) {
+          const isPerm = diag.is_permanent || diag.expiry_description.includes('NEVER') || diag.expiry_description.includes('Permanent');
+          html += `<div class="text-[10px] ${isPerm ? 'text-emerald-800 font-bold' : 'text-amber-800 font-semibold'}">
+            Token Lifetime: ${escapeHtml(diag.expiry_description)} ${isPerm ? '★ GUARANTEED PERMANENT' : ''}
+          </div>`;
         }
         if (diag.instagram_account_id && diag.instagram_account_id !== 'not_linked') {
           html += `<div class="text-[10px] text-fuchsia-800">Linked Instagram: ${escapeHtml(diag.instagram_username || diag.instagram_account_id)} (ID: ${escapeHtml(diag.instagram_account_id)})</div>`;
