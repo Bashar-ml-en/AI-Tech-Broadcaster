@@ -87,7 +87,7 @@ logging.basicConfig(
 )
 
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
-DIRECTOR_MODEL = os.getenv("DIRECTOR_MODEL", "gemini-2.0-flash")
+DIRECTOR_MODEL = os.getenv("DIRECTOR_MODEL", "gemini-3.8-flash")
 STAGING_DIR = root_dir / "storage" / "staging"
 STAGING_DIR.mkdir(parents=True, exist_ok=True)
 

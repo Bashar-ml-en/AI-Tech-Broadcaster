@@ -94,6 +94,91 @@ def is_threads_configured() -> bool:
     )
 
 
+def diagnose_threads_connection(
+    token: Optional[str] = None,
+    client: Optional[httpx.Client] = None
+) -> Dict[str, Any]:
+    """
+    Comprehensive diagnostic health-check for Meta Threads API credentials.
+    Checks:
+    - Token validity via GET /v1.0/me
+    - Auto-discovered user_id and username
+    - Rate limit & publishing quota via GET /{user_id}/threads_publishing_limit
+    """
+    global THREADS_USER_ID
+    tok = (token or THREADS_ACCESS_TOKEN or os.getenv("THREADS_ACCESS_TOKEN", "")).strip()
+    if not tok or "YOUR_" in tok or "THREADS" in tok or len(tok) < 15:
+        return {
+            "configured": False,
+            "status": "unconfigured",
+            "status_badge": "TOKEN MISSING",
+            "user_id": THREADS_USER_ID or "unconfigured",
+            "diagnostic": "Threads User Access Token is empty. Generate a token via Threads API Dashboard.",
+            "recommended_action": "Add a Threads User Access Token in the Platform Token Configurator."
+        }
+
+    c = client or httpx.Client(timeout=15.0)
+    try:
+        resp = c.get(
+            f"{THREADS_GRAPH_BASE}/me",
+            params={"fields": "id,username,threads_profile_picture_url", "access_token": tok}
+        )
+        if resp.status_code == 200:
+            data = resp.json()
+            uid = str(data.get("id", ""))
+            username = data.get("username", "Threads User")
+            if uid:
+                THREADS_USER_ID = uid
+
+            # Try to fetch publishing limit
+            quota_info: Dict[str, Any] = {}
+            try:
+                q_res = c.get(
+                    f"{THREADS_GRAPH_BASE}/{uid}/threads_publishing_limit",
+                    params={"fields": "quota_usage,config", "access_token": tok}
+                )
+                if q_res.status_code == 200:
+                    quota_info = q_res.json().get("data", [{}])[0]
+            except Exception:
+                pass
+
+            return {
+                "configured": True,
+                "status": "ready",
+                "status_badge": "ONLINE // READY",
+                "user_id": uid,
+                "username": username,
+                "quota_usage": quota_info.get("quota_usage", 0),
+                "quota_total": quota_info.get("config", {}).get("quota_total", 250),
+                "diagnostic": f"Authenticated as @{username} (ID: {uid}). Publishing quota ready.",
+                "recommended_action": "Ready for live Threads broadcasting."
+            }
+        else:
+            err_msg = resp.text
+            try:
+                err_data = resp.json()
+                err_msg = err_data.get("error", {}).get("message", resp.text)
+            except Exception:
+                pass
+            return {
+                "configured": False,
+                "status": "invalid",
+                "status_badge": "INVALID TOKEN",
+                "user_id": THREADS_USER_ID or "unconfigured",
+                "diagnostic": f"Threads authentication rejected: {err_msg}",
+                "recommended_action": "Generate a new Threads User Access Token."
+            }
+    except Exception as e:
+        return {
+            "configured": False,
+            "status": "error",
+            "status_badge": "CONNECTION ERROR",
+            "user_id": THREADS_USER_ID or "unconfigured",
+            "diagnostic": f"Threads connection error: {e}",
+            "recommended_action": "Check network connectivity to graph.threads.net."
+        }
+
+
 def refresh_threads_token(client: Optional[httpx.Client] = None) -> Optional[str]:
     """
     Refresh long-lived Threads User Access Token using th_refresh_token grant.

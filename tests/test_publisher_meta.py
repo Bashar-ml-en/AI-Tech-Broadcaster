@@ -70,3 +70,69 @@ def test_instagram_mock_transport_reel_flow(monkeypatch):
     assert res["status"] == "published"
     assert res["remote_id"] == "published_media_456"
     assert "https://instagram.com/p/reel456" in res["permalink"]
+
+
+def test_exchange_user_token_for_page_token():
+    from src.publisher_meta import exchange_user_token_for_page_token
+
+    def mock_handler(request: httpx.Request):
+        url = str(request.url)
+        if "/1399811016543093" in url:
+            return httpx.Response(200, json={
+                "access_token": "EAABpermanentpagetokenextracted12345",
+                "id": "1399811016543093",
+                "name": "EraofAi Facebook Page"
+            })
+        return httpx.Response(404, json={"error": "Not found"})
+
+    client = httpx.Client(transport=httpx.MockTransport(mock_handler))
+    result = exchange_user_token_for_page_token(
+        token="EAABusertokenfromexplorer987654321",
+        page_id="1399811016543093",
+        client=client
+    )
+    assert result is not None
+    assert result["page_token"] == "EAABpermanentpagetokenextracted12345"
+    assert result["page_id"] == "1399811016543093"
+    assert result["exchanged"] is True
+
+
+def test_diagnose_meta_connection_with_mock():
+    from src.publisher_meta import diagnose_meta_connection
+
+    def mock_handler(request: httpx.Request):
+        url = str(request.url)
+        if "/1399811016543093" in url and "instagram_business_account" in url:
+            return httpx.Response(200, json={
+                "id": "1399811016543093",
+                "name": "EraofAi",
+                "instagram_business_account": {"id": "17841499999999", "username": "eraof_ai20"}
+            })
+        if "/1399811016543093" in url:
+            return httpx.Response(200, json={
+                "access_token": "EAABpageaccessvalidtoken123456789",
+                "id": "1399811016543093",
+                "name": "EraofAi"
+            })
+        if "/me/permissions" in url:
+            return httpx.Response(200, json={
+                "data": [
+                    {"permission": "pages_manage_posts", "status": "granted"},
+                    {"permission": "instagram_content_publish", "status": "granted"}
+                ]
+            })
+        return httpx.Response(200, json={})
+
+    client = httpx.Client(transport=httpx.MockTransport(mock_handler))
+    diag = diagnose_meta_connection(
+        token="EAABpageaccessvalidtoken123456789",
+        page_id="1399811016543093",
+        client=client
+    )
+    assert diag["configured"] is True
+    assert diag["status"] == "ready"
+    assert diag["can_post_facebook"] is True
+    assert diag["instagram_account_id"] == "17841499999999"
+    assert diag["instagram_username"] == "eraof_ai20"
+    assert "pages_manage_posts" in diag["scopes"]
+

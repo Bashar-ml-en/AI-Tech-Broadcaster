@@ -945,6 +945,59 @@ class PublishingSubagentOrchestrator:
                     else:
                         env_content = env_content.rstrip() + f"\n{k}={clean_val}\n"
 
+        # Meta auto-exchange & auto-discovery
+        if p in ("facebook", "instagram"):
+            raw_meta_tok = os.environ.get("META_PAGE_ACCESS_TOKEN", "").strip()
+            if raw_meta_tok:
+                try:
+                    from src.publisher_meta import exchange_user_token_for_page_token, get_instagram_id
+                    exchanged = exchange_user_token_for_page_token(raw_meta_tok)
+                    if exchanged and exchanged.get("page_token"):
+                        page_tok = exchanged["page_token"]
+                        if page_tok != raw_meta_tok:
+                            os.environ["META_PAGE_ACCESS_TOKEN"] = page_tok
+                            updated_keys.append("META_PAGE_ACCESS_TOKEN (Auto-Exchanged)")
+                            if env_content:
+                                pattern = r"^META_PAGE_ACCESS_TOKEN=.*$"
+                                if re.search(pattern, env_content, flags=re.MULTILINE):
+                                    env_content = re.sub(pattern, f"META_PAGE_ACCESS_TOKEN={page_tok}", env_content, flags=re.MULTILINE)
+                                else:
+                                    env_content = env_content.rstrip() + f"\nMETA_PAGE_ACCESS_TOKEN={page_tok}\n"
+                        if exchanged.get("page_id") and not os.environ.get("META_PAGE_ID"):
+                            os.environ["META_PAGE_ID"] = exchanged["page_id"]
+                            updated_keys.append("META_PAGE_ID (Auto-Discovered)")
+                    if not os.environ.get("META_INSTAGRAM_ACCOUNT_ID"):
+                        discovered_ig = get_instagram_id()
+                        if discovered_ig and "178414000000" not in discovered_ig:
+                            os.environ["META_INSTAGRAM_ACCOUNT_ID"] = discovered_ig
+                            updated_keys.append("META_INSTAGRAM_ACCOUNT_ID (Auto-Discovered)")
+                            if env_content:
+                                pattern = r"^META_INSTAGRAM_ACCOUNT_ID=.*$"
+                                if re.search(pattern, env_content, flags=re.MULTILINE):
+                                    env_content = re.sub(pattern, f"META_INSTAGRAM_ACCOUNT_ID={discovered_ig}", env_content, flags=re.MULTILINE)
+                                else:
+                                    env_content = env_content.rstrip() + f"\nMETA_INSTAGRAM_ACCOUNT_ID={discovered_ig}\n"
+                except Exception as e:
+                    logger.debug("Meta auto-exchange during config failed: %s", e)
+
+        elif p == "threads":
+            raw_th_tok = os.environ.get("THREADS_ACCESS_TOKEN", "").strip()
+            if raw_th_tok and not os.environ.get("THREADS_USER_ID"):
+                try:
+                    from src.publisher_threads import resolve_threads_user_id
+                    uid = resolve_threads_user_id()
+                    if uid:
+                        os.environ["THREADS_USER_ID"] = uid
+                        updated_keys.append("THREADS_USER_ID (Auto-Discovered)")
+                        if env_content:
+                            pattern = r"^THREADS_USER_ID=.*$"
+                            if re.search(pattern, env_content, flags=re.MULTILINE):
+                                env_content = re.sub(pattern, f"THREADS_USER_ID={uid}", env_content, flags=re.MULTILINE)
+                            else:
+                                env_content = env_content.rstrip() + f"\nTHREADS_USER_ID={uid}\n"
+                except Exception as e:
+                    logger.debug("Threads auto-discovery during config failed: %s", e)
+
         if updated_keys and env_content:
             try:
                 ENV_PATH.write_text(env_content, encoding="utf-8")

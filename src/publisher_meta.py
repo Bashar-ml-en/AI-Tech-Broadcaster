@@ -57,8 +57,186 @@ def reload_meta_credentials() -> Dict[str, Any]:
 
 def is_meta_configured() -> bool:
     """Check if Meta Page Access Token is configured and not a placeholder."""
-    tok = META_PAGE_ACCESS_TOKEN or os.getenv("META_PAGE_ACCESS_TOKEN", "").strip()
+    tok = get_active_page_token()
     return bool(tok and "META" not in tok and "YOUR_" not in tok and len(tok) > 20)
+
+
+def get_active_page_token() -> str:
+    """Resolve currently active Meta Page Access Token from memory or environment."""
+    global META_PAGE_ACCESS_TOKEN
+    tok = os.getenv("META_PAGE_ACCESS_TOKEN", "").strip() or META_PAGE_ACCESS_TOKEN
+    return tok
+
+
+def exchange_user_token_for_page_token(
+    token: str,
+    page_id: Optional[str] = None,
+    client: Optional[httpx.Client] = None
+) -> Optional[Dict[str, Any]]:
+    """
+    Given a User Access Token or System User Token from Meta Graph API Explorer,
+    query the Graph API to extract the permanent Page Access Token.
+
+    1. Checks GET /{target_page_id}?fields=access_token,name,id&access_token={token}
+    2. Falls back to GET /me/accounts?fields=access_token,name,id,tasks&access_token={token}
+
+    Returns a dict with:
+      - page_token: str
+      - page_id: str
+      - page_name: str
+      - exchanged: bool (True if the returned token was extracted/differs from the user token)
+    or None if the token cannot access the page.
+    """
+    clean_tok = (token or "").strip()
+    if not clean_tok or len(clean_tok) < 15:
+        return None
+
+    target_page_id = (page_id or META_PAGE_ID or os.getenv("META_PAGE_ID", "1399811016543093")).strip()
+    c = client or httpx.Client(timeout=15.0)
+
+    # 1. Direct page endpoint check
+    if target_page_id:
+        try:
+            res = c.get(
+                f"{GRAPH_BASE_URL}/{target_page_id}",
+                params={"fields": "access_token,name,id", "access_token": clean_tok}
+            )
+            if res.status_code == 200:
+                data = res.json()
+                page_token = data.get("access_token")
+                if page_token:
+                    return {
+                        "page_token": page_token,
+                        "page_id": str(data.get("id", target_page_id)),
+                        "page_name": data.get("name", "EraofAi Facebook Page"),
+                        "exchanged": page_token != clean_tok,
+                    }
+        except Exception as e:
+            logger.debug("Direct page token query failed: %s", e)
+
+    # 2. Query /me/accounts (returns list of all managed pages)
+    try:
+        res = c.get(
+            f"{GRAPH_BASE_URL}/me/accounts",
+            params={"fields": "access_token,name,id,tasks", "access_token": clean_tok}
+        )
+        if res.status_code == 200:
+            accounts = res.json().get("data", [])
+            if accounts:
+                match = next((acc for acc in accounts if str(acc.get("id")) == str(target_page_id)), accounts[0])
+                page_tok = match.get("access_token")
+                if page_tok:
+                    return {
+                        "page_token": page_tok,
+                        "page_id": str(match.get("id")),
+                        "page_name": match.get("name", "Managed Page"),
+                        "exchanged": True,
+                    }
+    except Exception as e:
+        logger.debug("/me/accounts query failed: %s", e)
+
+    return None
+
+
+def diagnose_meta_connection(
+    token: Optional[str] = None,
+    page_id: Optional[str] = None,
+    client: Optional[httpx.Client] = None
+) -> Dict[str, Any]:
+    """
+    Comprehensive diagnostic health-check for Meta Graph API credentials.
+    Checks:
+    - Token validity and type (Page vs User)
+    - Auto-exchange if a User token is supplied
+    - Permission scopes granted
+    - Target Facebook Page details
+    - Connected Instagram Professional Account ID & username
+    """
+    tok = (token or get_active_page_token()).strip()
+    pid = (page_id or META_PAGE_ID or os.getenv("META_PAGE_ID", "1399811016543093")).strip()
+
+    if not tok or "YOUR_" in tok or "META" in tok or len(tok) < 15:
+        return {
+            "configured": False,
+            "status": "unconfigured",
+            "status_badge": "TOKEN MISSING",
+            "token_type": "none",
+            "page_id": pid,
+            "diagnostic": "Meta Page Access Token is empty. Generate a token via Meta Graph API Explorer.",
+            "recommended_action": "Add a Page or User token in the Platform Token Configurator."
+        }
+
+    c = client or httpx.Client(timeout=15.0)
+
+    # Attempt user-to-page exchange / resolution
+    exchange_info = exchange_user_token_for_page_token(tok, pid, client=c)
+    effective_token = exchange_info["page_token"] if exchange_info else tok
+    page_name = exchange_info["page_name"] if exchange_info else "EraofAi Facebook Page"
+    target_pid = exchange_info["page_id"] if exchange_info else pid
+
+    # Test permissions
+    scopes: List[str] = []
+    try:
+        p_res = c.get(f"{GRAPH_BASE_URL}/me/permissions", params={"access_token": tok})
+        if p_res.status_code == 200:
+            scopes = [
+                item.get("permission", "")
+                for item in p_res.json().get("data", [])
+                if item.get("status") == "granted"
+            ]
+    except Exception:
+        pass
+
+    # Discover linked Instagram account
+    ig_id: Optional[str] = None
+    ig_username: Optional[str] = None
+    try:
+        ig_res = c.get(
+            f"{GRAPH_BASE_URL}/{target_pid}",
+            params={
+                "fields": "instagram_business_account{id,username},connected_instagram_account{id,username}",
+                "access_token": effective_token
+            }
+        )
+        if ig_res.status_code == 200:
+            body = ig_res.json()
+            ig_data = body.get("instagram_business_account") or body.get("connected_instagram_account") or {}
+            ig_id = ig_data.get("id")
+            ig_username = ig_data.get("username")
+    except Exception:
+        pass
+
+    # Validate publishing capability
+    can_post_fb = "pages_manage_posts" in scopes or exchange_info is not None
+    can_post_ig = bool(ig_id) and ("instagram_content_publish" in scopes or exchange_info is not None)
+
+    is_valid = exchange_info is not None or len(scopes) > 0
+    token_type = "PAGE" if (exchange_info and not exchange_info["exchanged"]) else ("USER_AUTO_EXCHANGED" if exchange_info else "UNKNOWN")
+
+    return {
+        "configured": is_valid,
+        "status": "ready" if is_valid else "invalid",
+        "status_badge": "ONLINE // READY" if is_valid else "INVALID TOKEN",
+        "token_type": token_type,
+        "page_id": target_pid,
+        "page_name": page_name,
+        "instagram_account_id": ig_id or "not_linked",
+        "instagram_username": ig_username or "N/A",
+        "scopes": scopes,
+        "can_post_facebook": can_post_fb,
+        "can_post_instagram": can_post_ig,
+        "exchanged_page_token": effective_token if exchange_info and exchange_info["exchanged"] else None,
+        "diagnostic": (
+            f"Successfully authenticated with {page_name} (ID: {target_pid})."
+            if is_valid
+            else "Token was rejected by Meta Graph API. Please verify expiration or app permissions."
+        ),
+        "recommended_action": (
+            "Ready for live broadcast dispatches."
+            if is_valid
+            else "Generate a new token with pages_manage_posts & instagram_content_publish scopes."
+        )
+    }
 
 
 def build_caption(headline: str, captions_json: Optional[str] = None, max_len: int = 2200) -> str:
@@ -553,11 +731,12 @@ def publish_facebook_reel(
     c = client or httpx.Client(timeout=60.0)
     try:
         # Phase 1: Initialize Reel
+        tok = get_active_page_token()
         init_resp = c.post(
             f"{GRAPH_BASE_URL}/{META_PAGE_ID}/video_reels",
             data={
                 "upload_phase": "start",
-                "access_token": META_PAGE_ACCESS_TOKEN
+                "access_token": tok
             }
         )
         if init_resp.status_code != 200:
@@ -585,15 +764,26 @@ def publish_facebook_reel(
                     video_bytes = stream_resp.content
 
             if video_bytes:
-                c.post(
+                upload_res = c.post(
                     upload_url,
                     headers={
-                        "Authorization": f"OAuth {META_PAGE_ACCESS_TOKEN}",
+                        "Authorization": f"OAuth {tok}",
                         "offset": "0",
-                        "file_size": str(len(video_bytes))
+                        "file_size": str(len(video_bytes)),
+                        "Content-Type": "application/octet-stream"
                     },
                     content=video_bytes
                 )
+                if upload_res.status_code not in (200, 201):
+                    return PlatformResult(
+                        platform="facebook",
+                        status="failed",
+                        mode="live",
+                        error_code="FB_REEL_UPLOAD_FAILED",
+                        error_message=f"Facebook Reel binary transfer rejected ({upload_res.status_code}): {upload_res.text}",
+                        attempts=1,
+                        latency_ms=int((time.time() - start_t) * 1000)
+                    )
 
         # Phase 2: Finish and publish
         finish_resp = c.post(
@@ -603,7 +793,7 @@ def publish_facebook_reel(
                 "video_id": video_id,
                 "video_state": "PUBLISHED",
                 "description": description,
-                "access_token": META_PAGE_ACCESS_TOKEN
+                "access_token": tok
             }
         )
         if finish_resp.status_code != 200:

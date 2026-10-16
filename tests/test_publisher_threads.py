@@ -60,3 +60,25 @@ def test_threads_mock_transport_live_publish(monkeypatch):
     assert res["status"] == "published"
     assert res["remote_id"] == "th_media_1001"
     assert "https://threads.net/@user/post/1001" in res["permalink"]
+
+
+def test_diagnose_threads_connection():
+    from src.publisher_threads import diagnose_threads_connection
+
+    def mock_handler(request: httpx.Request):
+        url = str(request.url)
+        if "/me" in url:
+            return httpx.Response(200, json={"id": "987654321", "username": "eraofai_creator"})
+        if "/threads_publishing_limit" in url:
+            return httpx.Response(200, json={"data": [{"quota_usage": 3, "config": {"quota_total": 250}}]})
+        return httpx.Response(404, json={"error": "Not found"})
+
+    client = httpx.Client(transport=httpx.MockTransport(mock_handler))
+    diag = diagnose_threads_connection(token="TH_SAMPLE_TOKEN_WITH_SUFFICIENT_LENGTH", client=client)
+    assert diag["configured"] is True
+    assert diag["status"] == "ready"
+    assert diag["user_id"] == "987654321"
+    assert diag["username"] == "eraofai_creator"
+    assert diag["quota_usage"] == 3
+    assert diag["quota_total"] == 250
+

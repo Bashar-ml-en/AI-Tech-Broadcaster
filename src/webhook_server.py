@@ -1373,7 +1373,7 @@ def get_logs(lines: int = 50):
     ts = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
     default_logs = [
         f"{ts} [INFO] studio_server: AI Tech Broadcaster Executive Engine online.",
-        f"{ts} [INFO] director: Gemini 2.5 Flash Lite engine initialized & active.",
+        f"{ts} [INFO] director: Gemini 3.8 Flash (High) engine initialized & active (thinkingBudget=2048).",
         f"{ts} [INFO] hitl_gate: Telegram cryptographic gate active (@Gasprovbot).",
         f"{ts} [INFO] publisher: Ayrshare omnichannel publisher connected (Brand: EraofAi, Channels: TikTok, IG, FB, X).",
         f"{ts} [INFO] scheduler: Cadence set to hourly autonomous cycle (1h)."
@@ -1470,7 +1470,7 @@ def get_subagents_telemetry():
             {
                 "id": "agent_03",
                 "name": "SCRIPTWRITER",
-                "role": "Multi-Format Viral Hook & Body Synthesis",
+                "role": "Gemini 3.8 Flash (High) Scriptwriter & Viral Synthesis",
                 "status": "READY",
                 "latency_ms": 680,
                 "throughput": "120 WPM",
@@ -1625,6 +1625,25 @@ def api_configure_platform(payload: Dict[str, Any] = Body(...)):
     return orchestrator.configure_platform_credentials(platform=platform, credentials=credentials)
 
 
+@app.get("/api/platforms/meta/diagnose")
+@app.post("/api/platforms/meta/diagnose")
+def api_diagnose_meta(payload: Optional[Dict[str, Any]] = Body(default=None)):
+    """Interactive diagnosis for Meta Graph API credentials, scopes, auto-exchange & linked accounts."""
+    from src.publisher_meta import diagnose_meta_connection
+    token = payload.get("token") if payload else None
+    page_id = payload.get("page_id") if payload else None
+    return diagnose_meta_connection(token=token, page_id=page_id)
+
+
+@app.get("/api/platforms/threads/diagnose")
+@app.post("/api/platforms/threads/diagnose")
+def api_diagnose_threads(payload: Optional[Dict[str, Any]] = Body(default=None)):
+    """Interactive diagnosis for Meta Threads API credentials, quotas, and user discovery."""
+    from src.publisher_threads import diagnose_threads_connection
+    token = payload.get("token") if payload else None
+    return diagnose_threads_connection(token=token)
+
+
 @app.post("/api/subagents/{agent_id}/action")
 def api_execute_subagent_action(agent_id: str, payload: Dict[str, Any] = Body(default={})):
     """Execute an interactive diagnostic or operational test on a specific DAG Subagent."""
@@ -1659,8 +1678,8 @@ def api_execute_subagent_action(agent_id: str, payload: Dict[str, Any] = Body(de
             "agent_id": aid,
             "action": action,
             "latency_ms": int((time.time() - start_t) * 1000) + 45,
-            "summary": "Gemini 2.5 Flash Editorial Director online; 4-tier exponential backoff & deterministic newsroom fallback armed.",
-            "payload": {"gemini_api_configured": gemini_ok, "model": "gemini-2.5-flash"},
+            "summary": "Gemini 3.8 Flash (High) Editorial Director online (thinkingBudget=2048); 4-tier exponential backoff & deterministic newsroom fallback armed.",
+            "payload": {"gemini_api_configured": gemini_ok, "model": "gemini-3.8-flash", "thinking_budget": 2048},
         }
     elif aid in ("SA-04", "AGENT_04", "AGENT_05"):
         return {

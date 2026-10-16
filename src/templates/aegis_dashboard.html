@@ -7,7 +7,7 @@
   <title>AEGIS NEXUS // Sahara Edition — Autonomous Omnichannel &amp; Publishing Subagent Console</title>
   <link href="https://fonts.googleapis.com" rel="preconnect"/>
   <link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
-  <link href="https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,500..700;1,400..600&amp;family=JetBrains+Mono:wght@400;500;600;700&amp;family=Manrope:wght@400;500;600;700;800&amp;display=swap" rel="stylesheet"/>
+  <link href="https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,500..700;1,400..600&amp;family=JetBrains+Mono:wght@400;500;600;700&amp;family=Manrope:wght@400;500;600;700;800&amp;family=Plus+Jakarta+Sans:wght@400;500;600;700;800&amp;display=swap" rel="stylesheet"/>
   <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet"/>
   <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
   <script id="tailwind-config">
@@ -44,7 +44,7 @@
           fontFamily: {
             "headline": ["EB Garamond", "serif"],
             "display": ["EB Garamond", "serif"],
-            "body": ["Manrope", "sans-serif"],
+            "body": ["Plus Jakarta Sans", "Manrope", "sans-serif"],
             "mono": ["JetBrains Mono", "monospace"]
           }
         }
@@ -131,55 +131,80 @@
           <span class="font-mono text-[10px] uppercase tracking-widest text-primary font-bold">Publishing Channels</span>
           <span class="font-mono text-[9px] text-on-surface-variant">Reached / Total</span>
         </div>
-        <div class="space-y-1" id="sidebarChannelsNav">
+        <div class="space-y-1.5" id="sidebarChannelsNav">
           <!-- Telegram -->
-          <button onclick="openPlatformWorkspace('telegram')" data-nav="channel-telegram" class="nav-btn w-full flex items-center justify-between px-2.5 py-2 rounded-lg text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface transition-all text-left group">
-            <span class="flex items-center gap-2 min-w-0">
-              <span id="dot_telegram" class="w-2 h-2 rounded-full bg-emerald-600 shrink-0"></span>
-              <span class="material-symbols-outlined text-[17px] text-sky-700">send</span>
-              <span class="text-xs font-bold uppercase tracking-wider truncate">Telegram</span>
-            </span>
-            <span id="sidebarBadge_telegram" class="font-mono text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/15 text-emerald-800 font-bold shrink-0">--/--</span>
+          <button onclick="openPlatformWorkspace('telegram')" data-nav="channel-telegram" class="nav-btn w-full flex flex-col gap-1 px-2.5 py-2 rounded-lg text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface transition-all text-left group">
+            <div class="flex items-center justify-between w-full">
+              <span class="flex items-center gap-2 min-w-0">
+                <span id="dot_telegram" class="w-2 h-2 rounded-full bg-emerald-600 shrink-0"></span>
+                <span class="material-symbols-outlined text-[17px] text-sky-700">send</span>
+                <span class="text-xs font-bold uppercase tracking-wider truncate">Telegram</span>
+              </span>
+              <span id="sidebarBadge_telegram" class="font-mono text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/15 text-emerald-800 font-bold shrink-0 tabular-nums">--/--</span>
+            </div>
+            <div class="w-full bg-surface-container-highest/60 h-1 rounded-full overflow-hidden">
+              <div id="sidebarBar_telegram" class="h-full bg-sky-600 rounded-full transition-all duration-500" style="width: 0%"></div>
+            </div>
           </button>
 
           <!-- TikTok -->
-          <button onclick="openPlatformWorkspace('tiktok')" data-nav="channel-tiktok" class="nav-btn w-full flex items-center justify-between px-2.5 py-2 rounded-lg text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface transition-all text-left group">
-            <span class="flex items-center gap-2 min-w-0">
-              <span id="dot_tiktok" class="w-2 h-2 rounded-full bg-emerald-600 shrink-0"></span>
-              <span class="material-symbols-outlined text-[17px] text-rose-700">movie</span>
-              <span class="text-xs font-bold uppercase tracking-wider truncate">TikTok</span>
-            </span>
-            <span id="sidebarBadge_tiktok" class="font-mono text-[10px] px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-900 font-bold shrink-0">--/--</span>
+          <button onclick="openPlatformWorkspace('tiktok')" data-nav="channel-tiktok" class="nav-btn w-full flex flex-col gap-1 px-2.5 py-2 rounded-lg text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface transition-all text-left group">
+            <div class="flex items-center justify-between w-full">
+              <span class="flex items-center gap-2 min-w-0">
+                <span id="dot_tiktok" class="w-2 h-2 rounded-full bg-emerald-600 shrink-0"></span>
+                <span class="material-symbols-outlined text-[17px] text-rose-700">movie</span>
+                <span class="text-xs font-bold uppercase tracking-wider truncate">TikTok</span>
+              </span>
+              <span id="sidebarBadge_tiktok" class="font-mono text-[10px] px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-900 font-bold shrink-0 tabular-nums">--/--</span>
+            </div>
+            <div class="w-full bg-surface-container-highest/60 h-1 rounded-full overflow-hidden">
+              <div id="sidebarBar_tiktok" class="h-full bg-rose-600 rounded-full transition-all duration-500" style="width: 0%"></div>
+            </div>
           </button>
 
           <!-- Facebook -->
-          <button onclick="openPlatformWorkspace('facebook')" data-nav="channel-facebook" class="nav-btn w-full flex items-center justify-between px-2.5 py-2 rounded-lg text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface transition-all text-left group">
-            <span class="flex items-center gap-2 min-w-0">
-              <span id="dot_facebook" class="w-2 h-2 rounded-full bg-amber-500 shrink-0"></span>
-              <span class="material-symbols-outlined text-[17px] text-blue-700">public</span>
-              <span class="text-xs font-bold uppercase tracking-wider truncate">Facebook</span>
-            </span>
-            <span id="sidebarBadge_facebook" class="font-mono text-[10px] px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-900 font-bold shrink-0">--/--</span>
+          <button onclick="openPlatformWorkspace('facebook')" data-nav="channel-facebook" class="nav-btn w-full flex flex-col gap-1 px-2.5 py-2 rounded-lg text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface transition-all text-left group">
+            <div class="flex items-center justify-between w-full">
+              <span class="flex items-center gap-2 min-w-0">
+                <span id="dot_facebook" class="w-2 h-2 rounded-full bg-amber-500 shrink-0"></span>
+                <span class="material-symbols-outlined text-[17px] text-blue-700">public</span>
+                <span class="text-xs font-bold uppercase tracking-wider truncate">Facebook</span>
+              </span>
+              <span id="sidebarBadge_facebook" class="font-mono text-[10px] px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-900 font-bold shrink-0 tabular-nums">--/--</span>
+            </div>
+            <div class="w-full bg-surface-container-highest/60 h-1 rounded-full overflow-hidden">
+              <div id="sidebarBar_facebook" class="h-full bg-blue-600 rounded-full transition-all duration-500" style="width: 0%"></div>
+            </div>
           </button>
 
           <!-- Instagram -->
-          <button onclick="openPlatformWorkspace('instagram')" data-nav="channel-instagram" class="nav-btn w-full flex items-center justify-between px-2.5 py-2 rounded-lg text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface transition-all text-left group">
-            <span class="flex items-center gap-2 min-w-0">
-              <span id="dot_instagram" class="w-2 h-2 rounded-full bg-amber-500 shrink-0"></span>
-              <span class="material-symbols-outlined text-[17px] text-fuchsia-700">photo_camera</span>
-              <span class="text-xs font-bold uppercase tracking-wider truncate">Instagram</span>
-            </span>
-            <span id="sidebarBadge_instagram" class="font-mono text-[10px] px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-900 font-bold shrink-0">--/--</span>
+          <button onclick="openPlatformWorkspace('instagram')" data-nav="channel-instagram" class="nav-btn w-full flex flex-col gap-1 px-2.5 py-2 rounded-lg text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface transition-all text-left group">
+            <div class="flex items-center justify-between w-full">
+              <span class="flex items-center gap-2 min-w-0">
+                <span id="dot_instagram" class="w-2 h-2 rounded-full bg-amber-500 shrink-0"></span>
+                <span class="material-symbols-outlined text-[17px] text-fuchsia-700">photo_camera</span>
+                <span class="text-xs font-bold uppercase tracking-wider truncate">Instagram</span>
+              </span>
+              <span id="sidebarBadge_instagram" class="font-mono text-[10px] px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-900 font-bold shrink-0 tabular-nums">--/--</span>
+            </div>
+            <div class="w-full bg-surface-container-highest/60 h-1 rounded-full overflow-hidden">
+              <div id="sidebarBar_instagram" class="h-full bg-fuchsia-600 rounded-full transition-all duration-500" style="width: 0%"></div>
+            </div>
           </button>
 
           <!-- Threads -->
-          <button onclick="openPlatformWorkspace('threads')" data-nav="channel-threads" class="nav-btn w-full flex items-center justify-between px-2.5 py-2 rounded-lg text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface transition-all text-left group">
-            <span class="flex items-center gap-2 min-w-0">
-              <span id="dot_threads" class="w-2 h-2 rounded-full bg-amber-500 shrink-0"></span>
-              <span class="material-symbols-outlined text-[17px] text-stone-700">alternate_email</span>
-              <span class="text-xs font-bold uppercase tracking-wider truncate">Threads</span>
-            </span>
-            <span id="sidebarBadge_threads" class="font-mono text-[10px] px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-900 font-bold shrink-0">--/--</span>
+          <button onclick="openPlatformWorkspace('threads')" data-nav="channel-threads" class="nav-btn w-full flex flex-col gap-1 px-2.5 py-2 rounded-lg text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface transition-all text-left group">
+            <div class="flex items-center justify-between w-full">
+              <span class="flex items-center gap-2 min-w-0">
+                <span id="dot_threads" class="w-2 h-2 rounded-full bg-amber-500 shrink-0"></span>
+                <span class="material-symbols-outlined text-[17px] text-stone-700">alternate_email</span>
+                <span class="text-xs font-bold uppercase tracking-wider truncate">Threads</span>
+              </span>
+              <span id="sidebarBadge_threads" class="font-mono text-[10px] px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-900 font-bold shrink-0 tabular-nums">--/--</span>
+            </div>
+            <div class="w-full bg-surface-container-highest/60 h-1 rounded-full overflow-hidden">
+              <div id="sidebarBar_threads" class="h-full bg-stone-700 rounded-full transition-all duration-500" style="width: 0%"></div>
+            </div>
           </button>
         </div>
       </div>
@@ -520,14 +545,14 @@
             <div onclick="openSubagentInspector('SA-03')" class="cursor-pointer group p-4 rounded-xl bg-surface-container-low hover:bg-primary-fixed/40 border border-outline-variant/70 hover:border-primary transition-all flex flex-col justify-between min-h-[138px]">
               <div class="flex items-center justify-between">
                 <span class="font-mono text-xs font-bold text-primary">SA-03 // DIRECTOR</span>
-                <span class="font-mono text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-800 font-bold">ACTIVE</span>
+                <span class="font-mono text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-800 font-bold">GEMINI 3.8 (HIGH)</span>
               </div>
               <div class="my-2">
-                <div class="font-headline text-lg font-bold text-on-surface group-hover:text-primary transition-colors">GEMINI 2.5 FLASH DIRECTOR</div>
-                <p class="text-xs text-on-surface-variant mt-0.5 leading-snug">Synthesizes viral hooks, 3-part scripts, &amp; platform captions with 4-tier retry.</p>
+                <div class="font-headline text-lg font-bold text-on-surface group-hover:text-primary transition-colors">GEMINI 3.8 FLASH (HIGH) DIRECTOR</div>
+                <p class="text-xs text-on-surface-variant mt-0.5 leading-snug">High-reasoning viral hooks, 3-part scripts, &amp; platform captions with thinkingBudget=2048.</p>
               </div>
               <div class="flex items-center justify-between pt-2 border-t border-outline-variant/40 font-mono text-[10px] text-on-surface-variant">
-                <span>src/director.py</span>
+                <span>src/pipeline.py</span>
                 <span class="text-primary font-bold">Inspect →</span>
               </div>
             </div>
@@ -624,7 +649,7 @@
             </button>
             <button onclick="openSubagentInspector('SA-03')" class="p-2.5 rounded-xl bg-surface-container hover:bg-primary-fixed border border-outline-variant/60 text-left transition-all">
               <div class="font-mono text-[10px] text-primary font-bold">03. DIRECT</div>
-              <div class="text-xs font-bold text-on-surface mt-0.5">Gemini 2.5</div>
+              <div class="text-xs font-bold text-on-surface mt-0.5">Gemini 3.8 (High)</div>
             </button>
             <button onclick="openSubagentInspector('SA-04')" class="p-2.5 rounded-xl bg-surface-container hover:bg-primary-fixed border border-outline-variant/60 text-left transition-all">
               <div class="font-mono text-[10px] text-primary font-bold">04. SYNTH</div>
@@ -821,6 +846,10 @@
       </div>
 
       <div class="flex items-center justify-end gap-2 pt-2 border-t border-outline-variant/50">
+        <button id="btnModalDiagnose" type="button" onclick="diagnoseModalToken()" class="px-3.5 py-2 rounded-xl bg-surface-container-high hover:bg-surface-dim text-on-surface font-mono text-xs uppercase font-semibold flex items-center gap-1.5 transition-all">
+          <span class="material-symbols-outlined text-[15px]">troubleshoot</span>
+          <span>Test &amp; Diagnose</span>
+        </button>
         <button onclick="savePlatformTokens()" class="px-4 py-2 rounded-xl bg-primary text-white font-mono text-xs uppercase font-bold">
           Save &amp; Verify Connection
         </button>
@@ -830,6 +859,11 @@
       </div>
     </div>
   </div>
+
+  <!-- ===================================================================== -->
+  <!-- FLOATING TOAST NOTIFICATION CONTAINER (Traversy Design Resources)     -->
+  <!-- ===================================================================== -->
+  <div id="aegisToastContainer" class="fixed top-5 right-5 z-[9999] flex flex-col gap-2.5 pointer-events-none max-w-sm w-full"></div>
 
   <!-- ===================================================================== -->
   <!-- INTERACTIVE CONTROLLER SCRIPT                                         -->
@@ -852,6 +886,55 @@
         .replace(/</g, '&lt;')
         .replace(/>/g, '&gt;')
         .replace(/"/g, '&quot;');
+    }
+
+    function showToast(type = 'info', title = '', message = '', duration = 4200) {
+      const container = document.getElementById('aegisToastContainer');
+      if (!container) return;
+
+      const toast = document.createElement('div');
+      toast.className = 'pointer-events-auto transform translate-y-2 opacity-0 transition-all duration-300 ease-out flex items-start gap-3 p-3.5 rounded-xl border shadow-lg backdrop-blur-xl';
+
+      let icon = 'info';
+      let colorStyles = 'bg-white/95 text-on-surface border-outline-variant/80 shadow-stone-900/10';
+      let iconStyles = 'text-primary';
+
+      if (type === 'success') {
+        icon = 'check_circle';
+        colorStyles = 'bg-[#f0fbf4]/95 text-emerald-950 border-emerald-300 shadow-emerald-900/10';
+        iconStyles = 'text-emerald-700';
+      } else if (type === 'error') {
+        icon = 'error';
+        colorStyles = 'bg-[#fdf2f2]/95 text-red-950 border-red-300 shadow-red-900/10';
+        iconStyles = 'text-red-700';
+      } else if (type === 'warning') {
+        icon = 'warning';
+        colorStyles = 'bg-[#fffbeb]/95 text-amber-950 border-amber-300 shadow-amber-900/10';
+        iconStyles = 'text-amber-700';
+      }
+
+      toast.className += ` ${colorStyles}`;
+      toast.innerHTML = `
+        <span class="material-symbols-outlined text-[20px] shrink-0 mt-0.5 ${iconStyles}">${icon}</span>
+        <div class="flex-1 min-w-0 pr-1">
+          <div class="font-bold text-xs uppercase tracking-wider">${escapeHtml(title)}</div>
+          <div class="text-[12px] opacity-90 leading-snug mt-0.5 break-words">${escapeHtml(message)}</div>
+        </div>
+        <button onclick="this.parentElement.remove()" class="text-on-surface-variant hover:text-on-surface p-0.5 rounded transition-colors shrink-0">
+          <span class="material-symbols-outlined text-[16px]">close</span>
+        </button>
+      `;
+
+      container.appendChild(toast);
+      requestAnimationFrame(() => {
+        toast.classList.remove('translate-y-2', 'opacity-0');
+        toast.classList.add('translate-y-0', 'opacity-100');
+      });
+
+      setTimeout(() => {
+        toast.classList.add('opacity-0', 'translate-x-4');
+        setTimeout(() => toast.remove(), 350);
+      }, duration);
     }
 
     function formatCountdown(sec) {
@@ -965,6 +1048,12 @@
             kpiMode.className = info.configured
               ? 'font-mono text-[9px] px-1.5 py-0.5 rounded bg-emerald-500/15 text-emerald-800 font-bold'
               : 'font-mono text-[9px] px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-900 font-bold';
+          }
+
+          const pct = info.total_posts > 0 ? Math.round((info.reached_count / info.total_posts) * 100) : 0;
+          const sbBar = document.getElementById(`sidebarBar_${p}`);
+          if (sbBar) {
+            sbBar.style.width = `${pct}%`;
           }
         });
 
@@ -1178,7 +1267,9 @@
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ force_live: true })
         });
-        await res.json();
+        const result = await res.json();
+        const isOk = result.status === 'published';
+        showToast(isOk ? 'success' : 'warning', `${platform.toUpperCase()} Dispatch`, `Post #${postId}: ${result.status.toUpperCase()} ${result.permalink ? '• ' + result.permalink : ''}`);
         await loadPlatformsReachSummary();
         if (activeWorkspace === 'platform' && activePlatform === platform) {
           await loadPlatformLedger(platform);
@@ -1186,6 +1277,7 @@
         await loadMediaStagePosts();
       } catch (err) {
         console.error('Heal & publish failed:', err);
+        showToast('error', 'Dispatch Error', String(err));
       } finally {
         if (btn) {
           btn.disabled = false;
@@ -1200,16 +1292,20 @@
       const orig = btn.innerHTML;
       btn.disabled = true;
       btn.innerHTML = `<span class="material-symbols-outlined text-[16px] animate-spin">sync</span><span>Healing &amp; Syncing Batch...</span>`;
+      showToast('info', 'Batch Sync', `Healing & dispatching up to 3 unreached posts to ${activePlatform.toUpperCase()}...`);
       try {
-        await fetch(`/api/platforms/${activePlatform}/sync`, {
+        const res = await fetch(`/api/platforms/${activePlatform}/sync`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ limit: 3 })
         });
+        const resData = await res.json();
+        showToast('success', 'Batch Sync Done', `${activePlatform.toUpperCase()} sync finished: ${resData.dispatched_count || 0} posts processed.`);
         await loadPlatformsReachSummary();
         await loadPlatformLedger(activePlatform);
       } catch (err) {
         console.error('Batch sync failed:', err);
+        showToast('error', 'Batch Sync Error', String(err));
       } finally {
         btn.disabled = false;
         btn.innerHTML = orig;
@@ -1300,6 +1396,7 @@
         btn.disabled = true;
         btn.innerHTML = `<span class="material-symbols-outlined text-[15px] animate-spin">sync</span><span>Running...</span>`;
       }
+      showToast('info', 'Cycle Dispatched', `Autonomous broadcast pipeline initiated for format: ${fmt.toUpperCase()}`);
       try {
         await fetch('/api/broadcast/trigger', {
           method: 'POST',
@@ -1309,6 +1406,7 @@
         setTimeout(refreshAllTelemetry, 2500);
       } catch (err) {
         console.error('Trigger failed:', err);
+        showToast('error', 'Cycle Trigger Error', String(err));
       } finally {
         setTimeout(() => {
           if (btn) {
@@ -1325,6 +1423,7 @@
         const res = await fetch('/api/lock/clear', { method: 'POST' });
         const data = await res.json();
         document.getElementById('sidebarLockState').textContent = 'UNLOCKED';
+        showToast('success', 'Lock Released', data.status === 'cleared' ? 'Cycle lock (storage/.cycle.lock) was cleared.' : 'No active cycle lock was present.');
         if (btn) {
           btn.innerHTML = `<span class="material-symbols-outlined text-[15px]">check</span><span class="hidden md:inline">${data.status === 'cleared' ? 'Cleared' : 'Unlocked'}</span>`;
           setTimeout(() => {
@@ -1333,6 +1432,7 @@
         }
       } catch (err) {
         console.error('Unlock failed:', err);
+        showToast('error', 'Unlock Failed', String(err));
       }
     }
 
@@ -1412,11 +1512,11 @@
       const container = document.getElementById('cfgDynamicFields');
       const schemas = {
         facebook: [
-          { key: 'META_PAGE_ACCESS_TOKEN', label: 'Meta Page Access Token (EAAB...)', placeholder: 'Paste long-lived Page Access Token' },
+          { key: 'META_PAGE_ACCESS_TOKEN', label: 'Meta Page Access Token or User Token (EAAB...)', placeholder: 'Paste Page or User token (auto-exchanges to Page token)' },
           { key: 'META_PAGE_ID', label: 'Facebook Page ID', placeholder: '1399811016543093' }
         ],
         instagram: [
-          { key: 'META_PAGE_ACCESS_TOKEN', label: 'Meta Page Access Token (EAAB...)', placeholder: 'Paste long-lived Page Access Token' },
+          { key: 'META_PAGE_ACCESS_TOKEN', label: 'Meta Page Access Token or User Token (EAAB...)', placeholder: 'Paste Page or User token (auto-exchanges to Page token)' },
           { key: 'META_INSTAGRAM_ACCOUNT_ID', label: 'Instagram Business Account ID (optional — auto-discovered)', placeholder: '178414...' }
         ],
         threads: [
@@ -1433,12 +1533,135 @@
         ]
       };
       const fields = schemas[platform] || schemas.facebook;
-      container.innerHTML = fields.map(f => `
+      let html = fields.map(f => `
         <div>
           <label class="block font-mono text-[10px] uppercase text-on-surface-variant mb-1">${escapeHtml(f.label)}</label>
           <input data-cred-key="${escapeHtml(f.key)}" type="password" placeholder="${escapeHtml(f.placeholder)}" class="w-full px-3 py-1.5 rounded-lg bg-surface-container border border-outline-variant font-mono text-xs"/>
         </div>
       `).join('');
+
+      if (platform === 'facebook' || platform === 'instagram') {
+        html += `
+          <div class="p-2.5 rounded-lg bg-surface-container border border-outline-variant/60 space-y-1 mt-2">
+            <div class="flex items-center justify-between">
+              <span class="font-mono text-[10px] text-primary font-bold">META GRAPH API AUTO-EXCHANGE</span>
+              <a href="https://developers.facebook.com/tools/explorer/" target="_blank" rel="noopener noreferrer" class="text-[10px] text-sky-700 hover:underline font-mono inline-flex items-center gap-0.5">
+                <span>Graph API Explorer</span><span class="material-symbols-outlined text-[12px]">open_in_new</span>
+              </a>
+            </div>
+            <p class="text-[11px] text-on-surface-variant leading-snug">
+              User Access Tokens or Page Access Tokens are accepted. Aegis automatically exchanges user tokens for permanent Page Access Tokens with <code class="font-mono text-[10px] bg-white/70 px-1 py-0.5 rounded">pages_manage_posts</code> and auto-discovers your connected Instagram Business Account.
+            </p>
+          </div>
+        `;
+      } else if (platform === 'threads') {
+        html += `
+          <div class="p-2.5 rounded-lg bg-surface-container border border-outline-variant/60 space-y-1 mt-2">
+            <div class="flex items-center justify-between">
+              <span class="font-mono text-[10px] text-primary font-bold">THREADS GRAPH API v1.0</span>
+              <a href="https://developers.facebook.com/docs/threads" target="_blank" rel="noopener noreferrer" class="text-[10px] text-sky-700 hover:underline font-mono inline-flex items-center gap-0.5">
+                <span>Threads Docs</span><span class="material-symbols-outlined text-[12px]">open_in_new</span>
+              </a>
+            </div>
+            <p class="text-[11px] text-on-surface-variant leading-snug">
+              Provide your 60-day Threads User Access Token with <code class="font-mono text-[10px] bg-white/70 px-1 py-0.5 rounded">threads_content_publish</code>. The system automatically retrieves your Threads User ID and tracks your 250 post/24h quota.
+            </p>
+          </div>
+        `;
+      }
+      container.innerHTML = html;
+    }
+
+    async function diagnoseModalToken() {
+      const platform = document.getElementById('cfgPlatformSelect')?.value || 'facebook';
+      const btn = document.getElementById('btnModalDiagnose');
+      const banner = document.getElementById('cfgResultBanner');
+      const origText = btn ? btn.innerHTML : 'Test & Diagnose';
+      if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = `<span class="material-symbols-outlined text-[15px] animate-spin">sync</span><span>Diagnosing...</span>`;
+      }
+      banner.classList.remove('hidden');
+      banner.className = 'p-3 rounded-xl font-mono text-[11px] bg-surface-container text-on-surface';
+      banner.textContent = `Connecting to ${platform.toUpperCase()} API for live authentication check...`;
+
+      const inputs = document.querySelectorAll('#cfgDynamicFields input[data-cred-key]');
+      const credentials = {};
+      inputs.forEach(inp => {
+        const k = inp.getAttribute('data-cred-key');
+        if (inp.value && inp.value.trim()) {
+          credentials[k] = inp.value.trim();
+        }
+      });
+
+      try {
+        let endpoint = '/api/platforms/meta/diagnose';
+        let body = {};
+        if (platform === 'threads') {
+          endpoint = '/api/platforms/threads/diagnose';
+          body = { token: credentials.THREADS_ACCESS_TOKEN };
+        } else if (platform === 'facebook' || platform === 'instagram') {
+          endpoint = '/api/platforms/meta/diagnose';
+          body = {
+            token: credentials.META_PAGE_ACCESS_TOKEN,
+            page_id: credentials.META_PAGE_ID
+          };
+        } else {
+          const res = await fetch('/api/platforms/configure', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ platform, credentials })
+          });
+          const data = await res.json();
+          const conn = data.connection || {};
+          banner.className = conn.configured
+            ? 'p-3 rounded-xl font-mono text-[11px] bg-emerald-500/15 text-emerald-900 font-bold'
+            : 'p-3 rounded-xl font-mono text-[11px] bg-amber-500/15 text-amber-900 font-bold';
+          banner.textContent = `${conn.status_badge || 'DIAGNOSED'}: ${conn.diagnostic || ''}`;
+          showToast(conn.configured ? 'success' : 'warning', `${platform.toUpperCase()} Diagnosis`, conn.diagnostic || 'Diagnostics complete.');
+          return;
+        }
+
+        const res = await fetch(endpoint, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body)
+        });
+        const diag = await res.json();
+
+        const isOk = diag.configured || diag.status === 'ready' || diag.can_post_facebook;
+        banner.className = isOk
+          ? 'p-3 rounded-xl font-mono text-[11px] bg-emerald-500/15 text-emerald-900 font-bold space-y-1.5'
+          : 'p-3 rounded-xl font-mono text-[11px] bg-amber-500/15 text-amber-900 font-bold space-y-1.5';
+
+        let html = `<div>${escapeHtml(diag.status_badge || 'STATUS')}: ${escapeHtml(diag.diagnostic || '')}</div>`;
+        if (diag.token_type) {
+          html += `<div class="text-[10px] opacity-80">Token Type: ${escapeHtml(diag.token_type)} | Page: ${escapeHtml(diag.page_name || '')} (${escapeHtml(diag.page_id || '')})</div>`;
+        }
+        if (diag.instagram_account_id && diag.instagram_account_id !== 'not_linked') {
+          html += `<div class="text-[10px] text-fuchsia-800">Linked Instagram: ${escapeHtml(diag.instagram_username || diag.instagram_account_id)} (ID: ${escapeHtml(diag.instagram_account_id)})</div>`;
+        }
+        if (diag.username) {
+          html += `<div class="text-[10px] text-stone-800">Threads User: @${escapeHtml(diag.username)} (Quota: ${diag.quota_usage ?? 0}/${diag.quota_total ?? 250})</div>`;
+        }
+        if (diag.scopes && diag.scopes.length) {
+          html += `<div class="flex flex-wrap gap-1 mt-1">${diag.scopes.map(s => `<span class="px-1.5 py-0.2 rounded bg-white/70 text-[9px] font-mono">${escapeHtml(s)}</span>`).join('')}</div>`;
+        }
+        if (diag.exchanged_page_token) {
+          html += `<div class="text-[10px] text-emerald-800 font-semibold mt-1">✓ User token was auto-exchanged for permanent Page Access Token! Click "Save" to persist it.</div>`;
+        }
+        banner.innerHTML = html;
+        showToast(isOk ? 'success' : 'warning', `${platform.toUpperCase()} Diagnosis`, diag.diagnostic || diag.status_badge);
+      } catch (err) {
+        banner.className = 'p-3 rounded-xl font-mono text-[11px] bg-error-container text-error';
+        banner.textContent = `Diagnostic Error: ${err}`;
+        showToast('error', 'Diagnostic Failed', String(err));
+      } finally {
+        if (btn) {
+          btn.disabled = false;
+          btn.innerHTML = origText;
+        }
+      }
     }
 
     async function savePlatformTokens() {
@@ -1469,6 +1692,7 @@
           ? 'p-3 rounded-xl font-mono text-[11px] bg-emerald-500/15 text-emerald-900 font-bold'
           : 'p-3 rounded-xl font-mono text-[11px] bg-amber-500/15 text-amber-900 font-bold';
         banner.textContent = `${conn.status_badge || 'UPDATED'}: ${conn.diagnostic || ''}`;
+        showToast(conn.configured ? 'success' : 'warning', `${platform.toUpperCase()} Updated`, conn.diagnostic || 'Credentials saved.');
         await loadPlatformsReachSummary();
         if (activeWorkspace === 'platform') {
           await loadPlatformLedger(activePlatform);
@@ -1476,6 +1700,7 @@
       } catch (err) {
         banner.className = 'p-3 rounded-xl font-mono text-[11px] bg-error-container text-error';
         banner.textContent = `Error: ${err}`;
+        showToast('error', 'Token Save Error', String(err));
       }
     }
 
