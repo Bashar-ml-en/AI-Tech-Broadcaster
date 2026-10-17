@@ -658,7 +658,7 @@ def render_motion_video(
 
     writer.close()
 
-    # Mux video with synthesized audio using FFmpeg
+    # Mux video with synthesized audio using FFmpeg into Full HD 1080x1920 (9:16) 30fps + 44.1kHz Stereo AAC
     ffmpeg_exe = imageio_ffmpeg.get_ffmpeg_exe()
     output_video_path.parent.mkdir(parents=True, exist_ok=True)
     if output_video_path.exists():
@@ -669,8 +669,16 @@ def render_motion_video(
         "-y",
         "-i", str(temp_raw_video),
         "-i", str(audio_path),
-        "-c:v", "copy",
+        "-vf", "scale=1080:1920:flags=lanczos,unsharp=3:3:0.5:3:3:0.0",
+        "-r", "30",
+        "-c:v", "libx264",
+        "-preset", "veryfast",
+        "-crf", "20",
+        "-pix_fmt", "yuv420p",
+        "-movflags", "+faststart",
         "-c:a", "aac",
+        "-ar", "44100",
+        "-ac", "2",
         "-b:a", "192k",
         "-shortest",
         str(output_video_path)

@@ -299,7 +299,7 @@ def poll_publish_status(
     max_wait_sec: int = 600,
     poll_interval: int = 5
 ) -> Dict[str, Any]:
-    """Poll status of uploaded TikTok video until PUBLISH_COMPLETE or FAILED."""
+    """Poll status of uploaded TikTok video until PUBLISH_COMPLETE, SEND_TO_USER_INBOX, or FAILED."""
     url = f"{TIKTOK_API_BASE}/post/publish/status/fetch/"
     headers = {
         "Authorization": f"Bearer {access_token}",
@@ -317,7 +317,7 @@ def poll_publish_status(
                 data = res_json.get("data", {})
                 status = data.get("status")
                 logger.info("[TikTok] Publish %s status: %s (elapsed %.1fs)", publish_id, status, time.time() - start)
-                if status in ("PUBLISH_COMPLETE", "SUCCESS"):
+                if status in ("PUBLISH_COMPLETE", "SEND_TO_USER_INBOX", "SUCCESS"):
                     return {
                         "success": True,
                         "status": status,
@@ -338,6 +338,120 @@ def poll_publish_status(
         backoff = min(backoff + 2, 20)
 
     return {"success": False, "status": "TIMEOUT", "fail_reason": f"Publish timed out after {max_wait_sec}s"}
+
+
+def _notify_telegram_inbox_caption(
+    client: httpx.Client,
+    creator_username: Optional[str],
+    publish_id: str,
+    title: Optional[str]
+) -> None:
+    """Send a Telegram helper alert with the ready-to-paste caption when a video arrives in TikTok Inbox."""
+    bot_token = os.getenv("TELEGRAM_BOT_TOKEN", "").strip()
+    chat_id = os.getenv("TELEGRAM_CHAT_ID", "").strip()
+    if not bot_token or not chat_id or not title:
+        return
+    handle = (creator_username or "eraofai8").lstrip("@")
+    msg = (
+        f"📲 <b>TikTok Full HD (1080x1920) Ready in Inbox (@{handle})</b>\n\n"
+        f"1️⃣ Open the <b>TikTok App</b> on your phone (@{handle}) → tap <b>Inbox (System Notifications)</b> → <i>'Your video is ready to post'</i>.\n"
+        f"2️⃣ Paste this caption and tap <b>Post (Everyone)</b> for full For You Page reach:\n\n"
+        f"<code>{title[:800]}</code>"
+    )
+    try:
+        client.post(
+            f"https://api.telegram.org/bot{bot_token}/sendMessage",
+            json={"chat_id": chat_id, "text": msg, "parse_mode": "HTML", "disable_web_page_preview": True},
+            timeout=10.0,
+        )
+    except Exception as e:
+        logger.debug("[TikTok] Optional Telegram caption helper failed: %s", e)
+
+
+def upload_video_to_tiktok_inbox(
+    client: httpx.Client,
+    local_file: Path,
+    access_token: str,
+    title: Optional[str] = None,
+    creator_username: Optional[str] = None
+) -> Dict[str, Any]:
+    """
+    Upload MP4 video to TikTok Creator Inbox (/v2/post/publish/inbox/video/init/).
+    Allows unaudited apps to deliver a ready-to-post draft notification to the TikTok mobile app
+    so the creator can publish with PUBLIC_TO_EVERYONE visibility and full FYP reach in 1 tap.
+    """
+    file_size = local_file.stat().st_size
+    chunk_size, total_chunks = calculate_chunks(file_size)
+
+    inbox_url = f"{TIKTOK_API_BASE}/post/publish/inbox/video/init/"
+    headers = {
+        "Authorization": f"Bearer {access_token}",
+        "Content-Type": "application/json; charset=UTF-8"
+    }
+    payload = {
+        "source_info": {
+            "source": "FILE_UPLOAD",
+            "video_size": file_size,
+            "chunk_size": chunk_size,
+            "total_chunk_count": total_chunks
+        }
+    }
+
+    resp = client.post(inbox_url, headers=headers, json=payload)
+    if resp.status_code != 200:
+        return {
+            "success": False,
+            "error_code": "INBOX_INIT_FAILED",
+            "error_message": f"TikTok inbox video init failed ({resp.status_code}): {resp.text}"
+        }
+
+    res_json = resp.json()
+    data = res_json.get("data", {})
+    publish_id = data.get("publish_id")
+    upload_url = data.get("upload_url")
+
+    if not publish_id or not upload_url:
+        err = res_json.get("error", {})
+        return {
+            "success": False,
+            "error_code": err.get("code", "INBOX_RESPONSE_INVALID"),
+            "error_message": err.get("message", f"Missing publish_id/upload_url in inbox init: {resp.text}")
+        }
+
+    with open(local_file, "rb") as f:
+        for chunk_idx in range(total_chunks):
+            chunk_bytes = f.read(chunk_size)
+            start_byte = chunk_idx * chunk_size
+            end_byte = start_byte + len(chunk_bytes) - 1
+            put_headers = {
+                "Content-Range": f"bytes {start_byte}-{end_byte}/{file_size}",
+                "Content-Type": "video/mp4",
+                "Content-Length": str(len(chunk_bytes))
+            }
+            put_resp = client.put(upload_url, headers=put_headers, content=chunk_bytes)
+            if put_resp.status_code not in (200, 201, 206):
+                return {
+                    "success": False,
+                    "error_code": "INBOX_CHUNK_FAILED",
+                    "error_message": f"Inbox chunk #{chunk_idx} failed ({put_resp.status_code}): {put_resp.text}"
+                }
+
+    poll_res = poll_publish_status(client, publish_id, access_token, max_wait_sec=600)
+    if not poll_res.get("success"):
+        return {
+            "success": False,
+            "error_code": poll_res.get("fail_reason", "INBOX_POLL_FAILED"),
+            "error_message": f"Inbox video processing failed: {poll_res.get('fail_reason')}"
+        }
+
+    _notify_telegram_inbox_caption(client, creator_username, publish_id, title)
+
+    return {
+        "success": True,
+        "publish_id": publish_id,
+        "status": poll_res.get("status", "SEND_TO_USER_INBOX"),
+        "publically_available_post_id": poll_res.get("publically_available_post_id", [])
+    }
 
 
 def resolve_tiktok_permalink(
@@ -367,7 +481,7 @@ def diagnose_tiktok_connection(
 ) -> Dict[str, Any]:
     """
     Comprehensive live diagnostic health-check for TikTok Content Posting API v2.
-    Checks OAuth2 token validity/auto-refresh, queries creator_info, and caches handle metadata.
+    Checks OAuth2 token validity/auto-refresh, queries creator_info, and checks Sandbox/Private Account reach status.
     """
     tok_data = load_persisted_token()
     if access_token and access_token.strip():
@@ -405,19 +519,40 @@ def diagnose_tiktok_connection(
     ttl_hours = max(0.0, round((expires_at - now) / 3600, 1)) if expires_at else 24.0
     refresh_days = max(0, int((refresh_expires_at - now) / 86400)) if refresh_expires_at else 365
 
+    ck = os.getenv("TIKTOK_CLIENT_KEY", "").strip() or TIKTOK_CLIENT_KEY
+    is_sandbox_key = ck.startswith("sb")
+    publish_method = os.getenv("TIKTOK_PUBLISH_METHOD", "auto").strip().lower()
+
     if creator_res.get("success"):
         cdata = creator_res.get("data", {})
         username = cdata.get("creator_username") or tok_data.get("creator_username") or "eraofai8"
         nickname = cdata.get("creator_nickname") or tok_data.get("creator_nickname") or "Ai_updats"
         privacy_opts = cdata.get("privacy_level_options", [])
         max_dur = cdata.get("max_video_post_duration_sec", 3600)
+        account_is_private = "PUBLIC_TO_EVERYONE" not in privacy_opts
 
         # Persist creator metadata for fast sidebar lookup
-        if tok_data.get("creator_username") != username or tok_data.get("creator_nickname") != nickname:
+        if (
+            tok_data.get("creator_username") != username
+            or tok_data.get("creator_nickname") != nickname
+            or tok_data.get("privacy_level_options") != privacy_opts
+        ):
             tok_data["creator_username"] = username
             tok_data["creator_nickname"] = nickname
             tok_data["privacy_level_options"] = privacy_opts
             save_persisted_token(tok_data)
+
+        warnings_list = []
+        if account_is_private:
+            warnings_list.append(
+                f"Account @{username} has 'Private Account' enabled in TikTok app (PUBLIC_TO_EVERYONE missing). "
+                "Go to TikTok App -> Profile -> Menu -> Settings and privacy -> Privacy -> turn 'Private account' OFF."
+            )
+        if is_sandbox_key:
+            warnings_list.append(
+                f"Client Key ({ck[:6]}...) is a TikTok Sandbox / Unaudited key. Direct Posts default to SELF_ONLY "
+                "(Private Lock tab). Use Inbox Draft mode or flip privacy to 'Everyone' in the TikTok app Lock tab."
+            )
 
         return {
             "configured": True,
@@ -427,16 +562,20 @@ def diagnose_tiktok_connection(
             "nickname": nickname,
             "open_id": tok_data.get("open_id") or TIKTOK_OPEN_ID,
             "privacy_level_options": privacy_opts,
+            "account_is_private": account_is_private,
+            "is_sandbox_key": is_sandbox_key,
+            "publish_method": publish_method,
             "max_video_post_duration_sec": max_dur,
             "token_ttl_hours": ttl_hours,
             "refresh_ttl_days": refresh_days,
             "is_permanent": True,
             "expiry_description": f"Auto-Rotating OAuth2 Refresh Token ({refresh_days}d remaining, Access TTL: {ttl_hours}h)",
             "scopes": ["video.publish", "video.upload", "user.info.basic"],
+            "warnings": warnings_list,
             "diagnostic": (
-                f"Connected live to TikTok @{username} ({nickname}). "
+                f"Connected live to TikTok @{username} ({nickname}) [mode={publish_method.upper()}]. "
                 f"Privacy options: {', '.join(privacy_opts) or 'SELF_ONLY'}. "
-                f"Max video duration: {max_dur}s."
+                + (" | WARNING: " + " ".join(warnings_list) if warnings_list else f"Max video duration: {max_dur}s.")
             ),
         }
 
@@ -651,7 +790,40 @@ def publish_to_tiktok(
             note = "private_unaudited_app"
             logger.warning("[TikTok] Creator query returned error; defaulting to SELF_ONLY: %s", creator_res.get("error"))
 
-        # Step 2: Video Init
+        publish_method = os.getenv("TIKTOK_PUBLISH_METHOD", "auto").strip().lower()
+
+        # If explicitly set to 'inbox', deliver directly to TikTok Creator Inbox for 1-tap PUBLIC_TO_EVERYONE posting
+        if publish_method == "inbox":
+            logger.info("[TikTok] Using INBOX draft upload (/v2/post/publish/inbox/video/init/) for public reach...")
+            inbox_res = upload_video_to_tiktok_inbox(c, local_file, token, title=title, creator_username=creator_username)
+            if not inbox_res.get("success"):
+                return PlatformResult(
+                    platform="tiktok",
+                    status="failed",
+                    mode="live",
+                    error_code=inbox_res.get("error_code", "INBOX_UPLOAD_FAILED"),
+                    error_message=inbox_res.get("error_message", "TikTok inbox upload failed"),
+                    attempts=1,
+                    latency_ms=int((time.time() - start_time) * 1000)
+                )
+            pub_id = inbox_res["publish_id"]
+            permalink = resolve_tiktok_permalink(
+                publish_id=pub_id,
+                creator_username=creator_username,
+                public_ids=inbox_res.get("publically_available_post_id"),
+            )
+            return PlatformResult(
+                platform="tiktok",
+                status="published",
+                mode="live",
+                remote_id=pub_id,
+                permalink=permalink,
+                attempts=1,
+                latency_ms=int((time.time() - start_time) * 1000),
+                note="inbox_draft_ready_for_public_post"
+            )
+
+        # Step 2: Direct Video Init (/v2/post/publish/video/init/)
         file_size = local_file.stat().st_size
         chunk_size, total_chunks = calculate_chunks(file_size)
 
@@ -687,6 +859,32 @@ def publish_to_tiktok(
             note = "private_unaudited_app"
             init_payload["post_info"]["privacy_level"] = "SELF_ONLY"
             init_resp = c.post(init_url, headers=init_headers, json=init_payload)
+
+        # When the target TikTok account is PUBLIC, TikTok blocks /video/init/ even with SELF_ONLY for unaudited apps.
+        # Automatically fall back to Creator Inbox Upload (/v2/post/publish/inbox/video/init/) which works on Public Accounts!
+        if init_resp.status_code != 200 and "unaudited_client_can_only_post_to_private_accounts" in init_resp.text:
+            logger.info(
+                "[TikTok] Target account @%s is PUBLIC and app is unaudited; routing to Creator Inbox (/v2/post/publish/inbox/video/init/) for public FYP reach...",
+                creator_username or "eraofai8"
+            )
+            inbox_res = upload_video_to_tiktok_inbox(c, local_file, token, title=title, creator_username=creator_username)
+            if inbox_res.get("success"):
+                pub_id = inbox_res["publish_id"]
+                permalink = resolve_tiktok_permalink(
+                    publish_id=pub_id,
+                    creator_username=creator_username,
+                    public_ids=inbox_res.get("publically_available_post_id"),
+                )
+                return PlatformResult(
+                    platform="tiktok",
+                    status="published",
+                    mode="live",
+                    remote_id=pub_id,
+                    permalink=permalink,
+                    attempts=1,
+                    latency_ms=int((time.time() - start_time) * 1000),
+                    note="inbox_draft_public_account"
+                )
 
         if init_resp.status_code != 200:
             return PlatformResult(
@@ -767,6 +965,15 @@ def publish_to_tiktok(
                 attempts=1,
                 latency_ms=int((time.time() - start_time) * 1000)
             )
+
+        # Optional Dual-Delivery to Inbox when unaudited SELF_ONLY was forced and publish_method == 'dual'
+        if privacy_level == "SELF_ONLY" and publish_method == "dual":
+            try:
+                inbox_res = upload_video_to_tiktok_inbox(c, local_file, token, title=title, creator_username=creator_username)
+                if inbox_res.get("success"):
+                    note = f"private_unaudited_app+inbox_draft:{inbox_res.get('publish_id')}"
+            except Exception as inbox_err:
+                logger.warning("[TikTok] Dual-delivery inbox mirror failed: %s", inbox_err)
 
         permalink = resolve_tiktok_permalink(
             publish_id=publish_id,

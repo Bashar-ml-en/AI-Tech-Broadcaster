@@ -1524,8 +1524,9 @@
           { key: 'THREADS_USER_ID', label: 'Threads User ID (optional — auto-discovered via /v1.0/me)', placeholder: 'Auto-discovered if blank' }
         ],
         tiktok: [
-          { key: 'TIKTOK_ACCESS_TOKEN', label: 'TikTok Access Token (act...)', placeholder: 'act.example...' },
-          { key: 'TIKTOK_REFRESH_TOKEN', label: 'TikTok Refresh Token (rft...)', placeholder: 'rft.example...' }
+          { key: 'TIKTOK_ACCESS_TOKEN', label: 'TikTok Access Token (act... — optional if already linked)', placeholder: 'Leave blank to keep active auto-refreshing token' },
+          { key: 'TIKTOK_REFRESH_TOKEN', label: 'TikTok Refresh Token (rft... — optional if already linked)', placeholder: 'Leave blank to keep active 365d refresh token' },
+          { key: 'TIKTOK_PUBLISH_METHOD', label: 'TikTok Delivery Mode (auto | inbox | direct | dual)', placeholder: 'auto (or inbox for 1-tap Public FYP draft, dual for both)' }
         ],
         telegram: [
           { key: 'TELEGRAM_BOT_TOKEN', label: 'Telegram Bot Token', placeholder: '123456:ABC-DEF...' },
@@ -1536,7 +1537,7 @@
       let html = fields.map(f => `
         <div>
           <label class="block font-mono text-[10px] uppercase text-on-surface-variant mb-1">${escapeHtml(f.label)}</label>
-          <input data-cred-key="${escapeHtml(f.key)}" type="password" placeholder="${escapeHtml(f.placeholder)}" class="w-full px-3 py-1.5 rounded-lg bg-surface-container border border-outline-variant font-mono text-xs"/>
+          <input data-cred-key="${escapeHtml(f.key)}" type="${f.key.includes('METHOD') || f.key.includes('ID') ? 'text' : 'password'}" placeholder="${escapeHtml(f.placeholder)}" class="w-full px-3 py-1.5 rounded-lg bg-surface-container border border-outline-variant font-mono text-xs"/>
         </div>
       `).join('');
 
@@ -1586,18 +1587,18 @@
         `;
       } else if (platform === 'tiktok') {
         html += `
-          <div class="p-2.5 rounded-lg bg-surface-container border border-outline-variant/60 space-y-1 mt-2">
+          <div class="p-2.5 rounded-lg bg-surface-container border border-outline-variant/60 space-y-1.5 mt-2">
             <div class="flex items-center justify-between">
               <span class="font-mono text-[10px] text-emerald-800 font-bold flex items-center gap-1.5">
                 <span class="w-1.5 h-1.5 rounded-full bg-emerald-600 animate-pulse"></span>
-                <span>TIKTOK CONTENT POSTING API v2 // AUTO-REFRESH</span>
+                <span>TIKTOK CONTENT POSTING API v2 // FULL HD 1080x1920</span>
               </span>
               <a href="https://www.tiktok.com/@eraofai8" target="_blank" rel="noopener noreferrer" class="text-[10px] text-sky-700 hover:underline font-mono inline-flex items-center gap-0.5">
-                <span>@eraofai8 ↗</span>
+                <span>@eraofai8 (Ai_updats) ↗</span>
               </a>
             </div>
             <p class="text-[11px] text-on-surface-variant leading-snug">
-              Connected via 365-day rotating OAuth2 Refresh Token (<code class="font-mono text-[10px] bg-white/70 px-1 py-0.5 rounded">video.publish, video.upload</code>). Static carousels &amp; stories automatically compile into 9:16 H.264 MP4 Reels on dispatch.
+              <strong>Why Unaudited Direct Posts Land in the Lock 🔒 Tab:</strong> TikTok restricts unaudited apps (<code class="font-mono text-[10px]">sb...</code>) on Direct Post to <code class="font-mono text-[10px]">SELF_ONLY</code>. Set Delivery Mode to <strong><code class="font-mono text-[10px]">inbox</code></strong> or <strong><code class="font-mono text-[10px]">dual</code></strong> to also push videos to your <strong>TikTok App Inbox Notification</strong> for 1-tap <strong>Public (Everyone)</strong> For You Page reach, and ensure <strong>Private Account is OFF</strong> in TikTok App &rarr; Settings &amp; privacy &rarr; Privacy!
             </p>
           </div>
         `;

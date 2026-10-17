@@ -283,6 +283,8 @@ def get_platform_connection_state(platform: str) -> Dict[str, Any]:
         ttl_hours = max(0, round((expires_at - time.time()) / 3600, 1)) if expires_at else 0
         tt_user = tok.get("creator_username")
         tt_nick = tok.get("creator_nickname")
+        priv_opts = tok.get("privacy_level_options", [])
+        pub_method = os.getenv("TIKTOK_PUBLISH_METHOD", "auto").strip().lower()
         if configured:
             if tt_user:
                 account_label = f"@{tt_user}" + (f" ({tt_nick})" if tt_nick else "")
@@ -290,15 +292,21 @@ def get_platform_connection_state(platform: str) -> Dict[str, Any]:
                 account_label = f"open_id:{(tok.get('open_id') or os.getenv('TIKTOK_OPEN_ID', ''))[:10]}..."
         else:
             account_label = "Unlinked"
+        priv_note = (
+            "Public Ready"
+            if "PUBLIC_TO_EVERYONE" in priv_opts
+            else "Private Account ON in TikTok App (Lock 🔒 tab / Inbox Draft mode)"
+        )
         return {
             "configured": configured,
             "mode": "live" if configured and is_live_eligible else "simulated",
             "status_badge": "LIVE CONNECTED" if configured else "OAUTH REQUIRED",
             "account": account_label,
+            "publish_method": pub_method,
             "token_ttl_hours": ttl_hours,
-            "env_keys": ["TIKTOK_CLIENT_KEY", "TIKTOK_CLIENT_SECRET", "TIKTOK_ACCESS_TOKEN", "TIKTOK_REFRESH_TOKEN"],
+            "env_keys": ["TIKTOK_CLIENT_KEY", "TIKTOK_CLIENT_SECRET", "TIKTOK_ACCESS_TOKEN", "TIKTOK_REFRESH_TOKEN", "TIKTOK_PUBLISH_METHOD"],
             "diagnostic": (
-                f"Connected to {account_label} (OAuth2 TTL: {ttl_hours}h). Non-reel posts auto-compile to 9:16 MP4 video."
+                f"Connected to {account_label} [mode={pub_method.upper()}, {priv_note}, TTL: {ttl_hours}h]. All formats auto-compile to 1080x1920 Full HD MP4."
                 if configured else "Authorize TikTok v2 OAuth or provide TIKTOK_ACCESS_TOKEN."
             ),
         }
@@ -933,7 +941,15 @@ class PublishingSubagentOrchestrator:
         p = platform.lower()
         allowed_keys = {
             "telegram": ["TELEGRAM_BOT_TOKEN", "TELEGRAM_CHANNEL_ID", "TELEGRAM_CHAT_ID"],
-            "tiktok": ["TIKTOK_CLIENT_KEY", "TIKTOK_CLIENT_SECRET", "TIKTOK_ACCESS_TOKEN", "TIKTOK_REFRESH_TOKEN", "TIKTOK_OPEN_ID"],
+            "tiktok": [
+                "TIKTOK_CLIENT_KEY",
+                "TIKTOK_CLIENT_SECRET",
+                "TIKTOK_ACCESS_TOKEN",
+                "TIKTOK_REFRESH_TOKEN",
+                "TIKTOK_OPEN_ID",
+                "TIKTOK_PUBLISH_METHOD",
+                "TIKTOK_PRIVACY_LEVEL",
+            ],
             "facebook": ["META_PAGE_ACCESS_TOKEN", "META_PAGE_ID"],
             "instagram": ["META_PAGE_ACCESS_TOKEN", "META_INSTAGRAM_ACCOUNT_ID", "META_PAGE_ID"],
             "threads": ["THREADS_ACCESS_TOKEN", "THREADS_USER_ID"],
