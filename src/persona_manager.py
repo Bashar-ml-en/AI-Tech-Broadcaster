@@ -319,38 +319,66 @@ PERSONA_REGISTRY: Dict[str, Dict[str, Any]] = {
 
 def detect_persona(text: str, context: str = "") -> Dict[str, Any]:
     """
-    Detect the exact company CEO persona from headline, context, or source URL.
+    Detect the exact company CEO persona from headline, context, or source URL
+    using strict word-boundary matching so boilerplate words never cause false matches.
     Prioritizes explicit company/model matches (e.g. Google -> Sundar Pichai, OpenAI -> Sam Altman).
     """
-    combined = f"{text} {context}".lower()
+    import re
+
+    primary = (text or "").lower()
+    secondary = (context or "").lower()
+    combined = f"{primary} {secondary}"
     matched = None
 
-    # Check specific DeepMind scientific keywords first if explicitly DeepMind-only
-    if any(k in combined for k in ["alphafold", "alphageometry", "alphagenome", "hassabis"]):
+    def _has_word(haystack: str, kw: str) -> bool:
+        return bool(re.search(r"\b" + re.escape(kw.lower()) + r"\b", haystack))
+
+    # 1. Check primary headline first for explicit company/CEO/model keywords
+    if any(_has_word(primary, k) for k in ["alphafold", "alphageometry", "alphagenome", "hassabis", "deepmind"]):
         matched = PERSONA_REGISTRY["demis_hassabis"]
     else:
         for pid, data in PERSONA_REGISTRY.items():
             if pid == "default_titan":
                 continue
-            if any(kw in combined for kw in data["keywords"]):
+            if any(_has_word(primary, kw) for kw in data["keywords"]):
                 matched = data
                 break
 
+    # 2. Check secondary context if headline didn't name a specific company
+    if matched is None and secondary:
+        for pid, data in PERSONA_REGISTRY.items():
+            if pid == "default_titan":
+                continue
+            if any(_has_word(secondary, kw) for kw in data["keywords"]):
+                matched = data
+                break
+
+    # 3. Topic-based executive host fallback
     if matched is None:
-        # Rotate / select executive host based on topic keywords
-        if any(w in combined for w in ["gpu", "chip", "hardware", "circuit", "analog", "kernel", "cuda"]):
+        if any(_has_word(combined, w) for w in ["gpu", "chip", "hardware", "cuda", "blackwell", "rubin", "npu"]):
             matched = PERSONA_REGISTRY["jensen_huang"]
-        elif any(w in combined for w in ["agent", "safety", "verifier", "alignment", "tool"]):
+        elif any(_has_word(combined, w) for w in ["claude", "anthropic", "constitutional"]):
             matched = PERSONA_REGISTRY["dario_amodei"]
-        elif any(w in combined for w in ["open-source", "weights", "huggingface", "arxiv", "lean"]):
+        elif any(_has_word(combined, w) for w in ["deepseek", "open-weights", "moe"]):
             matched = PERSONA_REGISTRY["liang_wenfeng"]
+        elif any(_has_word(combined, w) for w in ["llama", "meta", "pytorch"]):
+            matched = PERSONA_REGISTRY["mark_zuckerberg"]
+        elif any(_has_word(combined, w) for w in ["copilot", "github", "azure", "microsoft"]):
+            matched = PERSONA_REGISTRY["satya_nadella"]
+        elif any(_has_word(combined, w) for w in ["openai", "gpt", "chatgpt", "sora"]):
+            matched = PERSONA_REGISTRY["sam_altman"]
         else:
             matched = PERSONA_REGISTRY["sundar_pichai"]
 
     res = dict(matched)
+    res["company"] = res.get("lab", "Google")
     res["role"] = res.get("role", res.get("title", "Chief Executive Officer"))
     res["quote"] = res.get("quote", res.get("default_quote", ""))
     return res
+
+
+get_persona = detect_persona
+get_persona_for_lab = detect_persona
 
 
 def get_persona_portrait(persona: Dict[str, Any], target_size: Tuple[int, int] = (520, 620)) -> Image.Image:

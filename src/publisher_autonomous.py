@@ -345,10 +345,12 @@ def dispatch_autonomous_broadcast(
         }
         logger.info(json.dumps(log_payload))
 
-    # 5. Persist outcome to database
+    # 5. Persist outcome to database & sync state to seed_history.db / R2
     try:
         from src.pipeline import update_publish_outcome
         update_publish_outcome(post_id, dispatch_result)
+        from src.r2_storage import sync_state_to_cloud
+        sync_state_to_cloud()
     except Exception as e:
         logger.error("[Dispatcher] Failed to persist outcome to DB for post %s: %s", post_id, e)
 

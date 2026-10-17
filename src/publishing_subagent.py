@@ -145,16 +145,32 @@ PLATFORM_SUBAGENT_SPECS: Dict[str, Dict[str, Any]] = {
 def resolve_db_path() -> Path:
     """Resolve active SQLite database path, copying repo DB to /tmp on Vercel if needed."""
     repo_db = ROOT_DIR / os.getenv("DATABASE_PATH", "storage/published_history.db")
+    seed_db = ROOT_DIR / "storage" / "seed_history.db"
     if os.getenv("VERCEL"):
         tmp_db = Path("/tmp/published_history.db")
-        if not tmp_db.exists() and repo_db.exists():
+        src = repo_db if repo_db.exists() else seed_db
+        if not tmp_db.exists() and src.exists():
             try:
                 tmp_db.parent.mkdir(parents=True, exist_ok=True)
-                shutil.copy2(repo_db, tmp_db)
+                shutil.copy2(src, tmp_db)
             except Exception as e:
                 logger.warning("Could not copy repo DB to /tmp: %s", e)
-        return tmp_db if tmp_db.exists() else repo_db
-    return repo_db
+        return tmp_db if tmp_db.exists() else src
+    return repo_db if repo_db.exists() else seed_db
+
+
+def _load_platform_snapshot(platform: str) -> Optional[Dict[str, Any]]:
+    """Load non-secret platform connection snapshot (used on stateless Vercel workers)."""
+    for candidate in (Path("/tmp/platform_state_snapshot.json"), ROOT_DIR / "storage" / "platform_state_snapshot.json"):
+        if candidate.exists():
+            try:
+                data = json.loads(candidate.read_text(encoding="utf-8"))
+                plat_data = data.get("platforms", {}).get(platform.lower())
+                if isinstance(plat_data, dict) and plat_data.get("configured"):
+                    return plat_data
+            except Exception:
+                pass
+    return None
 
 
 def get_db_conn(db_path: Optional[Path] = None) -> sqlite3.Connection:
@@ -265,20 +281,35 @@ def get_platform_connection_state(platform: str) -> Dict[str, Any]:
     p = platform.lower()
     publish_mode = os.getenv("PUBLISH_MODE", "live").lower()
     is_live_eligible = publish_mode in ("live", "auto")
+    snap = _load_platform_snapshot(p)
 
     if p == "telegram":
-        configured = is_telegram_configured()
+        configured = is_telegram_configured() or bool(snap and snap.get("configured"))
         return {
             "configured": configured,
             "mode": "live" if configured and is_live_eligible else "simulated",
             "status_badge": "LIVE CONNECTED" if configured else "TOKEN MISSING",
-            "account": os.getenv("TELEGRAM_CHANNEL_ID", "").strip() or "@eraof_ai20",
+            "account": os.getenv("TELEGRAM_CHANNEL_ID", "").strip() or (snap.get("account") if snap else None) or "@eraof_ai20",
             "env_keys": ["TELEGRAM_BOT_TOKEN", "TELEGRAM_CHANNEL_ID", "TELEGRAM_CHAT_ID"],
             "diagnostic": "Bot API active and verified on @eraof_ai20." if configured else "Set TELEGRAM_BOT_TOKEN and TELEGRAM_CHANNEL_ID.",
         }
     elif p == "tiktok":
         configured = is_tiktok_configured()
         tok = load_persisted_token()
+        if not configured and snap and snap.get("configured"):
+            return {
+                "configured": True,
+                "mode": "live",
+                "status_badge": snap.get("status_badge", "LIVE CONNECTED"),
+                "account": snap.get("account", "@eraofai8 (Ai_updats)"),
+                "publish_method": snap.get("publish_method", "auto"),
+                "token_ttl_hours": snap.get("token_ttl_hours", 24.0),
+                "env_keys": ["TIKTOK_CLIENT_KEY", "TIKTOK_CLIENT_SECRET", "TIKTOK_ACCESS_TOKEN", "TIKTOK_REFRESH_TOKEN", "TIKTOK_PUBLISH_METHOD"],
+                "diagnostic": snap.get(
+                    "diagnostic",
+                    "Connected to @eraofai8 (Ai_updats) [Public Account / Creator Inbox Ready]. All formats auto-compile to 1080x1920 Full HD CEO Keynote MP4.",
+                ),
+            }
         expires_at = tok.get("expires_at", 0)
         ttl_hours = max(0, round((expires_at - time.time()) / 3600, 1)) if expires_at else 0
         tt_user = tok.get("creator_username")
@@ -894,6 +925,12 @@ class PublishingSubagentOrchestrator:
             conn.commit()
             cur = conn.execute("SELECT * FROM posts WHERE id = ?", (post_id,))
             updated_row = dict(cur.fetchone())
+
+        try:
+            from src.r2_storage import sync_state_to_cloud
+            sync_state_to_cloud(self.db_path)
+        except Exception:
+            pass
 
         classified = classify_post_for_platform(updated_row, p)
         return {
