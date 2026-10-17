@@ -1,5 +1,5 @@
 """
-AI Tech Broadcaster - Command-Line Management Utility
+AutoProdcaster - Command-Line Management Utility
 Usage:
     python manage.py studio        # Start Executive Management Web Studio & open browser
     python manage.py scan          # Trigger an immediate broadcast scan cycle
@@ -531,7 +531,7 @@ def cmd_tiktok_auth(code: Optional[str] = None, redirect_uri: Optional[str] = No
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="AI Tech Broadcaster Management CLI")
+    parser = argparse.ArgumentParser(description="AutoProdcaster Management CLI")
     subparsers = parser.add_subparsers(dest="command", help="Available management commands")
 
     subparsers.add_parser("status", help="Show system status and KPIs")

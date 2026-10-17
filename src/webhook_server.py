@@ -103,7 +103,7 @@ last_post_time: Optional[float] = None
 pipeline_phase = "idle"  # idle | scraping | qualifying | directing | rendering | awaiting_hitl | broadcasting
 phase_timestamp = time.time()
 
-app = FastAPI(title="AI Tech Broadcaster Executive Studio & Analytics Engine")
+app = FastAPI(title="AutoProdcaster — Autonomous Omnichannel Keynote Studio")
 
 # Mount staging directory for media asset streaming
 app.mount("/media", StaticFiles(directory=str(STAGING_DIR)), name="media")
@@ -924,7 +924,7 @@ def server_startup_event():
 def health_check():
     return {
         "status": "healthy",
-        "service": "AI Tech Broadcaster Executive Studio & Analytics Engine",
+        "service": "AutoProdcaster Autonomous Omnichannel Studio & Analytics Engine",
         "timestamp": time.time(),
         "sidecar_running": sidecar_running,
         "pipeline_phase": pipeline_phase
@@ -1851,7 +1851,7 @@ def executive_studio_dashboard():
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI Tech Broadcaster — Executive Studio & Analytics Engine</title>
+    <title>AutoProdcaster — Executive Studio & Analytics Engine</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
@@ -1877,7 +1877,7 @@ def executive_studio_dashboard():
             </div>
             <div>
                 <div class="flex items-center gap-2.5">
-                    <h1 class="font-extrabold text-lg text-white tracking-tight">AI Tech Broadcaster</h1>
+                    <h1 class="font-extrabold text-lg text-white tracking-tight">AutoProdcaster</h1>
                     <span class="text-[11px] font-mono font-bold px-2 py-0.5 rounded-full bg-cyan-500/10 text-cyan-400 border border-cyan-500/30">Executive Studio</span>
                     <span class="text-[11px] font-mono px-2 py-0.5 rounded-full bg-purple-500/10 text-purple-400 border border-purple-500/30">Brand: EraofAi</span>
                 </div>
