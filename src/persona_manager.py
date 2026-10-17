@@ -18,10 +18,13 @@ from typing import Dict, Any, Optional, Tuple
 from PIL import Image, ImageDraw, ImageFont
 
 ROOT_DIR = Path(__file__).resolve().parent.parent
-PERSONAS_DIR = ROOT_DIR / "storage" / "assets" / "personas"
+ASSETS_DIR = ROOT_DIR / "storage" / "assets"
+PERSONAS_DIR = ASSETS_DIR / "personas"
 PORTRAITS_DIR = PERSONAS_DIR / "portraits"
+STAGES_DIR = ASSETS_DIR / "stages"
 PERSONAS_DIR.mkdir(parents=True, exist_ok=True)
 PORTRAITS_DIR.mkdir(parents=True, exist_ok=True)
+STAGES_DIR.mkdir(parents=True, exist_ok=True)
 
 PERSONA_REGISTRY: Dict[str, Dict[str, Any]] = {
     "sundar_pichai": {
@@ -38,6 +41,7 @@ PERSONA_REGISTRY: Dict[str, Dict[str, Any]] = {
         "default_quote": "We are making Gemini and our AI infrastructure faster, more capable, and accessible to every developer globally.",
         "avatar_file": "sundar_pichai.png",
         "portrait_file": "sundar_pichai.jpg",
+        "stage_bg_file": "google_stage.jpg",
         "accent_color": (66, 133, 244),       # Google Blue
         "secondary_color": (234, 67, 53),     # Google Red
         "glow_color": (52, 168, 83),          # Google Green
@@ -68,6 +72,7 @@ PERSONA_REGISTRY: Dict[str, Dict[str, Any]] = {
         "default_quote": "This architecture marks our most significant leap in scientific discovery and real-time multimodal reasoning.",
         "avatar_file": "demis_hassabis.png",
         "portrait_file": "demis_hassabis.jpg",
+        "stage_bg_file": "google_stage.jpg",
         "accent_color": (99, 102, 241),       # DeepMind Indigo
         "secondary_color": (14, 165, 233),    # Cyan
         "glow_color": (129, 140, 248),
@@ -98,6 +103,7 @@ PERSONA_REGISTRY: Dict[str, Dict[str, Any]] = {
         "default_quote": "We believe test-time compute scaling and autonomous reasoning agents will fundamentally reshape software engineering.",
         "avatar_file": "sam_altman.png",
         "portrait_file": "sam_altman.jpg",
+        "stage_bg_file": "openai_stage.jpg",
         "accent_color": (16, 185, 129),       # OpenAI Emerald
         "secondary_color": (6, 182, 212),
         "glow_color": (52, 211, 153),
@@ -128,6 +134,7 @@ PERSONA_REGISTRY: Dict[str, Dict[str, Any]] = {
         "default_quote": "The entire computing stack is being reinvented from silicon to autonomous AI factories in real time.",
         "avatar_file": "jensen_huang.png",
         "portrait_file": "jensen_huang.jpg",
+        "stage_bg_file": "nvidia_stage.jpg",
         "accent_color": (118, 185, 0),        # NVIDIA Green
         "secondary_color": (16, 185, 129),
         "glow_color": (163, 230, 53),
@@ -158,6 +165,7 @@ PERSONA_REGISTRY: Dict[str, Dict[str, Any]] = {
         "default_quote": "Frontier models with verifiable alignment and agentic tool use are transforming how engineers build reliable systems.",
         "avatar_file": "dario_amodei.png",
         "portrait_file": "dario_amodei.jpg",
+        "stage_bg_file": "anthropic_stage.jpg",
         "accent_color": (217, 119, 6),        # Anthropic Amber
         "secondary_color": (245, 158, 11),
         "glow_color": (251, 191, 36),
@@ -188,6 +196,7 @@ PERSONA_REGISTRY: Dict[str, Dict[str, Any]] = {
         "default_quote": "Open source frontier AI ensures that every developer and company can build and own their intelligence stack.",
         "avatar_file": "mark_zuckerberg.png",
         "portrait_file": "mark_zuckerberg.jpg",
+        "stage_bg_file": "meta_stage.jpg",
         "accent_color": (2, 132, 199),        # Meta Blue
         "secondary_color": (56, 189, 248),
         "glow_color": (14, 165, 233),
@@ -218,6 +227,7 @@ PERSONA_REGISTRY: Dict[str, Dict[str, Any]] = {
         "default_quote": "Extreme architectural efficiency proves that frontier reasoning models can run openly at a fraction of legacy compute cost.",
         "avatar_file": "liang_wenfeng.png",
         "portrait_file": "liang_wenfeng.jpg",
+        "stage_bg_file": "deepseek_stage.jpg",
         "accent_color": (37, 99, 235),        # DeepSeek Royal Blue
         "secondary_color": (6, 182, 212),
         "glow_color": (96, 165, 250),
@@ -245,6 +255,7 @@ PERSONA_REGISTRY: Dict[str, Dict[str, Any]] = {
         "default_quote": "We are scaling maximum truth-seeking intelligence on the world's largest coherent supercomputing cluster.",
         "avatar_file": "elon_musk.png",
         "portrait_file": "elon_musk.jpg",
+        "stage_bg_file": "xai_stage.jpg",
         "accent_color": (148, 163, 184),
         "secondary_color": (56, 189, 248),
         "glow_color": (226, 232, 240),
@@ -272,6 +283,7 @@ PERSONA_REGISTRY: Dict[str, Dict[str, Any]] = {
         "default_quote": "We are building the copilot and agentic runtime layer to empower every developer and organization on the planet.",
         "avatar_file": "satya_nadella.png",
         "portrait_file": "satya_nadella.jpg",
+        "stage_bg_file": "microsoft_stage.jpg",
         "accent_color": (14, 165, 233),
         "secondary_color": (99, 102, 241),
         "glow_color": (56, 189, 248),
@@ -459,3 +471,24 @@ def get_circular_avatar(key_or_filename: str, size: int = 54) -> Optional[Image.
         except Exception:
             return None
     return None
+
+
+def get_persona_stage_background(persona: Dict[str, Any], target_size: Tuple[int, int] = (544, 960)) -> Image.Image:
+    """Load and return the authentic company keynote stage background for this persona."""
+    stage_file = persona.get("stage_bg_file", "google_stage.jpg")
+    candidates = [
+        STAGES_DIR / (f"{stage_file.replace('.jpg', '_544.jpg')}" if target_size[0] <= 544 else stage_file),
+        STAGES_DIR / stage_file,
+        STAGES_DIR / "google_stage.jpg",
+    ]
+    for p in candidates:
+        if p.exists():
+            try:
+                im = Image.open(p).convert("RGB")
+                return im.resize(target_size, Image.Resampling.LANCZOS)
+            except Exception:
+                continue
+
+    fallback = Image.new("RGB", target_size, (10, 16, 30))
+    return fallback
+

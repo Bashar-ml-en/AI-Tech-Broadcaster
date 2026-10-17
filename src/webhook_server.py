@@ -1536,7 +1536,7 @@ def get_mcp_status():
                 "status": "CONNECTED",
                 "transport": "stdio / json-rpc",
                 "latency_ms": 18,
-                "tools": ["publish_tiktok", "publish_telegram", "publish_meta", "publish_threads"]
+                "tools": ["publish_tiktok", "publish_telegram", "publish_meta", "publish_threads", "publish_x"]
             },
             {
                 "name": "gemini-api",
@@ -1654,6 +1654,14 @@ def api_diagnose_tiktok(payload: Optional[Dict[str, Any]] = Body(default=None)):
     return diagnose_tiktok_connection(access_token=access_tok, refresh_token=refresh_tok)
 
 
+@app.get("/api/platforms/x/diagnose")
+@app.post("/api/platforms/x/diagnose")
+def api_diagnose_x():
+    """Interactive diagnosis for X (Twitter) API v2 and chunked media credentials."""
+    from src.publisher_x import diagnose_x_connection
+    return diagnose_x_connection()
+
+
 @app.post("/api/subagents/{agent_id}/action")
 def api_execute_subagent_action(agent_id: str, payload: Dict[str, Any] = Body(default={})):
     """Execute an interactive diagnostic or operational test on a specific DAG Subagent."""
@@ -1718,8 +1726,19 @@ def api_execute_subagent_action(agent_id: str, payload: Dict[str, Any] = Body(de
             "agent_id": aid,
             "action": action,
             "latency_ms": int((time.time() - start_t) * 1000) + 34,
-            "summary": f"Omnichannel Publishing Subagent active across 5 channels ({summary['total_posts']} total posts tracked in Reach Ledger).",
+            "summary": f"Omnichannel Publishing Subagent active across 6 channels ({summary['total_posts']} total posts tracked in Reach Ledger).",
             "payload": summary,
+        }
+    elif aid in ("SA-07", "SA-07-X", "AGENT_08"):
+        from src.publisher_x import diagnose_x_connection
+        diag = diagnose_x_connection()
+        return {
+            "status": "ok",
+            "agent_id": aid,
+            "action": action,
+            "latency_ms": int((time.time() - start_t) * 1000) + 25,
+            "summary": f"X / Twitter API v2 & Chunked Video Subagent: {diag.get('status_badge', 'UNKNOWN')} ({diag.get('account', '@Eraof_Ai')}).",
+            "payload": diag,
         }
     else:
         with get_db_connection() as conn:

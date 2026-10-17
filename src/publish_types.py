@@ -8,7 +8,7 @@ from typing import TypedDict, Literal, Optional, List, Dict, Any
 # Platform publishing status states
 Status = Literal["published", "simulated", "skipped", "failed"]
 OverallStatus = Literal["published", "partial", "simulated", "failed", "blocked"]
-PlatformName = Literal["facebook", "instagram", "threads", "tiktok", "telegram"]
+PlatformName = Literal["facebook", "instagram", "threads", "tiktok", "telegram", "x"]
 
 
 class MediaRef(TypedDict, total=False):

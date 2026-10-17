@@ -157,6 +157,20 @@ def _run_platform_worker(
 
             return publish_to_tiktok(post_record, media=primary_media, allow_format_conversion=allow_conv)
 
+        elif platform == "x":
+            from src.publisher_x import is_x_configured, publish_to_x
+            if publish_mode == "live" and not is_x_configured():
+                return PlatformResult(
+                    platform="x",
+                    status="failed",
+                    mode="live",
+                    error_code="NOT_CONFIGURED",
+                    error_message="X (Twitter) credentials missing in live mode.",
+                    attempts=1,
+                    latency_ms=0
+                )
+            return publish_to_x(post_record, media_refs=media_refs)
+
         else:
             return PlatformResult(
                 platform=platform,  # type: ignore

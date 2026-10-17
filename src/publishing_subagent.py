@@ -64,9 +64,16 @@ from src.publisher_tiktok import (
     load_persisted_token,
 )
 
+from src.publisher_x import (
+    publish_to_x,
+    is_x_configured,
+    reload_x_credentials,
+    diagnose_x_connection,
+)
+
 logger = logging.getLogger("publishing_subagent")
 
-SUPPORTED_PLATFORMS = ("telegram", "tiktok", "facebook", "instagram", "threads")
+SUPPORTED_PLATFORMS = ("telegram", "tiktok", "facebook", "instagram", "threads", "x")
 
 PLATFORM_SUBAGENT_SPECS: Dict[str, Dict[str, Any]] = {
     "telegram": {
@@ -137,6 +144,20 @@ PLATFORM_SUBAGENT_SPECS: Dict[str, Dict[str, Any]] = {
             "Auto-discovers THREADS_USER_ID via GET /v1.0/me",
             "Publishes VIDEO, CAROUSEL, IMAGE, or auto-downgrades to TEXT + source link",
             "500-char word-boundary smart truncation & rate-limit quota inspection",
+        ],
+    },
+    "x": {
+        "platform": "x",
+        "subagent_id": "SA-07-X",
+        "name": "X / Twitter Content Subagent",
+        "role": "X API v2 Tweet, Thread & Chunked Video Publisher",
+        "account": "@Eraof_Ai (X)",
+        "protocol": "X API v2 & Chunked Media Upload v1.1",
+        "icon": "flutter_dash",
+        "capabilities": [
+            "X API v2 Tweet creation with automatic multi-tweet thread bursting",
+            "4-phase chunked Full HD 1080x1920 MP4 video upload with async transcode polling",
+            "Dual authentication: OAuth 1.0a User Context & OAuth 2.0 Bearer",
         ],
     },
 }
@@ -382,6 +403,17 @@ def get_platform_connection_state(platform: str) -> Dict[str, Any]:
                 f"Threads Graph API v1.0 active for user {uid}."
                 if configured else "Provide THREADS_ACCESS_TOKEN (THREADS_USER_ID is auto-discovered via /v1.0/me)."
             ),
+        }
+    elif p == "x":
+        configured = is_x_configured() or bool(snap and snap.get("configured"))
+        diag = diagnose_x_connection()
+        return {
+            "configured": configured,
+            "mode": "live" if configured and is_live_eligible else "simulated",
+            "status_badge": "LIVE CONNECTED" if configured else diag.get("status_badge", "NEEDS X API KEYS"),
+            "account": diag.get("account") or (snap.get("account") if snap else None) or "@Eraof_Ai",
+            "env_keys": ["X_API_KEY", "X_API_SECRET", "X_ACCESS_TOKEN", "X_ACCESS_TOKEN_SECRET", "X_BEARER_TOKEN"],
+            "diagnostic": diag.get("diagnostic", "Configure X API v2 keys in Configure Token."),
         }
     return {"configured": False, "mode": "simulated", "status_badge": "UNKNOWN", "account": "N/A", "env_keys": []}
 
@@ -859,6 +891,11 @@ class PublishingSubagentOrchestrator:
                     post_record,
                     media=media_refs
                 )
+            elif p == "x":
+                result = publish_to_x(
+                    post_record,
+                    media_refs=media_refs
+                )
             else:
                 return {"status": "error", "message": f"Unhandled platform {p}"}
         finally:
@@ -990,6 +1027,14 @@ class PublishingSubagentOrchestrator:
             "facebook": ["META_PAGE_ACCESS_TOKEN", "META_PAGE_ID"],
             "instagram": ["META_PAGE_ACCESS_TOKEN", "META_INSTAGRAM_ACCOUNT_ID", "META_PAGE_ID"],
             "threads": ["THREADS_ACCESS_TOKEN", "THREADS_USER_ID"],
+            "x": [
+                "X_API_KEY",
+                "X_API_SECRET",
+                "X_ACCESS_TOKEN",
+                "X_ACCESS_TOKEN_SECRET",
+                "X_BEARER_TOKEN",
+                "X_USERNAME",
+            ],
         }.get(p, [])
 
         updated_keys: List[str] = []
@@ -1080,6 +1125,12 @@ class PublishingSubagentOrchestrator:
             reload_threads_credentials()
         elif p == "tiktok":
             reload_tiktok_credentials()
+        elif p == "x":
+            try:
+                from src.publisher_x import reload_x_credentials
+                reload_x_credentials()
+            except Exception as e:
+                logger.debug("Failed to reload X credentials: %s", e)
 
         conn_state = get_platform_connection_state(p)
         return {

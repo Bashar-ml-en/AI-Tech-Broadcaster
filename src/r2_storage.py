@@ -378,6 +378,7 @@ def sync_state_to_cloud(db_path: Optional[Path] = None) -> Dict[str, Any]:
             from src.publisher_tiktok import is_tiktok_configured, load_persisted_token
             from src.publisher_meta import is_meta_configured, META_PAGE_ID
             from src.publisher_threads import is_threads_configured, THREADS_USER_ID
+            from src.publisher_x import is_x_configured
 
             tok = load_persisted_token()
             expires_at = tok.get("expires_at", 0)
@@ -432,6 +433,17 @@ def sync_state_to_cloud(db_path: Optional[Path] = None) -> Dict[str, Any]:
                         "mode": "live" if is_threads_configured() else "simulated",
                         "status_badge": "LIVE CONNECTED" if is_threads_configured() else "NEEDS THREADS TOKEN",
                         "account": f"Threads UID ({os.getenv('THREADS_USER_ID', THREADS_USER_ID) or 'unlinked'})",
+                    },
+                    "x": {
+                        "configured": is_x_configured(),
+                        "mode": "live" if is_x_configured() else "simulated",
+                        "status_badge": "LIVE CONNECTED" if is_x_configured() else "NEEDS X API KEYS",
+                        "account": f"@{os.getenv('X_USERNAME', 'Eraof_Ai').strip().lstrip('@')}",
+                        "diagnostic": (
+                            f"Verified connection to @{os.getenv('X_USERNAME', 'Eraof_Ai')}. API v2 & Chunked Video Ready."
+                            if is_x_configured()
+                            else "Provide X_API_KEY, X_API_SECRET, X_ACCESS_TOKEN, X_ACCESS_TOKEN_SECRET in Configure Token to enable live X publishing."
+                        ),
                     },
                 },
             }

@@ -1,7 +1,7 @@
 {
   "version": "2.0",
-  "last_updated": "2026-10-17T14:41:55Z",
-  "total_cycles_analyzed": 17,
+  "last_updated": "2026-10-17T22:37:13Z",
+  "total_cycles_analyzed": 18,
   "active_rules": [
     {
       "rule_id": "LR-001",
@@ -34,6 +34,22 @@
       "rationale": "Preserves brand credibility and prevents automated Quality Gate blocks.",
       "confidence": 0.98,
       "created_at": "2026-10-07T00:00:00Z"
+    },
+    {
+      "rule_id": "LR-005",
+      "category": "hook",
+      "directive": "Never start script with 'Google announced', 'In this video', or company greetings. Jump straight into the architectural leap in <=8 words.",
+      "rationale": "Underperforming posts in history exhibited high initial 3s drop-offs due to slow introductory phrasing.",
+      "confidence": 0.96,
+      "created_at": "2026-10-17T22:37:13Z"
+    },
+    {
+      "rule_id": "LR-005",
+      "category": "retention",
+      "directive": "Every post must state the exact memory footprint or serving efficiency gain (e.g. KV cache reduction, FP8 quantization, or VRAM delta).",
+      "rationale": "High-performing posts average 3x more peer shares when concrete systems specs are articulated.",
+      "confidence": 0.91,
+      "created_at": "2026-10-17T22:37:13Z"
     }
   ],
   "historical_lessons": []
