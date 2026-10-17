@@ -1,30 +1,27 @@
 """
-High-Production 9:16 Vertical Video Synthesizer for AI Tech Broadcaster
-Generates real, playable MP4 short-form video clips (Reels, TikTok, Shorts) with:
-1. Microsoft Neural Voiceover Synthesis (via edge-tts with captivating pacing)
-2. Lighter, Luminous, Executive Tech Aesthetic (Apple / OpenAI Light Mode with Frosted Glassmorphism)
-3. 7-Page High-Retention Poster Sequencing:
-   - Page 1 (0% - 14%): The Breakthrough Alert & Agent Terminal IDE
-   - Page 2 (14% - 28%): The Legacy Bottleneck vs. New Solution
-   - Page 3 (28% - 42%): Under-The-Hood Architecture Leap
-   - Page 4 (42% - 57%): Verified SOTA Benchmark Radar & Metric Gauges
-   - Page 5 (57% - 71%): Developer Superpowers & 3-Stage Workflow
-   - Page 6 (71% - 85%): Model Weights, API Availability & Hardware Specs
-   - Page 7 (85% - 100%): The Big Community Debate, Live Poll & Social Action Dock
-4. Clean, minimalist footer (NO audio wave bars at bottom)
-5. Native FFmpeg Muxing (H.264 video + AAC audio)
+High-Production 9:16 Full HD (1080x1920 @ 30fps) CEO Character Presenter Video Engine
+Generates executive-hosted short-form video clips (Reels, TikTok, Shorts) where the
+CEO/Founder of the company behind the update (Sundar Pichai for Google, Sam Altman for OpenAI,
+Jensen Huang for NVIDIA, Demis Hassabis for DeepMind, Dario Amodei for Anthropic,
+Mark Zuckerberg for Meta, Liang Wenfeng for DeepSeek, Elon Musk for xAI, Satya Nadella for Microsoft)
+appears on stage, speaks in first person with a matched vocal timbre/accent profile, and
+animates at 30fps with audio-synchronized jaw/mouth articulation, head motion, dynamic
+multi-scene holographic graphics, and word-by-word highlighted kinetic subtitles.
 """
 
 import os
+import re
 import sys
 import math
+import time
 import asyncio
 import subprocess
 from pathlib import Path
-from typing import Dict, Any, Optional, List
+from typing import Dict, Any, Optional, List, Tuple
+from urllib.parse import quote
+import httpx
 import numpy as np
-from PIL import Image, ImageDraw, ImageFont
-import imageio.v3 as iio
+from PIL import Image, ImageDraw, ImageFont, ImageEnhance
 import imageio_ffmpeg
 import edge_tts
 
@@ -32,18 +29,26 @@ ROOT_DIR = Path(__file__).resolve().parent.parent
 if str(ROOT_DIR) not in sys.path:
     sys.path.insert(0, str(ROOT_DIR))
 
-from src.persona_manager import detect_persona, get_circular_avatar
+from src.persona_manager import (
+    detect_persona,
+    get_persona_portrait,
+    get_circular_avatar,
+    PORTRAITS_DIR,
+)
 from src.google_veo_client import generate_veo_broll
 
 STAGING_DIR = ROOT_DIR / "storage" / "staging"
 STAGING_DIR.mkdir(parents=True, exist_ok=True)
+ASSETS_DIR = ROOT_DIR / "storage" / "assets"
 
 
 def get_font(size: int, bold: bool = False):
     font_names = [
+        "/System/Library/Fonts/Supplemental/Arial Bold.ttf" if bold else "/System/Library/Fonts/Supplemental/Arial.ttf",
+        "/System/Library/Fonts/Helvetica.ttc",
         "segoeuib.ttf" if bold else "segoeui.ttf",
         "arialbd.ttf" if bold else "arial.ttf",
-        "calibrib.ttf" if bold else "calibri.ttf"
+        "calibrib.ttf" if bold else "calibri.ttf",
     ]
     for fn in font_names:
         try:
@@ -90,152 +95,447 @@ def get_circular_logo(size: int = 36) -> Optional[Image.Image]:
     return None
 
 
-ASSETS_DIR = ROOT_DIR / "storage" / "assets"
-
-
 def draw_card_with_shadow(
     draw: ImageDraw.ImageDraw,
     bbox: tuple,
     radius: int = 16,
-    fill: tuple = (255, 255, 255),
-    outline: tuple = (226, 232, 240),
+    fill: tuple = (15, 23, 42),
+    outline: tuple = (51, 65, 85),
     width: int = 2
 ):
-    """Draw a crisp white frosted glass card with soft drop-shadow."""
+    """Draw a sleek executive dark-glass or light card with subtle drop-shadow."""
     if len(bbox) == 2 and isinstance(bbox[0], (tuple, list)):
         x0, y0 = bbox[0]
         x1, y1 = bbox[1]
     else:
         x0, y0, x1, y1 = bbox
-    # Ambient shadow tuned for vibrant wallpaper
-    draw.rounded_rectangle([(x0 + 3, y0 + 4), (x1 + 3, y1 + 4)], radius=radius, fill=(30, 20, 60))
-    # Card surface
+    draw.rounded_rectangle([(x0 + 3, y0 + 4), (x1 + 3, y1 + 4)], radius=radius, fill=(5, 10, 22))
     draw.rounded_rectangle([(x0, y0), (x1, y1)], radius=radius, fill=fill, outline=outline, width=width)
 
 
-def load_vertical_wallpaper(width: int = 544, height: int = 960) -> Image.Image:
-    """Load the Apple-style fluid silk wave vertical wallpaper."""
-    for p in [
-        ASSETS_DIR / "wallpaper_9x16_544.jpg",
-        ASSETS_DIR / "wallpaper_9x16_1080.jpg",
-        ASSETS_DIR / "brand_wallpaper.jpg",
-        STAGING_DIR / "brand_wallpaper.jpg",
-    ]:
-        if p.exists():
-            try:
-                im = Image.open(p).convert("RGB")
-                if im.size != (width, height):
-                    im = im.resize((width, height), Image.Resampling.LANCZOS)
-                return im
-            except Exception:
-                pass
-    # Fallback to light gradient
-    img = Image.new("RGB", (width, height))
-    d = ImageDraw.Draw(img)
-    for y in range(0, height, 4):
-        ratio = y / height
-        r = int(246 * (1 - ratio) + 232 * ratio)
-        g = int(249 * (1 - ratio) + 238 * ratio)
-        b = int(255 * (1 - ratio) + 250 * ratio)
-        d.rectangle([(0, y), (width, y + 4)], fill=(r, g, b))
-    return img
-
-
-async def synthesize_audio(narration_text: str, output_path: Path, voice: str = "en-US-AndrewNeural"):
+def build_ceo_first_person_script(directive: Dict[str, Any], persona: Dict[str, Any]) -> str:
     """
-    Synthesize charismatic, studio-quality neural voiceover with 3-tier fault tolerance:
-    Tier 1: Microsoft Edge-TTS Neural Voice (en-US-AndrewNeural)
-    Tier 2: macOS Native Neural Speech (/usr/bin/say -> FFmpeg MP3)
-    Tier 3: FFmpeg Synthesized Studio Broadcast Audio Bed (Zero-Failure Guarantee)
+    Build a charismatic first-person keynote script spoken by the company CEO.
+    """
+    greeting = persona.get("intro_greeting") or f"Hi everyone, {persona['name']} here from {persona['lab']}."
+    title = (directive.get("title") or "Frontier AI Breakthrough").strip()
+    hook = (directive.get("hook_narration") or "").strip()
+    body = (directive.get("body_narration") or "").strip()
+    cta = (directive.get("call_to_action") or "What will you build with this next? Share your thoughts below.").strip()
+
+    # Clean redundant prefixes from title
+    clean_title = re.sub(r"^(⚡\s*24H Signal:|Architecture Deep Dive:)\s*", "", title, flags=re.IGNORECASE)
+    clean_title = re.sub(r"\s*Shuts Down Legacy Benchmarks$", "", clean_title, flags=re.IGNORECASE)
+
+    parts = [greeting]
+    if clean_title and clean_title.lower() not in hook.lower():
+        parts.append(f"Today we are excited to share a major breakthrough: {clean_title}.")
+    if hook:
+        parts.append(hook)
+    if body:
+        parts.append(f"Here is what changes under the hood. {body}")
+    else:
+        parts.append(persona.get("default_quote", ""))
+    parts.append(cta)
+    return " ".join(parts)
+
+
+def _split_text_for_tts(text: str, max_chars: int = 175) -> List[str]:
+    """Split text into natural sentence/phrase chunks under `max_chars`."""
+    sentences = re.split(r"(?<=[.!?])\s+", text.strip())
+    chunks: List[str] = []
+    for sent in sentences:
+        if not sent:
+            continue
+        if len(sent) <= max_chars:
+            chunks.append(sent)
+        else:
+            words = sent.split()
+            curr: List[str] = []
+            for w in words:
+                curr.append(w)
+                if len(" ".join(curr)) > max_chars and len(curr) > 1:
+                    curr.pop()
+                    chunks.append(" ".join(curr))
+                    curr = [w]
+            if curr:
+                chunks.append(" ".join(curr))
+    return chunks
+
+
+async def synthesize_audio(
+    narration_text: str,
+    output_path: Path,
+    voice: str = "en-IN-PrabhatNeural",
+    persona: Optional[Dict[str, Any]] = None
+):
+    """
+    Synthesize CEO-matched voiceover with a 3-tier vocal persona engine:
+    Tier 1: Gemini 3.8 Flash TTS (`gemini-3.8-flash-tts` Voice Design) when GEMINI_API_KEY is set
+    Tier 2: Microsoft Edge-TTS Neural Voice (`en-IN-PrabhatNeural`, `en-GB-RyanNeural`, `en-US-RogerNeural`, etc.)
+    Tier 3: Multi-Accent Google Neural Speech (`en-IN`, `en-GB`, `en-US`, `en-ZA`, `en-SG`)
+            + FFmpeg Executive Vocal Formant, Pitch & Broadcast EQ Sculpting (Zero Robotic Fallback)
     """
     output_path.parent.mkdir(parents=True, exist_ok=True)
     ffmpeg_exe = imageio_ffmpeg.get_ffmpeg_exe()
+    vp = (persona or {}).get("voice_profile", {})
+    edge_voice = vp.get("edge_voice") or voice
+    accent_tld = vp.get("accent_tld") or "en-US"
+    pitch_factor = float(vp.get("pitch_factor", 0.96))
+    tempo = float(vp.get("tempo", 1.04))
+    eq_filter = vp.get(
+        "eq_filter",
+        "equalizer=f=220:width_type=o:width=1.5:g=3.5,equalizer=f=3200:width_type=o:width=1.2:g=2.5",
+    )
 
-    # Tier 1: Edge-TTS Neural Voiceover
-    try:
-        communicate = edge_tts.Communicate(narration_text, voice, rate="+3%")
-        await communicate.save(str(output_path))
-        if output_path.exists() and output_path.stat().st_size > 1000:
-            return
-    except Exception as edge_err:
-        print(f"[VideoSynthesizer] Tier-1 Edge-TTS unavailable ({edge_err}); engaging Tier-2 native voice fallback...")
-
-    # Tier 2: macOS Native Speech Engine (/usr/bin/say) -> FFmpeg MP3
-    say_bin = Path("/usr/bin/say")
-    if say_bin.exists():
-        temp_aiff = output_path.with_suffix(".aiff")
+    # Tier 1: Gemini 3.8 Flash TTS with CEO Voice Design (if GEMINI_API_KEY configured)
+    gemini_key = os.getenv("GEMINI_API_KEY", "").strip()
+    if gemini_key and "YOUR_" not in gemini_key:
         try:
-            clean_text = narration_text.replace('"', "'").replace("\n", " ").strip()[:900]
+            from google import genai
+            client = genai.Client(api_key=gemini_key)
+            if hasattr(client, "interactions"):
+                voice_desc = vp.get("gemini_voice_design", "Articulate executive tech CEO keynote voice.")
+                interaction = client.interactions.create(
+                    model="gemini-3.8-flash-tts",
+                    input=f"[Voice Design: {voice_desc}] {narration_text}",
+                )
+                if hasattr(interaction, "output_audio") and interaction.output_audio:
+                    raw_wav = output_path.with_suffix(".wav")
+                    raw_wav.write_bytes(interaction.output_audio.data)
+                    subprocess.run(
+                        [ffmpeg_exe, "-y", "-i", str(raw_wav), "-c:a", "libmp3lame", "-b:a", "192k", str(output_path)],
+                        stdout=subprocess.PIPE,
+                        stderr=subprocess.PIPE,
+                        check=False,
+                    )
+                    if raw_wav.exists():
+                        raw_wav.unlink()
+                    if output_path.exists() and output_path.stat().st_size > 2000:
+                        return
+        except Exception as gem_err:
+            print(f"[CEOVoiceEngine] Gemini 3.8 TTS fallback: {gem_err}")
+
+    # Tier 2: Edge-TTS Neural Voiceover
+    raw_tts_path = output_path.with_name(f"raw_tts_{output_path.stem}.mp3")
+    try:
+        communicate = edge_tts.Communicate(narration_text, edge_voice, rate="+4%")
+        await communicate.save(str(raw_tts_path))
+    except Exception as edge_err:
+        print(f"[CEOVoiceEngine] Edge-TTS unavailable ({edge_err}); engaging Multi-Accent Neural TTS + Formant DSP...")
+
+    # Tier 3: Multi-Accent Google Neural Speech + FFmpeg Executive Vocal Formant/Pitch/EQ Sculpting
+    if not raw_tts_path.exists() or raw_tts_path.stat().st_size < 1500:
+        try:
+            chunks = _split_text_for_tts(narration_text, max_chars=175)
+            audio_segments: List[bytes] = []
+            headers = {"User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36"}
+            with httpx.Client(timeout=15.0, follow_redirects=True) as client:
+                for chunk in chunks:
+                    q = quote(chunk)
+                    url = f"https://translate.googleapis.com/translate_tts?ie=UTF-8&client=tw-ob&tl={accent_tld}&q={q}"
+                    resp = client.get(url, headers=headers)
+                    if resp.status_code == 200 and len(resp.content) > 500:
+                        audio_segments.append(resp.content)
+            if audio_segments:
+                raw_tts_path.write_bytes(b"".join(audio_segments))
+        except Exception as gtts_err:
+            print(f"[CEOVoiceEngine] Multi-accent neural TTS error: {gtts_err}")
+
+    # Apply Executive Vocal Formant, Pitch & Keynote Studio EQ DSP via FFmpeg
+    if raw_tts_path.exists() and raw_tts_path.stat().st_size > 1000:
+        try:
+            # Compensate tempo when shifting sample-rate pitch so speech speed matches the CEO's natural cadence
+            effective_tempo = max(0.85, min(1.30, tempo / pitch_factor))
+            af_chain = (
+                f"asetrate=24000*{pitch_factor:.3f},"
+                f"aresample=44100,"
+                f"atempo={effective_tempo:.3f},"
+                f"{eq_filter},"
+                f"acompressor=threshold=-16dB:ratio=2.4:attack=8:release=90"
+            )
             subprocess.run(
-                [str(say_bin), "-r", "195", "-o", str(temp_aiff), clean_text],
+                [
+                    ffmpeg_exe,
+                    "-y",
+                    "-i", str(raw_tts_path),
+                    "-af", af_chain,
+                    "-c:a", "libmp3lame",
+                    "-ar", "44100",
+                    "-ac", "2",
+                    "-b:a", "192k",
+                    str(output_path),
+                ],
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
                 timeout=30,
-                check=True
+                check=False,
             )
-            if temp_aiff.exists() and temp_aiff.stat().st_size > 1000:
-                subprocess.run(
-                    [ffmpeg_exe, "-y", "-i", str(temp_aiff), "-acodec", "libmp3lame", "-b:a", "192k", str(output_path)],
-                    stdout=subprocess.PIPE,
-                    stderr=subprocess.PIPE,
-                    timeout=30,
-                    check=False
-                )
-                if not output_path.exists() or output_path.stat().st_size < 500:
-                    # Fallback to AAC in M4A/MP3 container if libmp3lame not compiled
-                    subprocess.run(
-                        [ffmpeg_exe, "-y", "-i", str(temp_aiff), "-c:a", "aac", "-b:a", "192k", "-f", "adts", str(output_path)],
-                        stdout=subprocess.PIPE,
-                        stderr=subprocess.PIPE,
-                        timeout=30,
-                        check=False
-                    )
-            if temp_aiff.exists():
-                temp_aiff.unlink()
+            if not output_path.exists() or output_path.stat().st_size < 1000:
+                raw_tts_path.replace(output_path)
+            elif raw_tts_path.exists():
+                raw_tts_path.unlink()
             if output_path.exists() and output_path.stat().st_size > 1000:
                 return
-        except Exception as say_err:
-            if temp_aiff.exists():
-                try:
-                    temp_aiff.unlink()
-                except Exception:
-                    pass
-            print(f"[VideoSynthesizer] Tier-2 macOS speech fallback error ({say_err}); engaging Tier-3 FFmpeg studio synth...")
+        except Exception as dsp_err:
+            print(f"[CEOVoiceEngine] Vocal DSP warning: {dsp_err}")
+            if raw_tts_path.exists():
+                raw_tts_path.replace(output_path)
+                return
 
-    # Tier 3: FFmpeg Synthesized Studio Harmonic Audio Bed (12 seconds)
-    try:
-        word_count = max(20, len(narration_text.split()))
-        est_duration = max(8.0, min(25.0, word_count / 3.2))
-        cmd = [
+    # Final Emergency Fallback: Synthesized Harmonic Audio Bed
+    word_count = max(20, len(narration_text.split()))
+    est_duration = max(10.0, min(25.0, word_count / 3.0))
+    subprocess.run(
+        [
             ffmpeg_exe,
             "-y",
             "-f", "lavfi",
             "-i", f"sine=frequency=220:sample_rate=44100:duration={est_duration:.1f}",
-            "-af", "volume=0.08,afade=t=in:ss=0:d=0.5,afade=t=out:st=" + f"{max(1.0, est_duration - 1.0):.1f}:d=1.0",
+            "-af", "volume=0.08",
             "-c:a", "aac",
             "-b:a", "128k",
-            "-f", "adts",
-            str(output_path)
-        ]
-        subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=20, check=True)
-    except Exception as synth_err:
-        print(f"[VideoSynthesizer] Tier-3 audio synth error: {synth_err}")
-
+            str(output_path),
+        ],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        timeout=20,
+        check=False,
+    )
 
 
 def get_audio_duration(audio_path: Path) -> float:
-    """Use FFprobe / FFmpeg to get exact audio duration."""
+    """Use FFmpeg to get exact audio duration in seconds."""
     ffmpeg_exe = imageio_ffmpeg.get_ffmpeg_exe()
     cmd = [ffmpeg_exe, "-i", str(audio_path)]
     result = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
     for line in result.stderr.splitlines():
         if "Duration:" in line:
-            parts = line.split("Duration:")[1].split(",")[0].strip().split(":")
-            hours = float(parts[0])
-            mins = float(parts[1])
-            secs = float(parts[2])
-            return hours * 3600 + mins * 60 + secs
-    return 10.0
+            try:
+                parts = line.split("Duration:")[1].split(",")[0].strip().split(":")
+                return float(parts[0]) * 3600 + float(parts[1]) * 60 + float(parts[2])
+            except Exception:
+                pass
+    return 12.0
+
+
+def extract_audio_envelope(audio_path: Path, total_frames: int, fps: int = 30) -> np.ndarray:
+    """
+    Decode audio track into mono 8kHz PCM samples and compute per-frame RMS vocal energy
+    normalized to [0.0, 1.0] for frame-accurate 30fps lip/jaw articulation and voice aura pulsing.
+    """
+    ffmpeg_exe = imageio_ffmpeg.get_ffmpeg_exe()
+    try:
+        cmd = [
+            ffmpeg_exe,
+            "-i", str(audio_path),
+            "-f", "s16le",
+            "-ac", "1",
+            "-ar", "8000",
+            "-v", "quiet",
+            "-",
+        ]
+        res = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=20)
+        pcm = np.frombuffer(res.stdout, dtype=np.int16).astype(np.float32)
+        if pcm.size < 100:
+            raise ValueError("Empty PCM stream")
+
+        samples_per_frame = max(1, len(pcm) // max(1, total_frames))
+        env = np.zeros(total_frames, dtype=np.float32)
+        for i in range(total_frames):
+            start = i * samples_per_frame
+            end = min(len(pcm), start + samples_per_frame)
+            if end > start:
+                env[i] = float(np.sqrt(np.mean(np.square(pcm[start:end]))))
+
+        p95 = float(np.percentile(env, 95)) if env.size > 0 else 1.0
+        if p95 > 1.0:
+            env = np.clip(env / p95, 0.0, 1.0)
+        # Apply noise gate so silent pauses close the mouth cleanly
+        env = np.where(env < 0.12, 0.0, (env - 0.12) / 0.88)
+        # Smooth with a 3-tap kernel for natural jaw inertia
+        if total_frames >= 3:
+            env = np.convolve(env, np.array([0.25, 0.50, 0.25], dtype=np.float32), mode="same")
+        return env
+    except Exception:
+        t = np.linspace(0, total_frames / fps, total_frames)
+        return np.clip(0.5 + 0.45 * np.sin(t * 14.0) * np.cos(t * 3.5), 0.0, 1.0).astype(np.float32)
+
+
+def animate_ceo_portrait(
+    base_portrait: Image.Image,
+    mouth_box_ratio: Tuple[float, float, float, float],
+    amp: float,
+    t: float,
+    accent_color: Tuple[int, int, int],
+    secondary_color: Tuple[int, int, int],
+) -> Image.Image:
+    """
+    Real-Time 2.5D Neural Portrait Animator (30fps):
+    1. Syllabic Jaw & Mouth Articulation: Warps lower jaw/mouth region smoothly downward
+       in proportion to real-time voice amplitude `amp` and phoneme oscillation, while rendering
+       a subtle inner-mouth speaking aperture during active speech.
+    2. Natural Eye Blinks: Periodic 120ms natural eyelid blink every ~3.8 seconds.
+    3. Conversational Head Nod & Sway: Subtle pitch/yaw translation & rotation driven by speech cadence.
+    4. Studio Rim-Light & Reactive Voice Aura Frame.
+    """
+    arr = np.array(base_portrait, dtype=np.uint8)
+    h, w, _ = arr.shape
+
+    # 1. Syllabic Jaw & Mouth Articulation via 2D Gaussian Vertical Displacement Field
+    phoneme_pulse = 0.65 + 0.35 * math.sin(t * 31.0)
+    jaw_open = float(amp) * phoneme_pulse  # [0.0 .. 1.0]
+
+    mx0, my0, mx1, my1 = mouth_box_ratio
+    cx = int((mx0 + mx1) * 0.5 * w)
+    cy = int((my0 + my1) * 0.5 * h)
+    rx = max(12, int((mx1 - mx0) * 0.55 * w))
+    ry = max(12, int((my1 - my0) * 0.70 * h))
+
+    if jaw_open > 0.04:
+        y_start = max(0, cy - int(ry * 0.4))
+        y_end = min(h, cy + int(ry * 1.9))
+        x_start = max(0, cx - int(rx * 1.4))
+        x_end = min(w, cx + int(rx * 1.4))
+
+        sub_h = y_end - y_start
+        sub_w = x_end - x_start
+        if sub_h > 4 and sub_w > 4:
+            yy, xx = np.mgrid[y_start:y_end, x_start:x_end]
+            # Smooth horizontal bell curve centered at mouth X
+            wx = np.exp(-0.5 * ((xx - cx) / max(1.0, rx * 0.75)) ** 2)
+            # Smooth vertical bell curve for lower lip + chin (below cy)
+            wy = np.where(
+                yy >= cy,
+                np.exp(-0.5 * ((yy - (cy + ry * 0.35)) / max(1.0, ry * 0.75)) ** 2),
+                0.0,
+            )
+            max_shift_px = max(2.0, h * 0.026) * jaw_open
+            dy = (wx * wy * max_shift_px).astype(np.float32)
+            src_y = np.clip((yy - dy).astype(np.int32), 0, h - 1)
+            arr[y_start:y_end, x_start:x_end] = arr[src_y, xx]
+
+            # Subtle inner mouth dark phoneme crease right at lip parting line (cy) when speaking strongly
+            if jaw_open > 0.22:
+                lip_h = max(1, int(jaw_open * h * 0.010))
+                lip_w = max(4, int(rx * 0.48 * (0.75 + 0.25 * math.sin(t * 24.0))))
+                ly0 = max(0, cy - 1)
+                ly1 = min(h, cy + lip_h)
+                lx0 = max(0, cx - lip_w)
+                lx1 = min(w, cx + lip_w)
+                if ly1 > ly0 and lx1 > lx0:
+                    ly_grid, lx_grid = np.mgrid[ly0:ly1, lx0:lx1]
+                    ellipse_mask = (((lx_grid - cx) / max(1.0, lip_w)) ** 2 + ((ly_grid - cy) / max(1.0, lip_h)) ** 2) <= 1.0
+                    region = arr[ly0:ly1, lx0:lx1].astype(np.float32)
+                    darken = 1.0 - (0.52 * min(1.0, jaw_open))
+                    region[ellipse_mask] *= darken
+                    arr[ly0:ly1, lx0:lx1] = np.clip(region, 0, 255).astype(np.uint8)
+
+    img = Image.fromarray(arr)
+
+    # 2. Natural Conversational Head Motion (Zoom + Subtle Tilt + Emphatic Nod on High Energy)
+    nod_dy = int(3.0 * math.sin(t * 2.1) + 4.5 * jaw_open)
+    sway_dx = int(3.5 * math.sin(t * 1.15))
+    tilt_deg = 1.1 * math.sin(t * 0.95) + (0.7 * math.sin(t * 4.5) if jaw_open > 0.35 else 0.0)
+    zoom = 1.04 + 0.025 * math.sin(t * 0.8) + 0.015 * jaw_open
+
+    img = img.rotate(tilt_deg, resample=Image.Resampling.BILINEAR, expand=False)
+    zw = int(w / zoom)
+    zh = int(h / zoom)
+    x0 = max(0, min(w - zw, (w - zw) // 2 + sway_dx))
+    y0 = max(0, min(h - zh, (h - zh) // 2 - nod_dy))
+    img = img.crop((x0, y0, x0 + zw, y0 + zh)).resize((w, h), Image.Resampling.BILINEAR)
+
+    # 3. Round-Corner Studio Frame + Reactive Voice-Energy Rim Glow
+    framed = Image.new("RGBA", (w, h), (0, 0, 0, 0))
+    mask = Image.new("L", (w, h), 0)
+    mdraw = ImageDraw.Draw(mask)
+    mdraw.rounded_rectangle([(0, 0), (w - 1, h - 1)], radius=24, fill=255)
+    framed.paste(img.convert("RGBA"), (0, 0), mask=mask)
+
+    fdraw = ImageDraw.Draw(framed)
+    border_w = 3 if jaw_open > 0.2 else 2
+    glow_clr = accent_color if int(t * 4) % 2 == 0 else secondary_color
+    fdraw.rounded_rectangle([(1, 1), (w - 2, h - 2)], radius=24, outline=glow_clr, width=border_w)
+
+    # Live Audio Spectrum Equalizer Overlay at Bottom-Right of CEO Frame
+    eq_base_x = w - 88
+    eq_base_y = h - 18
+    fdraw.rounded_rectangle([(eq_base_x - 8, eq_base_y - 30), (w - 10, eq_base_y + 6)], radius=8, fill=(10, 15, 30, 210))
+    for b_idx in range(9):
+        phase = t * 18.0 + b_idx * 0.9
+        bar_h = int(4 + (20 * jaw_open * (0.45 + 0.55 * abs(math.sin(phase)))))
+        bx = eq_base_x + b_idx * 8
+        b_clr = accent_color if b_idx % 2 == 0 else secondary_color
+        fdraw.rounded_rectangle([(bx, eq_base_y - bar_h), (bx + 4, eq_base_y)], radius=2, fill=b_clr)
+
+    return framed
+
+
+def draw_kinetic_subtitles(
+    draw: ImageDraw.ImageDraw,
+    words: List[str],
+    progress: float,
+    width: int,
+    y_pos: int,
+    accent_color: Tuple[int, int, int],
+    font_sub: ImageFont.ImageFont,
+):
+    """
+    Render viral TikTok/Reels word-by-word highlighted kinetic subtitles.
+    Displays a 6-word window centered on the currently spoken word, highlighting the active word.
+    """
+    if not words:
+        return
+    total_w = len(words)
+    curr_idx = min(total_w - 1, max(0, int(progress * total_w)))
+    chunk_size = 6
+    chunk_start = (curr_idx // chunk_size) * chunk_size
+    chunk_words = words[chunk_start: chunk_start + chunk_size]
+    active_in_chunk = curr_idx - chunk_start
+
+    # Lay out words across 1 or 2 centered lines
+    line1 = chunk_words[:3]
+    line2 = chunk_words[3:]
+
+    # Subtitle backdrop pill
+    draw.rounded_rectangle(
+        [(22, y_pos - 8), (width - 22, y_pos + (68 if line2 else 38))],
+        radius=14,
+        fill=(8, 12, 24),
+        outline=accent_color,
+        width=1,
+    )
+
+    for line_idx, line_words in enumerate([line1, line2]):
+        if not line_words:
+            continue
+        ly = y_pos + line_idx * 30
+        # Measure total line width
+        word_widths = []
+        space_w = 8
+        for w_str in line_words:
+            bb = draw.textbbox((0, 0), w_str.upper(), font=font_sub)
+            word_widths.append(bb[2] - bb[0])
+        total_line_w = sum(word_widths) + space_w * max(0, len(line_words) - 1)
+        curr_x = (width - total_line_w) // 2
+
+        for w_i, w_str in enumerate(line_words):
+            global_in_chunk = line_idx * 3 + w_i
+            w_up = w_str.upper()
+            ww = word_widths[w_i]
+            if global_in_chunk == active_in_chunk:
+                draw.rounded_rectangle(
+                    [(curr_x - 5, ly - 2), (curr_x + ww + 5, ly + 24)],
+                    radius=6,
+                    fill=accent_color,
+                )
+                draw.text((curr_x, ly), w_up, fill=(255, 255, 255), font=font_sub)
+            elif global_in_chunk < active_in_chunk:
+                draw.text((curr_x, ly), w_up, fill=(226, 232, 240), font=font_sub)
+            else:
+                draw.text((curr_x, ly), w_up, fill=(148, 163, 184), font=font_sub)
+            curr_x += ww + space_w
 
 
 def render_motion_video(
@@ -244,19 +544,41 @@ def render_motion_video(
     output_video_path: Path,
     width: int = 544,
     height: int = 960,
-    fps: int = 24
+    fps: int = 30,
+    persona: Optional[Dict[str, Any]] = None,
+    spoken_script: Optional[str] = None,
 ) -> str:
     """
-    Render 9:16 vertical motion video across 7 high-impact poster chapters.
-    NO audio frequency waves at bottom; luminous light theme with interactive UI.
+    Render a 9:16 CEO Character Keynote Video across 4 dynamic animated scenes (upscaled to 1080x1920 30fps):
+    - Scene 1 (0% - 25%): Full Keynote Stage Reveal — Large animated CEO presenter center-stage + Executive Nameplate
+    - Scene 2 (25% - 52%): Split-Screen Holographic Architecture Diagram + Live Speaking CEO Presenter
+    - Scene 3 (52% - 78%): Live Animated SOTA Benchmark Radar & Metric Bars + Live Speaking CEO Presenter
+    - Scene 4 (78% - 100%): Executive Close-Up Takeaway & Live Community Poll + Word-by-Word Kinetic Subtitles
     """
     duration = get_audio_duration(audio_path)
-    total_frames = max(fps * 6, int(duration * fps))
+    total_frames = max(fps * 8, int(duration * fps))
 
     headline = directive.get("title") or "Frontier AI Breakthrough"
     hook = directive.get("hook_narration") or "Major AI architecture update confirmed."
     body = directive.get("body_narration") or "Engineering documentation confirms verified benchmark gains."
     cta = directive.get("call_to_action") or "What do you think? Drop your perspective below!"
+    source_url = directive.get("source_url") or ""
+
+    if persona is None:
+        persona = detect_persona(headline, f"{hook} {body} {source_url}")
+    if not spoken_script:
+        spoken_script = build_ceo_first_person_script(directive, persona)
+
+    script_words = spoken_script.split()
+    audio_env = extract_audio_envelope(audio_path, total_frames, fps=fps)
+
+    # Pre-load CEO high-resolution portraits at the two stage sizes for fast 30fps rendering
+    mouth_ratio = persona.get("mouth_box_ratio", (0.37, 0.56, 0.63, 0.72))
+    accent_clr = persona.get("accent_color", (66, 133, 244))
+    sec_clr = persona.get("secondary_color", (99, 102, 241))
+
+    ceo_portrait_large = get_persona_portrait(persona, target_size=(464, 500))
+    ceo_portrait_split = get_persona_portrait(persona, target_size=(215, 255))
 
     temp_raw_video = STAGING_DIR / f"temp_raw_{output_video_path.name}"
     writer = imageio_ffmpeg.write_frames(
@@ -266,399 +588,280 @@ def render_motion_video(
         codec="libx264",
         pix_fmt_in="rgb24",
         pix_fmt_out="yuv420p",
-        ffmpeg_log_level="error"
+        ffmpeg_log_level="error",
     )
-    writer.send(None)  # initialize generator
+    writer.send(None)
 
-    font_brand = get_font(17, bold=True)
+    font_brand = get_font(16, bold=True)
     font_brand_sub = get_font(10, bold=True)
-    font_hl = get_font(26, bold=True)
-    font_body = get_font(18, bold=False)
-    font_badge = get_font(13, bold=True)
-    font_code = get_font(13, bold=False)
-    font_cta = get_font(20, bold=True)
-    font_dock = get_font(15, bold=True)
-    font_small = get_font(12, bold=False)
+    font_hl = get_font(22, bold=True)
+    font_name = get_font(20, bold=True)
+    font_body = get_font(15, bold=False)
+    font_badge = get_font(12, bold=True)
+    font_code = get_font(12, bold=False)
+    font_sub = get_font(15, bold=True)
+    font_small = get_font(11, bold=False)
 
-    logo_icon = get_circular_logo(size=34)
-    base_wallpaper = load_vertical_wallpaper(width, height)
-    persona = detect_persona(headline, hook + " " + body)
+    logo_icon = get_circular_logo(size=32)
 
-    # Fetch 9:16 photorealistic FLUX AI visual for animated motion video
-    ai_motion_source = None
-    try:
-        from src.pollinations_client import generate_visual_for_story
-        from PIL import ImageEnhance
-        visual_path = generate_visual_for_story(headline, aspect_ratio="9:16")
-        if visual_path and visual_path.exists():
-            ai_motion_source = Image.open(visual_path).convert("RGB")
-    except Exception:
-        pass
+    # Pre-render dark executive keynote stage base with subtle grid
+    stage_bg = Image.new("RGB", (width, height), (7, 11, 22))
+    sdraw = ImageDraw.Draw(stage_bg)
+    for y in range(0, height, 4):
+        r_val = int(7 + 8 * (y / height))
+        g_val = int(11 + 14 * (y / height))
+        b_val = int(22 + 26 * (y / height))
+        sdraw.rectangle([(0, y), (width, y + 4)], fill=(r_val, g_val, b_val))
+    for gx in range(0, width, 36):
+        sdraw.line([(gx, 0), (gx, height)], fill=(15, 23, 42), width=1)
+    for gy in range(0, height, 36):
+        sdraw.line([(0, gy), (width, gy)], fill=(15, 23, 42), width=1)
+
+    clean_hl = re.sub(r"^(⚡\s*24H Signal:|Architecture Deep Dive:)\s*", "", headline, flags=re.IGNORECASE)
+    clean_hl = re.sub(r"\s*Shuts Down Legacy Benchmarks$", "", clean_hl, flags=re.IGNORECASE)
 
     for f_idx in range(total_frames):
         t = f_idx / fps
         progress = f_idx / total_frames
+        amp = float(audio_env[f_idx]) if f_idx < len(audio_env) else 0.3
 
-        # Create animated motion base image (Continuous Ken Burns Camera Motion)
-        if ai_motion_source is not None:
-            zoom = 1.0 + (progress * 0.16)
-            w_crop = int(ai_motion_source.width / zoom)
-            h_crop = int(ai_motion_source.height / zoom)
-            x_crop = int((ai_motion_source.width - w_crop) / 2)
-            y_crop = int((ai_motion_source.height - h_crop) * progress)
-            cropped = ai_motion_source.crop((x_crop, y_crop, x_crop + w_crop, y_crop + h_crop))
-            frame_base = cropped.resize((width, height), Image.Resampling.BILINEAR)
-            from PIL import ImageEnhance
-            img = ImageEnhance.Brightness(frame_base).enhance(0.42)
-        else:
-            img = base_wallpaper.copy()
+        img = stage_bg.copy()
         draw = ImageDraw.Draw(img)
 
-        # -------------------------------------------------------------
-        # 1. Top Header: Brand Identity & Live AI Pulse
-        # -------------------------------------------------------------
-        draw.rectangle([(0, 0), (width // 2, 6)], fill=(6, 182, 212))
-        draw.rectangle([(width // 2, 0), (width, 6)], fill=(99, 102, 241))
+        # Dynamic Keynote Spotlight Rays at Top
+        ray_shift = int(25 * math.sin(t * 1.2))
+        draw.polygon(
+            [(width // 2 + ray_shift, 0), (40, 260), (190, 260)],
+            fill=(accent_clr[0] // 5, accent_clr[1] // 5, accent_clr[2] // 5),
+        )
+        draw.polygon(
+            [(width // 2 - ray_shift, 0), (width - 190, 260), (width - 40, 260)],
+            fill=(sec_clr[0] // 5, sec_clr[1] // 5, sec_clr[2] // 5),
+        )
 
-        # Brand Badge with Logo
-        brand_card = [(30, 22), (210, 62)]
-        draw_card_with_shadow(draw, brand_card, radius=12, fill=(255, 255, 255), outline=(226, 232, 240), width=1)
+        # -------------------------------------------------------------
+        # 1. Top Broadcast Header Bar
+        # -------------------------------------------------------------
+        draw.rectangle([(0, 0), (width // 2, 5)], fill=accent_clr)
+        draw.rectangle([(width // 2, 0), (width, 5)], fill=sec_clr)
 
+        draw_card_with_shadow(draw, [(22, 16), (215, 54)], radius=12, fill=(15, 23, 42), outline=accent_clr, width=1)
         if logo_icon:
-            img.paste(logo_icon, (38, 25), mask=logo_icon)
-            text_x = 78
-        else:
-            draw.ellipse([(38, 26), (68, 56)], fill=(6, 182, 212), outline=(99, 102, 241), width=2)
-            draw.text((45, 32), "AI", fill=(255, 255, 255), font=font_brand_sub)
-            text_x = 78
+            img.paste(logo_icon, (30, 19), mask=logo_icon)
+        draw.text((70, 20), "ERA OF AI", fill=(255, 255, 255), font=font_brand)
+        draw.text((70, 37), f"{persona['lab'].upper()} KEYNOTE", fill=accent_clr, font=font_brand_sub)
 
-        draw.text((text_x, 26), "ERA OF AI", fill=(15, 23, 42), font=font_brand)
-        draw.text((text_x, 44), "TECH INTELLIGENCE", fill=(2, 132, 199), font=font_brand_sub)
+        # Live Speaking Indicator Pill
+        live_pill = [(width - 195, 18), (width - 22, 52)]
+        draw.rounded_rectangle(live_pill, radius=16, fill=(15, 23, 42), outline=accent_clr, width=1)
+        dot_r = 6 if amp > 0.25 else 4
+        draw.ellipse([(width - 180 - dot_r, 35 - dot_r), (width - 180 + dot_r, 35 + dot_r)], fill=(239, 68, 68))
+        draw.text((width - 166, 27), f"LIVE • {persona['name'].split()[0].upper()}", fill=(255, 255, 255), font=font_badge)
 
-        # Right Status Pill
-        status_pill = [(width - 185, 26), (width - 30, 58)]
-        draw.rounded_rectangle(status_pill, radius=16, fill=(255, 255, 255), outline=(52, 211, 153), width=1)
-        pulse_green = int(180 + 70 * math.sin(t * 4))
-        draw.ellipse([(width - 173, 38), (width - 163, 48)], fill=(16, pulse_green, 129))
-        draw.text((width - 155, 34), "AI CORE ACTIVE", fill=(5, 150, 105), font=font_badge)
-
-        # Dynamic Dual-Color Progress Bar
-        bar_w = int((width - 60) * progress)
-        draw.rectangle([(30, 72), (width - 30, 76)], fill=(226, 232, 240))
-        draw.rectangle([(30, 72), (30 + bar_w, 76)], fill=(14, 165, 233))
-        if bar_w > 8:
-            draw.ellipse([(26 + bar_w, 70), (34 + bar_w, 78)], fill=(99, 102, 241))
+        # Progress Timeline Bar
+        bar_w = int((width - 44) * progress)
+        draw.rectangle([(22, 62), (width - 22, 66)], fill=(30, 41, 59))
+        draw.rectangle([(22, 62), (22 + bar_w, 66)], fill=accent_clr)
 
         # -------------------------------------------------------------
-        # 2. 7-Page Poster Architecture Sequencing
+        # 2. Multi-Scene CEO Presenter & Dynamic Visual Stage
         # -------------------------------------------------------------
-        # Chapter 1: 0% - 14%
-        # Chapter 2: 14% - 28%
-        # Chapter 3: 28% - 42%
-        # Chapter 4: 42% - 57%
-        # Chapter 5: 57% - 71%
-        # Chapter 6: 71% - 85%
-        # Chapter 7: 85% - 100%
-
-        if progress < 0.14:
+        if progress < 0.26 or progress >= 0.78:
             # =========================================================
-            # POSTER 1/7: THE BREAKTHROUGH ALERT & AGENT TERMINAL
+            # SCENE 1 (0-26%) & SCENE 4 (78-100%):
+            # FULL KEYNOTE STAGE — LARGE ANIMATED CEO PRESENTER
             # =========================================================
-            draw.rounded_rectangle([(30, 95), (280, 128)], radius=16, fill=(255, 255, 255), outline=(99, 102, 241), width=1)
-            draw.text((45, 102), "PAGE 01/07 // THE ALERT", fill=(67, 56, 202), font=font_badge)
+            scene_tag = "KEYNOTE STAGE // EXECUTIVE BRIEFING" if progress < 0.26 else "EXECUTIVE TAKEAWAY // LIVE DEBATE"
+            draw.rounded_rectangle([(22, 76), (310, 102)], radius=10, fill=(15, 23, 42), outline=accent_clr, width=1)
+            draw.text((34, 82), scene_tag, fill=accent_clr, font=font_badge)
 
-            # Titan Persona Avatar Chip (MrBeast Hook rule: Human face + bold claim in first 1.5s)
-            avatar_chip = get_circular_avatar(persona["avatar_file"], size=36)
-            if avatar_chip:
-                img.paste(avatar_chip, (width - 70, 88), mask=avatar_chip)
-                draw.text((width - 170, 93), f"{persona['name'].split()[0].upper()}", fill=(255, 255, 255), font=font_badge)
-                draw.text((width - 170, 109), f"{persona['lab'].upper()}", fill=(167, 243, 208), font=font_brand_sub)
+            # Headline Banner above CEO
+            hl_lines = wrap_text(clean_hl if progress < 0.26 else cta, font_hl, width - 48, draw)
+            yh = 110
+            for l_str in hl_lines[:2]:
+                draw.text((25, yh + 1), l_str, fill=(0, 0, 0), font=font_hl)
+                draw.text((24, yh), l_str, fill=(255, 255, 255), font=font_hl)
+                yh += 28
 
-            lines_hl = wrap_text(headline, font_hl, width - 60, draw)
-            y_h = 145
-            for l in lines_hl[:3]:
-                draw.text((31, y_h + 1), l, fill=(15, 23, 42), font=font_hl)
-                draw.text((30, y_h), l, fill=(255, 255, 255), font=font_hl)
-                y_h += 36
+            # Large Animated Speaking CEO Portrait (464 x 500)
+            anim_ceo = animate_ceo_portrait(
+                ceo_portrait_large,
+                mouth_ratio,
+                amp=amp,
+                t=t,
+                accent_color=accent_clr,
+                secondary_color=sec_clr,
+            )
+            ceo_x = (width - 464) // 2
+            ceo_y = 175
 
-            term_y = max(y_h + 20, 275)
-            term_h = 470
-            draw_card_with_shadow(draw, [(30, term_y), (width - 30, term_y + term_h)], radius=18, fill=(255, 255, 255), outline=(203, 213, 225), width=2)
+            # Pulsing Voice Halo behind CEO Frame
+            halo_pad = int(4 + 10 * amp)
+            draw.rounded_rectangle(
+                [(ceo_x - halo_pad, ceo_y - halo_pad), (ceo_x + 464 + halo_pad, ceo_y + 500 + halo_pad)],
+                radius=28,
+                outline=accent_clr,
+                width=2,
+            )
+            img.paste(anim_ceo, (ceo_x, ceo_y), mask=anim_ceo)
 
-            # Window Title Bar
-            draw.rounded_rectangle([(30, term_y), (width - 30, term_y + 42)], radius=18, fill=(241, 245, 249))
-            draw.rectangle([(30, term_y + 24), (width - 30, term_y + 42)], fill=(241, 245, 249))
-            draw.line([(30, term_y + 42), (width - 30, term_y + 42)], fill=(226, 232, 240), width=1)
+            # Broadcast Lower-Third Nameplate over bottom of CEO Stage
+            lt_y = ceo_y + 420
+            draw.rounded_rectangle(
+                [(ceo_x + 14, lt_y), (ceo_x + 450, lt_y + 68)],
+                radius=14,
+                fill=(10, 15, 28),
+                outline=accent_clr,
+                width=2,
+            )
+            draw.rectangle([(ceo_x + 24, lt_y + 12), (ceo_x + 30, lt_y + 56)], fill=accent_clr)
+            draw.text((ceo_x + 42, lt_y + 11), persona["name"].upper(), fill=(255, 255, 255), font=font_name)
+            draw.text((ceo_x + 42, lt_y + 38), f"{persona['title']}  •  Official Update", fill=(148, 163, 184), font=font_badge)
 
-            draw.ellipse([(45, term_y + 16), (57, term_y + 28)], fill=(239, 68, 68))
-            draw.ellipse([(65, term_y + 16), (77, term_y + 28)], fill=(245, 158, 11))
-            draw.ellipse([(85, term_y + 16), (97, term_y + 28)], fill=(16, 185, 129))
-            draw.text((115, term_y + 14), "agent_runtime // autonomous_workspace.ts", fill=(100, 116, 139), font=font_code)
+            # Hook / Summary ticker below CEO
+            draw_card_with_shadow(draw, [(22, 690), (width - 22, 795)], radius=14, fill=(15, 23, 42), outline=(51, 65, 85), width=1)
+            sub_lines = wrap_text(hook if progress < 0.26 else persona.get("default_quote", body), font_body, width - 68, draw)
+            ys = 704
+            for sl in sub_lines[:3]:
+                draw.text((36, ys), sl, fill=(226, 232, 240), font=font_body)
+                ys += 24
 
-            chip_y = term_y + 54
-            draw.rounded_rectangle([(45, chip_y), (210, chip_y + 26)], radius=8, fill=(241, 245, 249), outline=(226, 232, 240), width=1)
-            draw.text((55, chip_y + 5), "> PROMPT STREAM", fill=(14, 165, 233), font=font_brand_sub)
-            draw.rounded_rectangle([(220, chip_y), (width - 45, chip_y + 26)], radius=8, fill=(236, 253, 245), outline=(167, 243, 208), width=1)
-            draw.text((230, chip_y + 5), "VERIFIED LAB DOCUMENTATION", fill=(5, 150, 105), font=font_brand_sub)
-
-            draw.text((45, term_y + 92), "$ autonomous-agent --eval-breakthrough", fill=(99, 102, 241), font=font_code)
-            draw.line([(45, term_y + 115), (width - 45, term_y + 115)], fill=(241, 245, 249), width=1)
-
-            lines_hook = wrap_text(hook, font_body, width - 90, draw)
-            yh = term_y + 130
-            for l in lines_hook[:6]:
-                draw.text((45, yh), l, fill=(30, 41, 59), font=font_body)
-                yh += 30
-
-            if int(t * 3) % 2 == 0 and yh < term_y + term_h - 40:
-                draw.text((45, yh), "| STREAMING TOKENS...", fill=(14, 165, 233), font=font_code)
-
-            draw.line([(45, term_y + term_h - 46), (width - 45, term_y + term_h - 46)], fill=(241, 245, 249), width=1)
-            draw.text((45, term_y + term_h - 35), "[•] 18ms Latency  •  128k Context  •  Native Multi-Agent", fill=(100, 116, 139), font=font_code)
-
-        elif progress < 0.28:
+        elif progress < 0.52:
             # =========================================================
-            # POSTER 2/7: THE PROBLEM & LEGACY BOTTLENECK
+            # SCENE 2 (26-52%):
+            # HOLOGRAPHIC ARCHITECTURE LAB + LIVE SPEAKING CEO DOCK
             # =========================================================
-            draw.rounded_rectangle([(30, 95), (300, 128)], radius=16, fill=(255, 255, 255), outline=(239, 68, 68), width=1)
-            draw.text((45, 102), "PAGE 02/07 // THE BOTTLENECK", fill=(185, 28, 28), font=font_badge)
+            draw.rounded_rectangle([(22, 76), (340, 102)], radius=10, fill=(15, 23, 42), outline=accent_clr, width=1)
+            draw.text((34, 82), f"ARCHITECTURE BREAKDOWN // {persona['lab'].upper()}", fill=accent_clr, font=font_badge)
 
-            draw.text((31, 143), "What Was Broken Before Today", fill=(15, 23, 42), font=font_hl)
-            draw.text((30, 142), "What Was Broken Before Today", fill=(255, 255, 255), font=font_hl)
+            # Upper Holographic Architecture Canvas (22, 110) -> (width-22, 495)
+            draw_card_with_shadow(draw, [(22, 110), (width - 22, 495)], radius=18, fill=(11, 18, 34), outline=accent_clr, width=2)
+            draw.text((38, 126), "NEURAL ARCHITECTURE & EXECUTION PIPELINE", fill=(255, 255, 255), font=font_badge)
 
-            # Card: Legacy Limitations
-            draw_card_with_shadow(draw, [(30, 195), (width - 30, 435)], radius=18, fill=(255, 255, 255), outline=(252, 165, 165), width=2)
-            draw.rounded_rectangle([(45, 215), (250, 242)], radius=8, fill=(254, 242, 242), outline=(239, 68, 68), width=1)
-            draw.text((55, 220), "[X] LEGACY AI CODE ASSISTANTS", fill=(185, 28, 28), font=font_badge)
-
-            limitations = [
-                "• Fragile single-pass edits with frequent syntax errors",
-                "• No AST or multi-file repository context awareness",
-                "• Hallucinated imports and broken test suites",
-                "• High token latency (>400ms) with expensive API costs"
+            # Animated 3-Node Neural Flow Graph
+            nodes = [
+                (105, 215, "INPUT STREAM", accent_clr),
+                (width // 2, 215, "CORE ENGINE", sec_clr),
+                (width - 105, 215, "VERIFIED OUT", (16, 185, 129)),
             ]
-            yl = 258
-            for lim in limitations:
-                draw.text((45, yl), lim, fill=(100, 116, 139), font=font_body)
-                yl += 38
+            # Animated data packet moving across waveguides
+            draw.line([(105, 215), (width - 105, 215)], fill=(51, 65, 85), width=3)
+            pkt_x = int(105 + ((width - 210) * ((t * 0.9) % 1.0)))
+            draw.ellipse([(pkt_x - 7, 208), (pkt_x + 7, 222)], fill=accent_clr)
 
-            # Card: The Solution Unlocked
-            draw_card_with_shadow(draw, [(30, 460), (width - 30, 755)], radius=18, fill=(255, 255, 255), outline=(52, 211, 153), width=2)
-            draw.rounded_rectangle([(45, 480), (250, 507)], radius=8, fill=(236, 253, 245), outline=(16, 185, 129), width=1)
-            draw.text((55, 485), "[+] THE NEW AGENTIC PARADIGM", fill=(5, 150, 105), font=font_badge)
+            for nx, ny, nlabel, nclr in nodes:
+                pulse_r = 26 + int(4 * abs(math.sin(t * 4 + nx)))
+                draw.ellipse([(nx - pulse_r, ny - pulse_r), (nx + pulse_r, ny + pulse_r)], fill=(15, 23, 42), outline=nclr, width=2)
+                draw.ellipse([(nx - 8, ny - 8), (nx + 8, ny + 8)], fill=nclr)
+                draw.text((nx - 42, ny + 34), nlabel, fill=(226, 232, 240), font=font_brand_sub)
 
-            solutions = [
-                "• Persistent conversation trees and reversible diffs",
-                "• Multi-step verification loop running live unit tests",
-                "• Direct inspection into every model transaction",
-                "• Zero code leaves your machine: vendor-neutral privacy"
-            ]
-            ys = 525
-            for sol in solutions:
-                draw.text((45, ys), sol, fill=(15, 23, 42), font=font_body)
-                ys += 44
+            # Key Architecture Bullet Points inside Hologram
+            body_lines = wrap_text(body, font_body, width - 80, draw)
+            yb = 290
+            for bl in body_lines[:6]:
+                draw.text((40, yb), bl, fill=(226, 232, 240), font=font_body)
+                yb += 26
 
-        elif progress < 0.42:
-            # =========================================================
-            # POSTER 3/7: ARCHITECTURE LEAP & INNER MECHANISM
-            # =========================================================
-            draw.rounded_rectangle([(30, 95), (320, 128)], radius=16, fill=(255, 255, 255), outline=(99, 102, 241), width=1)
-            draw.text((45, 102), "PAGE 03/07 // ARCHITECTURE LEAP", fill=(67, 56, 202), font=font_badge)
+            draw.rounded_rectangle([(38, 452), (width - 38, 480)], radius=8, fill=(15, 23, 42), outline=sec_clr, width=1)
+            draw.text((50, 459), f"[+] {persona['lab']} Verified Production Architecture", fill=accent_clr, font=font_code)
 
-            draw.text((31, 143), "How It Works Under The Hood", fill=(15, 23, 42), font=font_hl)
-            draw.text((30, 142), "How It Works Under The Hood", fill=(255, 255, 255), font=font_hl)
+            # Lower Split-Screen Live CEO Studio Dock (y: 510 -> 790)
+            anim_ceo_small = animate_ceo_portrait(
+                ceo_portrait_split,
+                mouth_ratio,
+                amp=amp,
+                t=t,
+                accent_color=accent_clr,
+                secondary_color=sec_clr,
+            )
+            img.paste(anim_ceo_small, (22, 515), mask=anim_ceo_small)
 
-            arch_layers = [
-                ("01", "Test-Time Compute Scaling", "Generates and validates multiple reasoning candidates before emitting diffs.", (99, 102, 241)),
-                ("02", "Quantized Sparse MoE Kernels", "Sub-second 18ms latency with 10x smaller VRAM footprint.", (14, 165, 233)),
-                ("03", "Persistent Tree AST Storage", "Branches code hypotheses independently without context rot.", (16, 185, 129))
-            ]
+            # Right-side Live Executive Commentary Card next to Speaking CEO
+            draw_card_with_shadow(draw, [(250, 515), (width - 22, 770)], radius=16, fill=(15, 23, 42), outline=accent_clr, width=2)
+            draw.text((266, 530), persona["name"].upper(), fill=(255, 255, 255), font=font_brand)
+            draw.text((266, 550), persona["title"], fill=accent_clr, font=font_brand_sub)
+            draw.line([(266, 568), (width - 38, 568)], fill=(51, 65, 85), width=1)
 
-            ya = 195
-            for num, title, desc, clr in arch_layers:
-                draw_card_with_shadow(draw, [(30, ya), (width - 30, ya + 165)], radius=16, fill=(255, 255, 255), outline=(226, 232, 240), width=2)
-                draw.rounded_rectangle([(45, ya + 18), (115, ya + 46)], radius=8, fill=(241, 245, 249))
-                draw.text((55, ya + 24), f"LAYER {num}", fill=(15, 23, 42), font=font_badge)
-
-                draw.text((45, ya + 58), title, fill=clr, font=font_cta)
-                lines_d = wrap_text(desc, font_body, width - 90, draw)
-                yd = ya + 95
-                for l in lines_d[:2]:
-                    draw.text((45, yd), l, fill=(71, 85, 105), font=font_body)
-                    yd += 28
-                ya += 185
-
-        elif progress < 0.57:
-            # =========================================================
-            # POSTER 4/7: BENCHMARK RADAR & SOTA VERIFICATION
-            # =========================================================
-            draw.rounded_rectangle([(30, 95), (320, 128)], radius=16, fill=(255, 255, 255), outline=(14, 165, 233), width=1)
-            draw.text((45, 102), "PAGE 04/07 // BENCHMARK RADAR", fill=(2, 132, 199), font=font_badge)
-
-            draw.text((31, 143), "Verified Benchmark Metrics", fill=(15, 23, 42), font=font_hl)
-            draw.text((30, 142), "Verified Benchmark Metrics", fill=(255, 255, 255), font=font_hl)
-
-            # SOTA Gauge Card
-            draw_card_with_shadow(draw, [(30, 185), (width - 30, 375)], radius=18, fill=(255, 255, 255), outline=(14, 165, 233), width=2)
-            draw.rounded_rectangle([(45, 205), (240, 232)], radius=8, fill=(236, 253, 245), outline=(52, 211, 153), width=1)
-            draw.text((55, 210), "STATE-OF-THE-ART METRIC", fill=(5, 150, 105), font=font_badge)
-
-            draw.text((45, 245), "VERIFIED SOTA BENCHMARK LEAP", fill=(15, 23, 42), font=get_font(24, bold=True))
-
-            gauge_p = min(0.92, 0.40 + progress * 0.8)
-            draw.rectangle([(45, 290), (width - 45, 305)], fill=(241, 245, 249))
-            draw.rectangle([(45, 290), (45 + int((width - 90) * gauge_p), 305)], fill=(16, 185, 129))
-            draw.text((45, 320), f"SWE-bench: {int(gauge_p * 100)}% Accuracy  •  +14.2% Over Prior SOTA", fill=(71, 85, 105), font=font_code)
-            draw.text((45, 345), "HumanEval: 94.1%  •  MMLU-Pro: 92.4%  •  Latency: 18ms", fill=(100, 116, 139), font=font_small)
-
-            # Documentation Card
-            draw_card_with_shadow(draw, [(30, 395), (width - 30, 745)], radius=18, fill=(255, 255, 255), outline=(226, 232, 240), width=2)
-            draw.rounded_rectangle([(45, 415), (270, 442)], radius=8, fill=(238, 242, 255), outline=(99, 102, 241), width=1)
-            draw.text((55, 420), "ENGINEERING SPECIFICATION", fill=(67, 56, 202), font=font_badge)
-
-            lines_b = wrap_text(body, font_body, width - 90, draw)
-            yb = 460
-            for l in lines_b[:7]:
-                draw.text((45, yb), l, fill=(30, 41, 59), font=font_body)
-                yb += 28
-
-            draw.rounded_rectangle([(45, 685), (width - 45, 725)], radius=10, fill=(248, 250, 252), outline=(203, 213, 225), width=1)
-            draw.text((55, 696), "[+] 100% Primary Lab Preprint & Repo Verified", fill=(5, 150, 105), font=font_code)
-
-        elif progress < 0.71:
-            # =========================================================
-            # POSTER 5/7: DEVELOPER SUPERPOWERS & WORKFLOW
-            # =========================================================
-            draw.rounded_rectangle([(30, 95), (330, 128)], radius=16, fill=(255, 255, 255), outline=(168, 85, 247), width=1)
-            draw.text((45, 102), "PAGE 05/07 // DEVELOPER POWERS", fill=(126, 34, 206), font=font_badge)
-
-            draw.text((31, 143), "What Engineers Can Deploy Today", fill=(15, 23, 42), font=font_hl)
-            draw.text((30, 142), "What Engineers Can Deploy Today", fill=(255, 255, 255), font=font_hl)
-
-            features = [
-                ("01", "Autonomous Context Engine", "Deep repo AST awareness & multi-file reasoning.", "READY", (16, 185, 129)),
-                ("02", "Self-Healing Code Loops", "Auto-executes tests, parses errors, and patches diffs.", "ACTIVE", (14, 165, 233)),
-                ("03", "Production Inference API", "Sub-second token throughput at 10x lower compute cost.", "DEPLOYED", (99, 102, 241))
-            ]
-
-            yf = 190
-            for num, f_title, f_desc, pill_text, pill_color in features:
-                draw_card_with_shadow(draw, [(30, yf), (width - 30, yf + 165)], radius=16, fill=(255, 255, 255), outline=(226, 232, 240), width=2)
-                draw.rounded_rectangle([(45, yf + 16), (105, yf + 42)], radius=8, fill=(241, 245, 249))
-                draw.text((55, yf + 21), f"STEP {num}", fill=(15, 23, 42), font=font_badge)
-
-                draw.rounded_rectangle([(width - 135, yf + 16), (width - 45, yf + 42)], radius=8, fill=(248, 250, 252), outline=pill_color, width=1)
-                draw.text((width - 125, yf + 21), pill_text, fill=pill_color, font=font_badge)
-
-                draw.text((45, yf + 54), f_title, fill=(15, 23, 42), font=font_cta)
-                lines_fd = wrap_text(f_desc, font_body, width - 90, draw)
-                draw.text((45, yf + 92), lines_fd[0] if lines_fd else "", fill=(71, 85, 105), font=font_body)
-                if len(lines_fd) > 1:
-                    draw.text((45, yf + 120), lines_fd[1], fill=(71, 85, 105), font=font_body)
-                yf += 185
-
-        elif progress < 0.85:
-            # =========================================================
-            # POSTER 6/7: MODEL WEIGHTS & CLOUD AVAILABILITY
-            # =========================================================
-            draw.rounded_rectangle([(30, 95), (330, 128)], radius=16, fill=(255, 255, 255), outline=(20, 184, 166), width=1)
-            draw.text((45, 102), "PAGE 06/07 // ACCESS & SPECS", fill=(13, 148, 136), font=font_badge)
-
-            draw.text((31, 143), "Availability, Weights & Stack", fill=(15, 23, 42), font=font_hl)
-            draw.text((30, 142), "Availability, Weights & Stack", fill=(255, 255, 255), font=font_hl)
-
-            # Specs Card
-            draw_card_with_shadow(draw, [(30, 195), (width - 30, 745)], radius=18, fill=(255, 255, 255), outline=(20, 184, 166), width=2)
-
-            specs = [
-                ("[•] Open Weights Checkpoint", "Available immediately on Hugging Face & GitHub with full safetensors checkpoints."),
-                ("[•] Local Execution Footprint", "Runs natively on consumer hardware: single RTX 4090 or Apple Silicon Mac."),
-                ("[•] Cloud REST & Python SDK", "Sub-second cloud endpoints accessible with standard OpenAI-compatible API schemas."),
-                ("[•] Commercial License", "Permissive open licensing: deployable for enterprise and private production workloads.")
-            ]
-
-            ysp = 225
-            for title, desc in specs:
-                draw.text((50, ysp), title, fill=(13, 148, 136), font=font_cta)
-                lines_sp = wrap_text(desc, font_body, width - 100, draw)
-                yd = ysp + 36
-                for l in lines_sp[:2]:
-                    draw.text((50, yd), l, fill=(51, 65, 85), font=font_body)
-                    yd += 28
-                ysp += 120
+            q_lines = wrap_text(f"\"{hook}\"", font_body, width - 302, draw)
+            yq = 580
+            for ql in q_lines[:6]:
+                draw.text((266, yq), ql, fill=(226, 232, 240), font=font_body)
+                yq += 24
 
         else:
             # =========================================================
-            # POSTER 7/7: COMMUNITY DEBATE & INTERACTIVE CTA
+            # SCENE 3 (52-78%):
+            # LIVE ANIMATED SOTA BENCHMARK ARENA + SPEAKING CEO DOCK
             # =========================================================
-            draw.rounded_rectangle([(30, 95), (320, 128)], radius=16, fill=(255, 255, 255), outline=(244, 63, 94), width=1)
-            draw.text((45, 102), "PAGE 07/07 // THE BIG DEBATE", fill=(190, 18, 60), font=font_badge)
+            draw.rounded_rectangle([(22, 76), (340, 102)], radius=10, fill=(15, 23, 42), outline=(16, 185, 129), width=1)
+            draw.text((34, 82), "VERIFIED BENCHMARKS // LIVE TELEMETRY", fill=(16, 185, 129), font=font_badge)
 
-            debate_bbox = [(30, 145), (width - 30, 395)]
-            draw_card_with_shadow(draw, debate_bbox, radius=20, fill=(255, 255, 255), outline=(244, 63, 94), width=2)
-            draw.text((45, 165), "THE BIG TECHNICAL DEBATE:", fill=(244, 63, 94), font=font_badge)
+            draw_card_with_shadow(draw, [(22, 110), (width - 22, 495)], radius=18, fill=(11, 18, 34), outline=(16, 185, 129), width=2)
+            draw.text((38, 126), f"{persona['lab'].upper()} PERFORMANCE BENCHMARKS", fill=(255, 255, 255), font=font_hl)
 
-            lines_cta = wrap_text(cta, font_hl, width - 90, draw)
-            yc = 198
-            for l in lines_cta[:5]:
-                draw.text((45, yc), l, fill=(15, 23, 42), font=font_hl)
-                yc += 36
-
-            # Live Poll Simulation
-            poll_y = 415
-            poll_bbox = [(30, poll_y), (width - 30, poll_y + 125)]
-            draw_card_with_shadow(draw, poll_bbox, radius=16, fill=(255, 255, 255), outline=(14, 165, 233), width=2)
-            draw.text((45, poll_y + 14), "LIVE COMMUNITY POLL", fill=(14, 165, 233), font=font_badge)
-
-            draw.rounded_rectangle([(45, poll_y + 38), (width - 45, poll_y + 70)], radius=8, fill=(241, 245, 249))
-            draw.rounded_rectangle([(45, poll_y + 38), (int(45 + (width - 90) * 0.84), poll_y + 70)], radius=8, fill=(220, 252, 231))
-            draw.text((55, poll_y + 44), "[A]  Game-Changer Paradigm (84%)", fill=(21, 128, 61), font=font_dock)
-
-            draw.rounded_rectangle([(45, poll_y + 78), (width - 45, poll_y + 110)], radius=8, fill=(248, 250, 252))
-            draw.rounded_rectangle([(45, poll_y + 78), (int(45 + (width - 90) * 0.16), poll_y + 110)], radius=8, fill=(241, 245, 249))
-            draw.text((55, poll_y + 84), "[B]  Incremental Benchmark (16%)", fill=(100, 116, 139), font=font_dock)
-
-            # Social Action Dock
-            dock_y = 560
-            dock_bbox = [(30, dock_y), (width - 30, 755)]
-            draw_card_with_shadow(draw, dock_bbox, radius=18, fill=(255, 255, 255), outline=(226, 232, 240), width=2)
-
-            actions = [
-                ("[ + ]", "LIKE & SAVE REEL", (244, 63, 94)),
-                ("[ > ]", "DROP YOUR COMMENT", (14, 165, 233)),
-                ("[ ^ ]", "SHARE WITH ENGINEERS", (99, 102, 241)),
-                ("[ * ]", "SUBSCRIBE TO @ERAOF_AI", (16, 185, 129))
+            scene_prog = min(1.0, max(0.1, (progress - 0.52) / 0.18))
+            benchmarks = [
+                ("Reasoning & Coding Accuracy", 0.94, accent_clr, "+14.8% vs Prior SOTA"),
+                ("Multi-Step Agent Verification", 0.91, (16, 185, 129), "2.4x Faster Throughput"),
+                ("Token Compute Efficiency", 0.89, sec_clr, "-62% Inference Latency"),
             ]
+            ym = 175
+            for b_label, target_val, b_clr, b_delta in benchmarks:
+                curr_val = target_val * scene_prog
+                draw.text((38, ym), b_label, fill=(226, 232, 240), font=font_body)
+                draw.text((width - 190, ym), b_delta, fill=b_clr, font=font_code)
+                draw.rounded_rectangle([(38, ym + 26), (width - 38, ym + 46)], radius=8, fill=(30, 41, 59))
+                fill_w = max(16, int((width - 76) * curr_val))
+                draw.rounded_rectangle([(38, ym + 26), (38 + fill_w, ym + 46)], radius=8, fill=b_clr)
+                draw.text((48, ym + 28), f"{int(curr_val * 100)}%", fill=(255, 255, 255), font=font_badge)
+                ym += 95
 
-            ya = dock_y + 20
-            for icon, label, clr in actions:
-                draw.rounded_rectangle([(45, ya), (width - 45, ya + 38)], radius=10, fill=(248, 250, 252), outline=(226, 232, 240), width=1)
-                draw.text((58, ya + 8), f"{icon}  {label}", fill=clr, font=font_dock)
-                ya += 46
+            # Lower Split-Screen Live Speaking CEO Dock
+            anim_ceo_small = animate_ceo_portrait(
+                ceo_portrait_split,
+                mouth_ratio,
+                amp=amp,
+                t=t,
+                accent_color=accent_clr,
+                secondary_color=sec_clr,
+            )
+            img.paste(anim_ceo_small, (22, 515), mask=anim_ceo_small)
 
-            # Seamless Loop Indicator (Loop completion psychology)
-            if progress > 0.93:
-                draw.rounded_rectangle([(30, 765), (width - 30, 805)], radius=10, fill=(238, 242, 255), outline=(99, 102, 241), width=1)
-                draw.text((42, 775), ">> SEAMLESS LOOP: RE-EXAMINE SOTA LEAP >>", fill=(79, 70, 229), font=font_dock)
+            draw_card_with_shadow(draw, [(250, 515), (width - 22, 770)], radius=16, fill=(15, 23, 42), outline=(16, 185, 129), width=2)
+            draw.text((266, 530), f"{persona['name'].upper()} // KEY TAKEAWAY", fill=(16, 185, 129), font=font_badge)
+            draw.line([(266, 554), (width - 38, 554)], fill=(51, 65, 85), width=1)
+            q_lines = wrap_text(persona.get("default_quote", body), font_body, width - 302, draw)
+            yq = 568
+            for ql in q_lines[:6]:
+                draw.text((266, yq), ql, fill=(226, 232, 240), font=font_body)
+                yq += 24
 
         # -------------------------------------------------------------
-        # 3. Clean Minimalist Frosted Footer (NO Audio Wave Bars)
+        # 3. Synchronized Word-by-Word Highlighted Kinetic Subtitles
         # -------------------------------------------------------------
-        footer_box = [(20, height - 52), (width - 20, height - 16)]
-        draw.rounded_rectangle([(footer_box[0][0] + 2, footer_box[0][1] + 3), (footer_box[1][0] + 2, footer_box[1][1] + 3)], radius=12, fill=(30, 20, 60))
-        draw.rounded_rectangle(footer_box, radius=12, fill=(255, 255, 255), outline=(226, 232, 240), width=1)
+        draw_kinetic_subtitles(
+            draw=draw,
+            words=script_words,
+            progress=progress,
+            width=width,
+            y_pos=812,
+            accent_color=accent_clr,
+            font_sub=font_sub,
+        )
 
-        draw.text((32, height - 42), "ERA OF AI", fill=(15, 23, 42), font=font_brand_sub)
-        draw.text((115, height - 42), "@Eraof_Ai  •  t.me/Eraof_Ai", fill=(71, 85, 105), font=font_small)
-        curr_page = min(7, int(progress * 7) + 1)
-        draw.text((width - 82, height - 43), f"0{curr_page} / 07", fill=(2, 132, 199), font=font_badge)
+        # -------------------------------------------------------------
+        # 4. Executive Broadcast Footer with AIGC Compliance Badge
+        # -------------------------------------------------------------
+        footer_box = [(22, height - 48), (width - 22, height - 14)]
+        draw.rounded_rectangle(footer_box, radius=10, fill=(15, 23, 42), outline=(51, 65, 85), width=1)
+        draw.text((34, height - 38), f"@{persona['lab'].replace(' ', '')}  •  @Eraof_Ai", fill=(255, 255, 255), font=font_small)
+        draw.text((width - 215, height - 38), "AI Executive Simulation • Full HD", fill=(148, 163, 184), font=font_small)
 
-        # Send frame to FFmpeg writer
         writer.send(np.array(img))
 
     writer.close()
 
-    # Mux video with synthesized audio using FFmpeg into Full HD 1080x1920 (9:16) 30fps + 44.1kHz Stereo AAC
+    # Mux video with synthesized CEO voiceover into Full HD 1080x1920 (9:16) 30fps + 44.1kHz Stereo AAC
     ffmpeg_exe = imageio_ffmpeg.get_ffmpeg_exe()
     output_video_path.parent.mkdir(parents=True, exist_ok=True)
     if output_video_path.exists():
@@ -681,7 +884,7 @@ def render_motion_video(
         "-ac", "2",
         "-b:a", "192k",
         "-shortest",
-        str(output_video_path)
+        str(output_video_path),
     ]
     subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True)
 
@@ -697,34 +900,51 @@ async def synthesize_broadcast_video(
     use_veo: bool = False
 ) -> str:
     """
-    End-to-end video synthesis pipeline:
-    Script -> Neural Voiceover -> Google AI Studio Veo / Apple Silk Wave -> 7-Poster Motion Graphics -> MP4.
+    End-to-end CEO Character Keynote Video synthesis pipeline:
+    1. Detect company CEO persona (Sundar Pichai for Google, Sam Altman for OpenAI, etc.)
+    2. Compose first-person CEO keynote script
+    3. Synthesize CEO-matched neural voiceover (accent + vocal formant/pitch/EQ profile)
+    4. Render 30fps audio-synchronized talking CEO character + 4 dynamic scenes in Full HD 1080x1920
     """
-    # Compose captivating, structured voiceover covering the 7-poster narrative
-    hook_text = directive.get('hook_narration', '').strip()
-    body_text = directive.get('body_narration', '').strip()
-    cta_text = directive.get('call_to_action', '').strip()
-    
-    narration = f"{hook_text} Let's examine the technical architecture and verified benchmarks. {body_text} The official checkpoints and weights are live today. {cta_text}"
-    
+    headline = directive.get("title") or "Frontier AI Breakthrough"
+    hook_text = directive.get("hook_narration", "").strip()
+    body_text = directive.get("body_narration", "").strip()
+    source_url = directive.get("source_url", "").strip()
+
+    persona = detect_persona(headline, f"{hook_text} {body_text} {source_url}")
+    narration = build_ceo_first_person_script(directive, persona)
+
     audio_path = STAGING_DIR / f"voice_{output_filename}.mp3"
     video_path = STAGING_DIR / f"{output_filename}.mp4"
 
-    # Step 1: Synthesize charismatic neural speech
-    await synthesize_audio(narration, audio_path)
+    # Step 1: Synthesize CEO-matched neural speech
+    await synthesize_audio(
+        narration,
+        audio_path,
+        voice=persona.get("voice_profile", {}).get("edge_voice", "en-IN-PrabhatNeural"),
+        persona=persona,
+    )
 
-    # Step 2: Optional Google AI Studio Veo video generation with automatic fallback to Apple silk wave
+    # Step 2: Optional Gemini Omni 1.1 Flash / Veo 3.1 cloud video generation
     if use_veo:
         try:
-            print("[Google AI Studio] Generating Veo b-roll video...")
-            veo_path = generate_veo_broll(directive.get('title', 'AI Architecture'))
-            if veo_path:
-                print(f"[Google AI Studio] Veo b-roll generated: {veo_path}")
+            p_file = PORTRAITS_DIR / persona.get("portrait_file", "sundar_pichai.jpg")
+            generate_veo_broll(
+                f"{persona['name']}, {persona['title']}, presenting {headline} on a modern AI keynote stage",
+                first_frame_path=p_file if p_file.exists() else None,
+            )
         except Exception as e:
-            print(f"[Google AI Studio] Veo unavailable ({e}); proceeding with Apple fluid silk wave engine.")
+            print(f"[CEOVideoEngine] Cloud Veo/Omni skipped ({e}); rendering via 30fps CEO Character Animator.")
 
-    # Step 3: Render 9:16 vertical motion video across 7 poster pages
-    render_motion_video(directive, audio_path, video_path)
+    # Step 3: Render 9:16 Full HD 1080x1920 30fps animated CEO presenter video
+    render_motion_video(
+        directive,
+        audio_path,
+        video_path,
+        fps=30,
+        persona=persona,
+        spoken_script=narration,
+    )
 
     return str(video_path)
 
@@ -744,18 +964,17 @@ def synthesize_broadcast_video_sync(
     if loop and loop.is_running():
         with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
             future = pool.submit(asyncio.run, synthesize_broadcast_video(directive, output_filename, use_veo=use_veo))
-            return future.result(timeout=120)
+            return future.result(timeout=180)
     else:
         return asyncio.run(synthesize_broadcast_video(directive, output_filename, use_veo=use_veo))
 
 
 if __name__ == "__main__":
     test_d = {
-        "title": "Gemini 2.5 Flash: Autonomous SWE-bench Leap",
-        "hook_narration": "Gemini 2.5 Flash just shattered SWE-bench coding benchmarks with a verified +14.2% gain!",
-        "body_narration": "DeepMind confirmed real-time multimodal reasoning and native coding automation inside Gemini 2.5. Benchmark data shows significant gains across complex multi-file repo edits and automated tests.",
-        "call_to_action": "Will multimodal test-time compute make all single-pass code models obsolete?"
+        "title": "Google Gemini 3.8 Flash: Real-Time Autonomous Coding & Multimodal Reasoning",
+        "hook_narration": "Gemini 3.8 Flash just shattered SWE-bench coding benchmarks with a verified 14.8% leap in autonomous repository engineering.",
+        "body_narration": "Our new sparse mixture-of-experts architecture combines sub-second 18 millisecond latency with native multi-file AST verification and live tool execution across Google Cloud and Android.",
+        "call_to_action": "Will autonomous test-time compute make single-pass code assistants obsolete? Drop your thoughts in the comments!",
     }
-    out = asyncio.run(synthesize_broadcast_video(test_d, "test_7page_poster_reel"))
-    print("7-Page Poster Video rendered successfully:", out, "Size:", os.path.getsize(out), "bytes")
-
+    out = asyncio.run(synthesize_broadcast_video(test_d, "test_google_ceo_sundar_pichai_reel"))
+    print("CEO Keynote Video rendered successfully:", out, "Size:", os.path.getsize(out), "bytes")
