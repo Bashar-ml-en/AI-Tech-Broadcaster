@@ -724,6 +724,9 @@ def render_motion_video(
     from src.persona_manager import get_persona_stage_background
     stage_bg = get_persona_stage_background(persona, target_size=(width, height))
 
+    from src.presenter_engine import FullBodyKeynotePresenter
+    presenter_inst = FullBodyKeynotePresenter(persona, width=width, height=height)
+
     clean_hl = _clean_legacy_boilerplate(headline) or headline
 
     for f_idx in range(total_frames):
@@ -731,216 +734,175 @@ def render_motion_video(
         progress = f_idx / total_frames
         amp = float(audio_env[f_idx]) if f_idx < len(audio_env) else 0.3
 
-        img = stage_bg.copy()
+        # -------------------------------------------------------------
+        # 1. Base Stage Plate with Living Photorealistic Presenter & Head Dynamics
+        # -------------------------------------------------------------
+        if progress < 0.26 or progress >= 0.78:
+            pose_req = "GREETING" if progress < 0.26 else "INVITE"
+            img, finger_xy = presenter_inst.get_stage_plate(pose_req, t=t, amp=amp)
+        else:
+            img, finger_xy = presenter_inst.get_stage_plate("POINT", t=t, amp=amp)
+
         draw = ImageDraw.Draw(img)
 
-        # Dynamic Keynote Spotlight Rays at Top
-        ray_shift = int(25 * math.sin(t * 1.2))
-        draw.polygon(
-            [(width // 2 + ray_shift, 0), (40, 260), (190, 260)],
-            fill=(accent_clr[0] // 5, accent_clr[1] // 5, accent_clr[2] // 5),
-        )
-        draw.polygon(
-            [(width // 2 - ray_shift, 0), (width - 190, 260), (width - 40, 260)],
-            fill=(sec_clr[0] // 5, sec_clr[1] // 5, sec_clr[2] // 5),
-        )
-
         # -------------------------------------------------------------
-        # 1. Top Broadcast Header Bar
+        # 2. Top Broadcast Header Bar
         # -------------------------------------------------------------
         draw.rectangle([(0, 0), (width // 2, 5)], fill=accent_clr)
         draw.rectangle([(width // 2, 0), (width, 5)], fill=sec_clr)
 
-        draw_card_with_shadow(draw, [(22, 16), (215, 54)], radius=12, fill=(15, 23, 42), outline=accent_clr, width=1)
+        draw_card_with_shadow(draw, [(22, 12), (215, 50)], radius=12, fill=(15, 23, 42), outline=accent_clr, width=1)
         if logo_icon:
-            img.paste(logo_icon, (30, 19), mask=logo_icon)
-        draw.text((70, 20), "ERA OF AI", fill=(255, 255, 255), font=font_brand)
-        draw.text((70, 37), f"{persona['lab'].upper()} KEYNOTE", fill=accent_clr, font=font_brand_sub)
+            img.paste(logo_icon, (30, 15), mask=logo_icon)
+        draw.text((70, 16), "ERA OF AI", fill=(255, 255, 255), font=font_brand)
+        draw.text((70, 33), f"{persona['lab'].upper()} KEYNOTE", fill=accent_clr, font=font_brand_sub)
 
         # Live Speaking Indicator Pill
-        live_pill = [(width - 195, 18), (width - 22, 52)]
+        live_pill = [(width - 195, 14), (width - 22, 48)]
         draw.rounded_rectangle(live_pill, radius=16, fill=(15, 23, 42), outline=accent_clr, width=1)
         dot_r = 6 if amp > 0.25 else 4
-        draw.ellipse([(width - 180 - dot_r, 35 - dot_r), (width - 180 + dot_r, 35 + dot_r)], fill=(239, 68, 68))
-        draw.text((width - 166, 27), f"LIVE • {persona['name'].split()[0].upper()}", fill=(255, 255, 255), font=font_badge)
+        draw.ellipse([(width - 180 - dot_r, 31 - dot_r), (width - 180 + dot_r, 31 + dot_r)], fill=(239, 68, 68))
+        draw.text((width - 166, 23), f"LIVE • {persona['name'].split()[0].upper()}", fill=(255, 255, 255), font=font_badge)
 
         # Progress Timeline Bar
         bar_w = int((width - 44) * progress)
-        draw.rectangle([(22, 62), (width - 22, 66)], fill=(30, 41, 59))
-        draw.rectangle([(22, 62), (22 + bar_w, 66)], fill=accent_clr)
+        draw.rectangle([(22, 54), (width - 22, 58)], fill=(30, 41, 59))
+        draw.rectangle([(22, 54), (22 + bar_w, 58)], fill=accent_clr)
 
         # -------------------------------------------------------------
-        # 2. Multi-Scene CEO Presenter & Dynamic Visual Stage
+        # 3. Multi-Scene Full-Body Keynote Presenter & Interactive Stage
         # -------------------------------------------------------------
         if progress < 0.26 or progress >= 0.78:
             # =========================================================
             # SCENE 1 (0-26%) & SCENE 4 (78-100%):
-            # FULL KEYNOTE STAGE — LARGE ANIMATED CEO PRESENTER
+            # CENTER STAGE FULL-BODY KEYNOTE PRESENTER
             # =========================================================
             scene_tag = "KEYNOTE STAGE // EXECUTIVE BRIEFING" if progress < 0.26 else "EXECUTIVE TAKEAWAY // LIVE DEBATE"
-            draw.rounded_rectangle([(22, 76), (310, 102)], radius=10, fill=(15, 23, 42), outline=accent_clr, width=1)
-            draw.text((34, 82), scene_tag, fill=accent_clr, font=font_badge)
+            draw.rounded_rectangle([(22, 64), (300, 88)], radius=8, fill=(15, 23, 42), outline=accent_clr, width=1)
+            draw.text((32, 69), scene_tag, fill=accent_clr, font=font_badge)
 
-            # Headline Banner above CEO
-            hl_lines = wrap_text(clean_hl if progress < 0.26 else cta, font_hl, width - 48, draw)
-            yh = 110
+            # Overhead Floating Headline Display (Placed cleanly above head)
+            hl_display = clean_hl if progress < 0.26 else cta
+            hl_lines = wrap_text(hl_display, font_hl, width - 64, draw)
+            yh = 94
+            h_card_h = min(2, len(hl_lines)) * 24 + 10
+            draw.rounded_rectangle([(22, 90), (width - 22, 90 + h_card_h)], radius=10, fill=(11, 18, 34, 210), outline=(accent_clr[0], accent_clr[1], accent_clr[2], 180), width=1)
             for l_str in hl_lines[:2]:
-                draw.text((25, yh + 1), l_str, fill=(0, 0, 0), font=font_hl)
-                draw.text((24, yh), l_str, fill=(255, 255, 255), font=font_hl)
-                yh += 28
+                draw.text((34, yh + 1), l_str, fill=(0, 0, 0), font=font_hl)
+                draw.text((33, yh), l_str, fill=(255, 255, 255), font=font_hl)
+                yh += 24
 
-            # Large Animated Speaking CEO Portrait (464 x 500)
-            anim_ceo = animate_ceo_portrait(
-                ceo_portrait_large,
-                mouth_ratio,
-                amp=amp,
-                t=t,
-                accent_color=accent_clr,
-                secondary_color=sec_clr,
-            )
-            ceo_x = (width - 464) // 2
-            ceo_y = 175
-
-            # Steady Studio Rim Border behind CEO Frame (no jumping padding)
-            halo_pad = 4
+            # Broadcast Lower-Third Nameplate grounded at Stage Level (y = 735)
+            lt_y = 735
             draw.rounded_rectangle(
-                [(ceo_x - halo_pad, ceo_y - halo_pad), (ceo_x + 464 + halo_pad, ceo_y + 500 + halo_pad)],
-                radius=28,
-                outline=accent_clr if amp > 0.2 else (51, 65, 85),
-                width=2,
-            )
-            img.paste(anim_ceo, (ceo_x, ceo_y), mask=anim_ceo)
-
-            # Broadcast Lower-Third Nameplate over bottom of CEO Stage
-            lt_y = ceo_y + 420
-            draw.rounded_rectangle(
-                [(ceo_x + 14, lt_y), (ceo_x + 450, lt_y + 68)],
+                [(width // 2 - 215, lt_y), (width // 2 + 215, lt_y + 54)],
                 radius=14,
-                fill=(10, 15, 28),
+                fill=(10, 15, 28, 220),
                 outline=accent_clr,
                 width=2,
             )
-            draw.rectangle([(ceo_x + 24, lt_y + 12), (ceo_x + 30, lt_y + 56)], fill=accent_clr)
-            draw.text((ceo_x + 42, lt_y + 11), persona["name"].upper(), fill=(255, 255, 255), font=font_name)
-            draw.text((ceo_x + 42, lt_y + 38), f"{persona['title']}  •  Official Update", fill=(148, 163, 184), font=font_badge)
-
-            # Hook / Summary ticker below CEO
-            draw_card_with_shadow(draw, [(22, 690), (width - 22, 795)], radius=14, fill=(15, 23, 42), outline=(51, 65, 85), width=1)
-            sub_lines = wrap_text(hook if progress < 0.26 else body, font_body, width - 68, draw)
-            ys = 704
-            for sl in sub_lines[:3]:
-                draw.text((36, ys), sl, fill=(226, 232, 240), font=font_body)
-                ys += 24
+            draw.rectangle([(width // 2 - 205, lt_y + 10), (width // 2 - 199, lt_y + 44)], fill=accent_clr)
+            draw.text((width // 2 - 188, lt_y + 9), persona["name"].upper(), fill=(255, 255, 255), font=font_name)
+            draw.text((width // 2 - 188, lt_y + 32), f"{persona['title']}  •  Official Keynote Update", fill=(148, 163, 184), font=font_badge)
 
         elif progress < 0.52:
             # =========================================================
             # SCENE 2 (26-52%):
-            # HOLOGRAPHIC ARCHITECTURE LAB + LIVE SPEAKING CEO DOCK
+            # STAGE-LEFT PRESENTER POINTING AT HOLOGRAPHIC ARCHITECTURE
             # =========================================================
-            draw.rounded_rectangle([(22, 76), (340, 102)], radius=10, fill=(15, 23, 42), outline=accent_clr, width=1)
-            draw.text((34, 82), f"ARCHITECTURE BREAKDOWN // {persona['lab'].upper()}", fill=accent_clr, font=font_badge)
+            draw.rounded_rectangle([(22, 72), (320, 98)], radius=8, fill=(15, 23, 42), outline=accent_clr, width=1)
+            draw.text((34, 78), f"ARCHITECTURE BREAKDOWN // {persona['lab'].upper()}", fill=accent_clr, font=font_badge)
 
-            # Upper Holographic Architecture Canvas (22, 110) -> (width-22, 495)
-            draw_card_with_shadow(draw, [(22, 110), (width - 22, 495)], radius=18, fill=(11, 18, 34), outline=accent_clr, width=2)
-            draw.text((38, 126), "NEURAL ARCHITECTURE & EXECUTION PIPELINE", fill=(255, 255, 255), font=font_badge)
+            # Upper Holographic Architecture Screen on Stage Right
+            screen_x0 = 250
+            screen_x1 = width - 16
+            draw.rounded_rectangle([(screen_x0, 104), (screen_x1, 260)], radius=12, fill=(11, 18, 34, 220), outline=accent_clr, width=2)
+            draw.text((screen_x0 + 14, 114), "NEURAL PIPELINE & EXECUTION", fill=(255, 255, 255), font=font_badge)
 
-            # Animated 3-Node Neural Flow Graph
-            nodes = [
-                (105, 215, "INPUT STREAM", accent_clr),
-                (width // 2, 215, "CORE ENGINE", sec_clr),
-                (width - 105, 215, "VERIFIED OUT", (16, 185, 129)),
+            # 3-Node Neural Waveguide
+            n1_x = screen_x0 + 38
+            n2_x = screen_x0 + 130
+            n3_x = screen_x0 + 222
+            node_y = 158
+
+            draw.line([(n1_x, node_y), (n3_x, node_y)], fill=(51, 65, 85), width=2)
+            pkt_prog = ((t * 0.95) % 1.0)
+            pkt_x = int(n1_x + (n3_x - n1_x) * pkt_prog)
+
+            nodes_spec = [
+                (n1_x, "INPUT", accent_clr),
+                (n2_x, "CORE", sec_clr),
+                (n3_x, "VERIFY", (16, 185, 129)),
             ]
-            # Animated data packet moving across waveguides
-            draw.line([(105, 215), (width - 105, 215)], fill=(51, 65, 85), width=3)
-            pkt_x = int(105 + ((width - 210) * ((t * 0.9) % 1.0)))
-            draw.ellipse([(pkt_x - 7, 208), (pkt_x + 7, 222)], fill=accent_clr)
+            for nx, nlabel, nclr in nodes_spec:
+                pulse_r = 14 + int(2 * abs(math.sin(t * 4 + nx)))
+                draw.ellipse([(nx - pulse_r, node_y - pulse_r), (nx + pulse_r, node_y + pulse_r)], fill=(15, 23, 42), outline=nclr, width=2)
+                draw.ellipse([(nx - 5, node_y - 5), (nx + 5, node_y + 5)], fill=nclr)
+                draw.text((nx - 16, node_y + 18), nlabel, fill=(226, 232, 240), font=font_small)
 
-            for nx, ny, nlabel, nclr in nodes:
-                pulse_r = 26 + int(4 * abs(math.sin(t * 4 + nx)))
-                draw.ellipse([(nx - pulse_r, ny - pulse_r), (nx + pulse_r, ny + pulse_r)], fill=(15, 23, 42), outline=nclr, width=2)
-                draw.ellipse([(nx - 8, ny - 8), (nx + 8, ny + 8)], fill=nclr)
-                draw.text((nx - 42, ny + 34), nlabel, fill=(226, 232, 240), font=font_brand_sub)
+            draw.ellipse([(pkt_x - 5, node_y - 5), (pkt_x + 5, node_y + 5)], fill=(255, 255, 255))
 
-            # Key Architecture Bullet Points inside Hologram
-            body_lines = wrap_text(body, font_body, width - 80, draw)
-            yb = 290
-            for bl in body_lines[:6]:
-                draw.text((40, yb), bl, fill=(226, 232, 240), font=font_body)
-                yb += 26
+            # Architecture Explanation Bullets inside Hologram
+            draw.text((screen_x0 + 14, 192), "• Parallel Test-Time Compute", fill=(226, 232, 240), font=font_small)
+            draw.text((screen_x0 + 14, 212), "• 2M Context Multi-Agent Verify", fill=(226, 232, 240), font=font_small)
+            draw.text((screen_x0 + 14, 232), "• 62% Lower Inference Latency", fill=(226, 232, 240), font=font_small)
 
-            draw.rounded_rectangle([(38, 452), (width - 38, 480)], radius=8, fill=(15, 23, 42), outline=sec_clr, width=1)
-            draw.text((50, 459), f"[+] {persona['lab']} Verified Production Architecture", fill=accent_clr, font=font_code)
+            # Active Target Coordinate (Core node target)
+            target_xy = (n2_x, node_y)
 
-            # Lower Split-Screen Live CEO Studio Dock (y: 510 -> 790)
-            anim_ceo_small = animate_ceo_portrait(
-                ceo_portrait_split,
-                mouth_ratio,
-                amp=amp,
+            # Dynamic Optical Beacon Connecting CEO's Finger to the Holographic Pipeline
+            presenter_inst.draw_interactive_optical_beacon(
+                base_canvas=img,
+                finger_xy=finger_xy,
+                target_xy=target_xy,
                 t=t,
-                accent_color=accent_clr,
-                secondary_color=sec_clr,
             )
-            img.paste(anim_ceo_small, (22, 515), mask=anim_ceo_small)
-
-            # Right-side Live Executive Commentary Card next to Speaking CEO
-            draw_card_with_shadow(draw, [(250, 515), (width - 22, 770)], radius=16, fill=(15, 23, 42), outline=accent_clr, width=2)
-            draw.text((266, 530), persona["name"].upper(), fill=(255, 255, 255), font=font_brand)
-            draw.text((266, 550), persona["title"], fill=accent_clr, font=font_brand_sub)
-            draw.line([(266, 568), (width - 38, 568)], fill=(51, 65, 85), width=1)
-
-            q_lines = wrap_text(f"\"{hook}\"", font_body, width - 302, draw)
-            yq = 580
-            for ql in q_lines[:6]:
-                draw.text((266, yq), ql, fill=(226, 232, 240), font=font_body)
-                yq += 24
 
         else:
             # =========================================================
             # SCENE 3 (52-78%):
-            # LIVE ANIMATED SOTA BENCHMARK ARENA + SPEAKING CEO DOCK
+            # STAGE-LEFT PRESENTER POINTING AT LIVE BENCHMARK TELEMETRY
             # =========================================================
-            draw.rounded_rectangle([(22, 76), (340, 102)], radius=10, fill=(15, 23, 42), outline=(16, 185, 129), width=1)
-            draw.text((34, 82), "VERIFIED BENCHMARKS // LIVE TELEMETRY", fill=(16, 185, 129), font=font_badge)
+            draw.rounded_rectangle([(22, 72), (320, 98)], radius=8, fill=(15, 23, 42), outline=(16, 185, 129), width=1)
+            draw.text((34, 78), "VERIFIED BENCHMARKS // LIVE TELEMETRY", fill=(16, 185, 129), font=font_badge)
 
-            draw_card_with_shadow(draw, [(22, 110), (width - 22, 495)], radius=18, fill=(11, 18, 34), outline=(16, 185, 129), width=2)
-            draw.text((38, 126), f"{persona['lab'].upper()} PERFORMANCE BENCHMARKS", fill=(255, 255, 255), font=font_hl)
+            screen_x0 = 250
+            screen_x1 = width - 16
+            draw.rounded_rectangle([(screen_x0, 104), (screen_x1, 260)], radius=12, fill=(11, 18, 34, 220), outline=(16, 185, 129), width=2)
+            draw.text((screen_x0 + 14, 114), f"{persona['lab'].upper()} SOTA BENCHMARKS", fill=(255, 255, 255), font=font_badge)
 
             scene_prog = min(1.0, max(0.1, (progress - 0.52) / 0.18))
             benchmarks = [
-                ("Reasoning & Coding Accuracy", 0.94, accent_clr, "+14.8% vs Prior SOTA"),
-                ("Multi-Step Agent Verification", 0.91, (16, 185, 129), "2.4x Faster Throughput"),
-                ("Token Compute Efficiency", 0.89, sec_clr, "-62% Inference Latency"),
+                ("Reasoning Accuracy", 0.94, accent_clr, "+14.8% SOTA", 142),
+                ("Multi-Agent Verify", 0.91, (16, 185, 129), "2.4x Speed", 180),
+                ("Inference Latency", 0.89, sec_clr, "-62% Latency", 218),
             ]
-            ym = 175
-            for b_label, target_val, b_clr, b_delta in benchmarks:
+
+            active_bench_y = 142
+            for b_label, target_val, b_clr, b_delta, ym in benchmarks:
                 curr_val = target_val * scene_prog
-                draw.text((38, ym), b_label, fill=(226, 232, 240), font=font_body)
-                draw.text((width - 190, ym), b_delta, fill=b_clr, font=font_code)
-                draw.rounded_rectangle([(38, ym + 26), (width - 38, ym + 46)], radius=8, fill=(30, 41, 59))
-                fill_w = max(16, int((width - 76) * curr_val))
-                draw.rounded_rectangle([(38, ym + 26), (38 + fill_w, ym + 46)], radius=8, fill=b_clr)
-                draw.text((48, ym + 28), f"{int(curr_val * 100)}%", fill=(255, 255, 255), font=font_badge)
-                ym += 95
+                draw.text((screen_x0 + 14, ym), b_label, fill=(226, 232, 240), font=font_small)
+                draw.text((screen_x1 - 85, ym), b_delta, fill=b_clr, font=font_code)
+                draw.rounded_rectangle([(screen_x0 + 14, ym + 16), (screen_x1 - 14, ym + 26)], radius=5, fill=(30, 41, 59))
+                fill_w = max(10, int((screen_x1 - screen_x0 - 28) * curr_val))
+                draw.rounded_rectangle([(screen_x0 + 14, ym + 16), (screen_x0 + 14 + fill_w, ym + 26)], radius=5, fill=b_clr)
+                if scene_prog > 0.65 and ym == 218:
+                    active_bench_y = ym + 21
+                elif scene_prog > 0.35 and ym == 180:
+                    active_bench_y = ym + 21
+                elif ym == 142:
+                    active_bench_y = ym + 21
 
-            # Lower Split-Screen Live Speaking CEO Dock
-            anim_ceo_small = animate_ceo_portrait(
-                ceo_portrait_split,
-                mouth_ratio,
-                amp=amp,
+            # Target active benchmark progress bar
+            target_xy = (screen_x1 - 30, active_bench_y)
+
+            # Optical Beacon Connecting CEO's Finger to the Benchmark Bar
+            presenter_inst.draw_interactive_optical_beacon(
+                base_canvas=img,
+                finger_xy=finger_xy,
+                target_xy=target_xy,
                 t=t,
-                accent_color=accent_clr,
-                secondary_color=sec_clr,
             )
-            img.paste(anim_ceo_small, (22, 515), mask=anim_ceo_small)
-
-            draw_card_with_shadow(draw, [(250, 515), (width - 22, 770)], radius=16, fill=(15, 23, 42), outline=(16, 185, 129), width=2)
-            draw.text((266, 530), f"{persona['name'].upper()} // KEY TAKEAWAY", fill=(16, 185, 129), font=font_badge)
-            draw.line([(266, 554), (width - 38, 554)], fill=(51, 65, 85), width=1)
-            q_lines = wrap_text(body, font_body, width - 302, draw)
-            yq = 568
-            for ql in q_lines[:6]:
-                draw.text((266, yq), ql, fill=(226, 232, 240), font=font_body)
-                yq += 24
 
         # -------------------------------------------------------------
         # 3. Synchronized Word-by-Word Highlighted Kinetic Subtitles
