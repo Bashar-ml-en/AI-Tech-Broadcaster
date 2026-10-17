@@ -318,7 +318,11 @@ def poll_publish_status(
                 status = data.get("status")
                 logger.info("[TikTok] Publish %s status: %s (elapsed %.1fs)", publish_id, status, time.time() - start)
                 if status in ("PUBLISH_COMPLETE", "SUCCESS"):
-                    return {"success": True, "status": status}
+                    return {
+                        "success": True,
+                        "status": status,
+                        "publically_available_post_id": data.get("publically_available_post_id", []),
+                    }
                 if status == "FAILED":
                     return {
                         "success": False,
@@ -336,6 +340,118 @@ def poll_publish_status(
     return {"success": False, "status": "TIMEOUT", "fail_reason": f"Publish timed out after {max_wait_sec}s"}
 
 
+def resolve_tiktok_permalink(
+    publish_id: str,
+    creator_username: Optional[str] = None,
+    public_ids: Optional[List[Any]] = None
+) -> str:
+    """Resolve canonical TikTok video permalink from publish_id, creator_username, and public_ids."""
+    video_id = publish_id
+    if public_ids and len(public_ids) > 0 and str(public_ids[0]).strip():
+        video_id = str(public_ids[0]).strip()
+    elif "." in publish_id:
+        suffix = publish_id.rsplit(".", 1)[-1].strip()
+        if suffix.isdigit():
+            video_id = suffix
+
+    clean_user = (creator_username or "").strip().lstrip("@")
+    if clean_user:
+        return f"https://www.tiktok.com/@{clean_user}/video/{video_id}"
+    return f"https://www.tiktok.com/video/{video_id}"
+
+
+def diagnose_tiktok_connection(
+    access_token: Optional[str] = None,
+    refresh_token: Optional[str] = None,
+    client: Optional[httpx.Client] = None
+) -> Dict[str, Any]:
+    """
+    Comprehensive live diagnostic health-check for TikTok Content Posting API v2.
+    Checks OAuth2 token validity/auto-refresh, queries creator_info, and caches handle metadata.
+    """
+    tok_data = load_persisted_token()
+    if access_token and access_token.strip():
+        os.environ["TIKTOK_ACCESS_TOKEN"] = access_token.strip()
+        tok_data["access_token"] = access_token.strip()
+    if refresh_token and refresh_token.strip():
+        os.environ["TIKTOK_REFRESH_TOKEN"] = refresh_token.strip()
+        tok_data["refresh_token"] = refresh_token.strip()
+    if (access_token and access_token.strip()) or (refresh_token and refresh_token.strip()):
+        save_persisted_token(tok_data)
+
+    if not is_tiktok_configured():
+        return {
+            "configured": False,
+            "status": "unconfigured",
+            "status_badge": "OAUTH REQUIRED",
+            "diagnostic": "TikTok OAuth2 credentials are missing. Provide TIKTOK_ACCESS_TOKEN and TIKTOK_REFRESH_TOKEN.",
+        }
+
+    c = client or httpx.Client(timeout=20.0)
+    active_tok = ensure_tiktok_token(c)
+    if not active_tok:
+        return {
+            "configured": False,
+            "status": "token_expired",
+            "status_badge": "TOKEN EXPIRED",
+            "diagnostic": "Failed to obtain or refresh TikTok access token via /v2/oauth/token/.",
+        }
+
+    creator_res = query_creator_info(c, active_tok)
+    tok_data = load_persisted_token()
+    now = time.time()
+    expires_at = tok_data.get("expires_at", 0)
+    refresh_expires_at = tok_data.get("refresh_expires_at", 0)
+    ttl_hours = max(0.0, round((expires_at - now) / 3600, 1)) if expires_at else 24.0
+    refresh_days = max(0, int((refresh_expires_at - now) / 86400)) if refresh_expires_at else 365
+
+    if creator_res.get("success"):
+        cdata = creator_res.get("data", {})
+        username = cdata.get("creator_username") or tok_data.get("creator_username") or "eraofai8"
+        nickname = cdata.get("creator_nickname") or tok_data.get("creator_nickname") or "Ai_updats"
+        privacy_opts = cdata.get("privacy_level_options", [])
+        max_dur = cdata.get("max_video_post_duration_sec", 3600)
+
+        # Persist creator metadata for fast sidebar lookup
+        if tok_data.get("creator_username") != username or tok_data.get("creator_nickname") != nickname:
+            tok_data["creator_username"] = username
+            tok_data["creator_nickname"] = nickname
+            tok_data["privacy_level_options"] = privacy_opts
+            save_persisted_token(tok_data)
+
+        return {
+            "configured": True,
+            "status": "ready",
+            "status_badge": f"ONLINE // READY (@{username})",
+            "username": username,
+            "nickname": nickname,
+            "open_id": tok_data.get("open_id") or TIKTOK_OPEN_ID,
+            "privacy_level_options": privacy_opts,
+            "max_video_post_duration_sec": max_dur,
+            "token_ttl_hours": ttl_hours,
+            "refresh_ttl_days": refresh_days,
+            "is_permanent": True,
+            "expiry_description": f"Auto-Rotating OAuth2 Refresh Token ({refresh_days}d remaining, Access TTL: {ttl_hours}h)",
+            "scopes": ["video.publish", "video.upload", "user.info.basic"],
+            "diagnostic": (
+                f"Connected live to TikTok @{username} ({nickname}). "
+                f"Privacy options: {', '.join(privacy_opts) or 'SELF_ONLY'}. "
+                f"Max video duration: {max_dur}s."
+            ),
+        }
+
+    err = creator_res.get("error", {})
+    return {
+        "configured": True,
+        "status": "degraded",
+        "status_badge": "API WARNING",
+        "open_id": tok_data.get("open_id") or TIKTOK_OPEN_ID,
+        "token_ttl_hours": ttl_hours,
+        "expiry_description": f"Access Token TTL: {ttl_hours}h",
+        "diagnostic": f"TikTok creator_info returned {err.get('code', 'ERROR')}: {err.get('message', '')}",
+    }
+
+
 def reload_tiktok_credentials() -> Dict[str, Any]:
     """Reload TikTok credentials from config/.env and storage/tiktok_token.json."""
     global TIKTOK_CLIENT_KEY, TIKTOK_CLIENT_SECRET, TIKTOK_ACCESS_TOKEN, TIKTOK_REFRESH_TOKEN, TIKTOK_OPEN_ID
@@ -346,10 +462,12 @@ def reload_tiktok_credentials() -> Dict[str, Any]:
     TIKTOK_REFRESH_TOKEN = os.getenv("TIKTOK_REFRESH_TOKEN", "").strip()
     TIKTOK_OPEN_ID = os.getenv("TIKTOK_OPEN_ID", "").strip()
     tok = ensure_tiktok_token()
+    persisted = load_persisted_token()
     return {
         "configured": is_tiktok_configured(),
         "has_active_token": bool(tok),
-        "open_id": load_persisted_token().get("open_id") or TIKTOK_OPEN_ID,
+        "open_id": persisted.get("open_id") or TIKTOK_OPEN_ID,
+        "username": persisted.get("creator_username"),
     }
 
 
@@ -494,6 +612,7 @@ def publish_to_tiktok(
         disable_duet = False
         disable_comment = False
         disable_stitch = False
+        creator_username: Optional[str] = load_persisted_token().get("creator_username")
 
         forced_privacy = os.getenv("TIKTOK_PRIVACY_LEVEL", "").strip().upper()
         if forced_privacy in ("PUBLIC_TO_EVERYONE", "MUTUAL_FOLLOW_FRIENDS", "SELF_ONLY", "FOLLOWER_OF_CREATOR"):
@@ -504,11 +623,13 @@ def publish_to_tiktok(
                 is_unaudited = False
             if creator_res["success"]:
                 cdata = creator_res["data"]
+                creator_username = cdata.get("creator_username") or creator_username
                 disable_duet = cdata.get("duet_disabled", False)
                 disable_comment = cdata.get("comment_disabled", False)
                 disable_stitch = cdata.get("stitch_disabled", False)
         elif creator_res["success"]:
             cdata = creator_res["data"]
+            creator_username = cdata.get("creator_username") or creator_username
             options = cdata.get("privacy_level_options", [])
             disable_duet = cdata.get("duet_disabled", False)
             disable_comment = cdata.get("comment_disabled", False)
@@ -516,6 +637,9 @@ def publish_to_tiktok(
 
             if "PUBLIC_TO_EVERYONE" in options:
                 privacy_level = "PUBLIC_TO_EVERYONE"
+                is_unaudited = False
+            elif "FOLLOWER_OF_CREATOR" in options:
+                privacy_level = "FOLLOWER_OF_CREATOR"
                 is_unaudited = False
             elif "MUTUAL_FOLLOW_FRIENDS" in options:
                 privacy_level = "MUTUAL_FOLLOW_FRIENDS"
@@ -644,12 +768,18 @@ def publish_to_tiktok(
                 latency_ms=int((time.time() - start_time) * 1000)
             )
 
+        permalink = resolve_tiktok_permalink(
+            publish_id=publish_id,
+            creator_username=creator_username,
+            public_ids=poll_res.get("publically_available_post_id"),
+        )
+
         return PlatformResult(
             platform="tiktok",
             status="published",
             mode="live",
             remote_id=publish_id,
-            permalink=f"https://www.tiktok.com/video/{publish_id}",
+            permalink=permalink,
             attempts=1,
             latency_ms=int((time.time() - start_time) * 1000),
             note=note

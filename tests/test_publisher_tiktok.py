@@ -7,7 +7,9 @@ import httpx
 from src.publisher_tiktok import (
     publish_to_tiktok,
     calculate_chunks,
-    build_tiktok_title
+    build_tiktok_title,
+    resolve_tiktok_permalink,
+    diagnose_tiktok_connection,
 )
 
 
@@ -87,3 +89,31 @@ def test_tiktok_mock_transport_unaudited_fallback(monkeypatch, tmp_path):
     assert res["status"] == "published"
     assert res["remote_id"] == "v_pub_tiktok_777"
     assert res["note"] == "private_unaudited_app"
+
+
+def test_resolve_tiktok_permalink_and_diagnose(monkeypatch):
+    url1 = resolve_tiktok_permalink("v_pub_file~v2-1.7697546097510467605", "eraofai8")
+    assert url1 == "https://www.tiktok.com/@eraofai8/video/7697546097510467605"
+
+    url2 = resolve_tiktok_permalink("v_pub_tiktok_777", None, ["999888777"])
+    assert url2 == "https://www.tiktok.com/video/999888777"
+
+    def mock_diag_handler(request: httpx.Request):
+        if "/creator_info/query/" in str(request.url):
+            return httpx.Response(200, json={
+                "data": {
+                    "creator_username": "eraofai8",
+                    "creator_nickname": "Ai_updats",
+                    "privacy_level_options": ["FOLLOWER_OF_CREATOR", "SELF_ONLY"],
+                    "max_video_post_duration_sec": 3600
+                },
+                "error": {"code": "ok", "message": ""}
+            })
+        return httpx.Response(200, json={"access_token": "tok_123"})
+
+    client = httpx.Client(transport=httpx.MockTransport(mock_diag_handler))
+    diag = diagnose_tiktok_connection(client=client)
+    assert diag["configured"] is True
+    assert diag["username"] == "eraofai8"
+    assert diag["is_permanent"] is True
+

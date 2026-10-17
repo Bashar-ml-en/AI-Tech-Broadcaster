@@ -264,12 +264,13 @@ def get_platform_connection_state(platform: str) -> Dict[str, Any]:
     """Return live configuration and token readiness for a specific platform."""
     p = platform.lower()
     publish_mode = os.getenv("PUBLISH_MODE", "live").lower()
+    is_live_eligible = publish_mode in ("live", "auto")
 
     if p == "telegram":
         configured = is_telegram_configured()
         return {
             "configured": configured,
-            "mode": "live" if configured and publish_mode == "live" else "simulated",
+            "mode": "live" if configured and is_live_eligible else "simulated",
             "status_badge": "LIVE CONNECTED" if configured else "TOKEN MISSING",
             "account": os.getenv("TELEGRAM_CHANNEL_ID", "").strip() or "@eraof_ai20",
             "env_keys": ["TELEGRAM_BOT_TOKEN", "TELEGRAM_CHANNEL_ID", "TELEGRAM_CHAT_ID"],
@@ -280,15 +281,24 @@ def get_platform_connection_state(platform: str) -> Dict[str, Any]:
         tok = load_persisted_token()
         expires_at = tok.get("expires_at", 0)
         ttl_hours = max(0, round((expires_at - time.time()) / 3600, 1)) if expires_at else 0
+        tt_user = tok.get("creator_username")
+        tt_nick = tok.get("creator_nickname")
+        if configured:
+            if tt_user:
+                account_label = f"@{tt_user}" + (f" ({tt_nick})" if tt_nick else "")
+            else:
+                account_label = f"open_id:{(tok.get('open_id') or os.getenv('TIKTOK_OPEN_ID', ''))[:10]}..."
+        else:
+            account_label = "Unlinked"
         return {
             "configured": configured,
-            "mode": "live" if configured and publish_mode == "live" else "simulated",
+            "mode": "live" if configured and is_live_eligible else "simulated",
             "status_badge": "LIVE CONNECTED" if configured else "OAUTH REQUIRED",
-            "account": f"open_id:{(tok.get('open_id') or os.getenv('TIKTOK_OPEN_ID', ''))[:10]}..." if configured else "Unlinked",
+            "account": account_label,
             "token_ttl_hours": ttl_hours,
             "env_keys": ["TIKTOK_CLIENT_KEY", "TIKTOK_CLIENT_SECRET", "TIKTOK_ACCESS_TOKEN", "TIKTOK_REFRESH_TOKEN"],
             "diagnostic": (
-                f"OAuth2 token active (TTL: {ttl_hours}h). Non-reel posts can be auto-compiled to 9:16 MP4 video."
+                f"Connected to {account_label} (OAuth2 TTL: {ttl_hours}h). Non-reel posts auto-compile to 9:16 MP4 video."
                 if configured else "Authorize TikTok v2 OAuth or provide TIKTOK_ACCESS_TOKEN."
             ),
         }
@@ -297,7 +307,7 @@ def get_platform_connection_state(platform: str) -> Dict[str, Any]:
         page_id = os.getenv("META_PAGE_ID", META_PAGE_ID).strip()
         return {
             "configured": configured,
-            "mode": "live" if configured and publish_mode == "live" else "simulated",
+            "mode": "live" if configured and is_live_eligible else "simulated",
             "status_badge": "LIVE CONNECTED" if configured else "NEEDS PAGE TOKEN",
             "account": f"Page #{page_id}",
             "env_keys": ["META_PAGE_ACCESS_TOKEN", "META_PAGE_ID"],
@@ -311,7 +321,7 @@ def get_platform_connection_state(platform: str) -> Dict[str, Any]:
         ig_id = os.getenv("META_INSTAGRAM_ACCOUNT_ID", "").strip() or ("auto-linked" if configured else "unlinked")
         return {
             "configured": configured,
-            "mode": "live" if configured and publish_mode == "live" else "simulated",
+            "mode": "live" if configured and is_live_eligible else "simulated",
             "status_badge": "LIVE CONNECTED" if configured else "NEEDS META TOKEN",
             "account": f"IG Business ({ig_id})",
             "env_keys": ["META_PAGE_ACCESS_TOKEN", "META_INSTAGRAM_ACCOUNT_ID"],
@@ -325,7 +335,7 @@ def get_platform_connection_state(platform: str) -> Dict[str, Any]:
         uid = os.getenv("THREADS_USER_ID", THREADS_USER_ID).strip()
         return {
             "configured": configured,
-            "mode": "live" if configured and publish_mode == "live" else "simulated",
+            "mode": "live" if configured and is_live_eligible else "simulated",
             "status_badge": "LIVE CONNECTED" if configured else "NEEDS THREADS TOKEN",
             "account": f"Threads UID ({uid or 'unlinked'})",
             "env_keys": ["THREADS_ACCESS_TOKEN", "THREADS_USER_ID"],
@@ -666,11 +676,17 @@ class PublishingSubagentOrchestrator:
         if row.get("post_payload"):
             try:
                 payload_data = json.loads(row["post_payload"])
-                for p_str in payload_data.get("local_paths", []):
-                    if p_str and Path(p_str).exists():
-                        existing_paths.append(p_str)
-                        if p_str.endswith(".mp4"):
-                            video_path = p_str
+                vp = payload_data.get("video_path")
+                if vp and Path(vp).exists():
+                    video_path = str(vp)
+                    existing_paths.append(str(vp))
+                for list_key in ("local_paths", "slides", "media_slides", "story_slides"):
+                    for p_str in payload_data.get(list_key, []) or []:
+                        if p_str and Path(p_str).exists():
+                            if str(p_str) not in existing_paths:
+                                existing_paths.append(str(p_str))
+                            if str(p_str).endswith(".mp4"):
+                                video_path = str(p_str)
             except Exception:
                 pass
 

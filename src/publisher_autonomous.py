@@ -119,7 +119,43 @@ def _run_platform_worker(
                     latency_ms=0
                 )
             primary_media = media_refs[0] if media_refs else None
-            return publish_to_tiktok(post_record, media=primary_media)
+            allow_conv = False
+            if (
+                "PYTEST_CURRENT_TEST" not in os.environ
+                and publish_mode in ("live", "auto")
+                and is_tiktok_configured()
+                and post_record.get("format_type") != "reel"
+            ):
+                has_mp4 = bool(
+                    primary_media
+                    and primary_media.get("local_path")
+                    and str(primary_media["local_path"]).lower().endswith(".mp4")
+                    and Path(primary_media["local_path"]).exists()
+                )
+                if not has_mp4:
+                    try:
+                        from src.video_synthesizer import synthesize_broadcast_video_sync
+                        pid = post_record.get("id", int(time.time()))
+                        headline = post_record.get("headline", "AI Tech Broadcast")
+                        summary = post_record.get("summary_text") or headline
+                        brief_data = {
+                            "headline": headline,
+                            "hook_narration": headline,
+                            "body_narration": summary,
+                            "call_to_action": "Follow @eraofai8 for daily AI breakthroughs.",
+                        }
+                        mp4_path = synthesize_broadcast_video_sync(
+                            brief_data, f"auto_tt_reel_{pid}_{int(time.time())}"
+                        )
+                        if mp4_path and Path(mp4_path).exists():
+                            primary_media = {"local_path": mp4_path, "hosted": False}
+                            allow_conv = True
+                    except Exception as synth_err:
+                        logger.warning("[Dispatcher] TikTok auto-video compilation failed: %s", synth_err)
+                else:
+                    allow_conv = True
+
+            return publish_to_tiktok(post_record, media=primary_media, allow_format_conversion=allow_conv)
 
         else:
             return PlatformResult(

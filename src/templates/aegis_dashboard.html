@@ -1584,6 +1584,23 @@
             </p>
           </div>
         `;
+      } else if (platform === 'tiktok') {
+        html += `
+          <div class="p-2.5 rounded-lg bg-surface-container border border-outline-variant/60 space-y-1 mt-2">
+            <div class="flex items-center justify-between">
+              <span class="font-mono text-[10px] text-emerald-800 font-bold flex items-center gap-1.5">
+                <span class="w-1.5 h-1.5 rounded-full bg-emerald-600 animate-pulse"></span>
+                <span>TIKTOK CONTENT POSTING API v2 // AUTO-REFRESH</span>
+              </span>
+              <a href="https://www.tiktok.com/@eraofai8" target="_blank" rel="noopener noreferrer" class="text-[10px] text-sky-700 hover:underline font-mono inline-flex items-center gap-0.5">
+                <span>@eraofai8 ↗</span>
+              </a>
+            </div>
+            <p class="text-[11px] text-on-surface-variant leading-snug">
+              Connected via 365-day rotating OAuth2 Refresh Token (<code class="font-mono text-[10px] bg-white/70 px-1 py-0.5 rounded">video.publish, video.upload</code>). Static carousels &amp; stories automatically compile into 9:16 H.264 MP4 Reels on dispatch.
+            </p>
+          </div>
+        `;
       }
       container.innerHTML = html;
     }
@@ -1616,6 +1633,12 @@
         if (platform === 'threads') {
           endpoint = '/api/platforms/threads/diagnose';
           body = { token: credentials.THREADS_ACCESS_TOKEN };
+        } else if (platform === 'tiktok') {
+          endpoint = '/api/platforms/tiktok/diagnose';
+          body = {
+            access_token: credentials.TIKTOK_ACCESS_TOKEN,
+            refresh_token: credentials.TIKTOK_REFRESH_TOKEN
+          };
         } else if (platform === 'facebook' || platform === 'instagram') {
           endpoint = '/api/platforms/meta/diagnose';
           body = {
@@ -1655,7 +1678,7 @@
           html += `<div class="text-[10px] opacity-80">Token Type: ${escapeHtml(diag.token_type)} | Page: ${escapeHtml(diag.page_name || '')} (${escapeHtml(diag.page_id || '')})</div>`;
         }
         if (diag.expiry_description) {
-          const isPerm = diag.is_permanent || diag.expiry_description.includes('NEVER') || diag.expiry_description.includes('Permanent');
+          const isPerm = diag.is_permanent || diag.expiry_description.includes('NEVER') || diag.expiry_description.includes('Permanent') || diag.expiry_description.includes('Auto-Rotating');
           html += `<div class="text-[10px] ${isPerm ? 'text-emerald-800 font-bold' : 'text-amber-800 font-semibold'}">
             Token Lifetime: ${escapeHtml(diag.expiry_description)} ${isPerm ? '★ GUARANTEED PERMANENT' : ''}
           </div>`;
@@ -1663,7 +1686,9 @@
         if (diag.instagram_account_id && diag.instagram_account_id !== 'not_linked') {
           html += `<div class="text-[10px] text-fuchsia-800">Linked Instagram: ${escapeHtml(diag.instagram_username || diag.instagram_account_id)} (ID: ${escapeHtml(diag.instagram_account_id)})</div>`;
         }
-        if (diag.username) {
+        if (diag.username && platform === 'tiktok') {
+          html += `<div class="text-[10px] text-stone-800">TikTok Creator: @${escapeHtml(diag.username)} (${escapeHtml(diag.nickname || '')}) | Privacy Options: ${escapeHtml((diag.privacy_level_options || []).join(', '))}</div>`;
+        } else if (diag.username) {
           html += `<div class="text-[10px] text-stone-800">Threads User: @${escapeHtml(diag.username)} (Quota: ${diag.quota_usage ?? 0}/${diag.quota_total ?? 250})</div>`;
         }
         if (diag.scopes && diag.scopes.length) {

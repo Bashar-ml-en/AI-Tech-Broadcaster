@@ -1644,6 +1644,16 @@ def api_diagnose_threads(payload: Optional[Dict[str, Any]] = Body(default=None))
     return diagnose_threads_connection(token=token)
 
 
+@app.get("/api/platforms/tiktok/diagnose")
+@app.post("/api/platforms/tiktok/diagnose")
+def api_diagnose_tiktok(payload: Optional[Dict[str, Any]] = Body(default=None)):
+    """Interactive diagnosis for TikTok Content Posting API v2 credentials, auto-refresh, and creator info."""
+    from src.publisher_tiktok import diagnose_tiktok_connection
+    access_tok = payload.get("access_token") if payload else None
+    refresh_tok = payload.get("refresh_token") if payload else None
+    return diagnose_tiktok_connection(access_token=access_tok, refresh_token=refresh_tok)
+
+
 @app.post("/api/subagents/{agent_id}/action")
 def api_execute_subagent_action(agent_id: str, payload: Dict[str, Any] = Body(default={})):
     """Execute an interactive diagnostic or operational test on a specific DAG Subagent."""
