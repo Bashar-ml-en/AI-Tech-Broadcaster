@@ -558,7 +558,10 @@ if __name__ == "__main__":
 
     subparsers.add_parser("repair", help="Analyze reach drop-offs and update learning memory")
     subparsers.add_parser("review", help="Review pending stories in terminal")
-    subparsers.add_parser("sidecar", help="Run continuous hourly background sidecar loop")
+    sidecar_parser = subparsers.add_parser("sidecar", help="Run continuous hourly background sidecar loop")
+    sidecar_parser.add_argument("--interval", type=int, default=1, help="Interval in hours (default: 1)")
+    cont_parser = subparsers.add_parser("run-continuous", help="Run continuous autonomous background loop")
+    cont_parser.add_argument("--interval", type=int, default=1, help="Interval in hours (default: 1)")
     subparsers.add_parser("telegram-id", help="Auto-detect Telegram Chat ID from incoming message")
 
     tk_parser = subparsers.add_parser("tiktok-auth", help="TikTok OAuth v2 authorization & token exchange")
@@ -587,8 +590,8 @@ if __name__ == "__main__":
         cmd_repair()
     elif args.command == "review":
         cmd_review()
-    elif args.command == "sidecar":
-        run_scheduled_sidecar(1)
+    elif args.command in ("sidecar", "run-continuous"):
+        run_scheduled_sidecar(getattr(args, "interval", 1))
     elif args.command == "tiktok-auth":
         cmd_tiktok_auth(code=getattr(args, "code", None), redirect_uri=getattr(args, "redirect", None), generate_url=getattr(args, "generate_url", False))
     elif args.command == "studio":
