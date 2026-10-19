@@ -146,8 +146,16 @@ case "$1" in
     trigger)
         trigger "$@"
         ;;
+    test-tiktok)
+        shift
+        if [ "$1" == "--publish" ]; then
+            "$PYTHON_BIN" manage.py tiktok-test --publish
+        else
+            "$PYTHON_BIN" manage.py tiktok-test
+        fi
+        ;;
     *)
-        echo "Usage: ./run_autonomous.sh {start|stop|restart|status|logs|trigger [reel|post|story]}"
+        echo "Usage: ./run_autonomous.sh {start|stop|restart|status|logs|trigger [reel|post|story]|test-tiktok [--publish]}"
         exit 1
         ;;
 esac

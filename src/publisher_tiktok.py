@@ -399,10 +399,18 @@ def upload_video_to_tiktok_inbox(
 
     resp = client.post(inbox_url, headers=headers, json=payload)
     if resp.status_code != 200:
+        err_code = "INBOX_INIT_FAILED"
+        err_msg = resp.text
+        try:
+            err_json = resp.json().get("error", {})
+            err_code = err_json.get("code") or err_code
+            err_msg = err_json.get("message") or err_msg
+        except Exception:
+            pass
         return {
             "success": False,
-            "error_code": "INBOX_INIT_FAILED",
-            "error_message": f"TikTok inbox video init failed ({resp.status_code}): {resp.text}"
+            "error_code": err_code,
+            "error_message": f"TikTok inbox video init failed ({resp.status_code}): {err_msg}"
         }
 
     res_json = resp.json()
@@ -885,6 +893,28 @@ def publish_to_tiktok(
                     latency_ms=int((time.time() - start_time) * 1000),
                     note="inbox_draft_public_account"
                 )
+            else:
+                inbox_err = inbox_res.get("error_code")
+                inbox_msg = inbox_res.get("error_message", "")
+                user_hint = ""
+                if inbox_err == "spam_risk_too_many_pending_share" or "spam_risk" in inbox_msg:
+                    user_hint = (
+                        " [ACTION REQUIRED: TikTok Inbox rate limit reached. "
+                        "Open the TikTok app on your phone -> tap Inbox (System notifications) and Post or Discard pending drafts. "
+                        "Alternatively, toggle your TikTok account to 'Private' in TikTok Settings -> Privacy to enable direct automatic posting.]"
+                    )
+                return PlatformResult(
+                    platform="tiktok",
+                    status="failed",
+                    mode="live",
+                    error_code="UNAUDITED_PUBLIC_ACCOUNT_RESTRICTION",
+                    error_message=(
+                        f"TikTok rejected direct post (unaudited_client_can_only_post_to_private_accounts) "
+                        f"and Inbox draft fallback failed ({inbox_err}).{user_hint}"
+                    ),
+                    attempts=1,
+                    latency_ms=int((time.time() - start_time) * 1000)
+                )
 
         if init_resp.status_code != 200:
             return PlatformResult(
@@ -943,7 +973,27 @@ def publish_to_tiktok(
                             note="inbox_draft_public_account"
                         )
                     else:
-                        logger.warning("[TikTok] Creator Inbox fallback also failed: %s", inbox_res.get("error_message"))
+                        inbox_err = inbox_res.get("error_code")
+                        inbox_msg = inbox_res.get("error_message", "")
+                        user_hint = ""
+                        if inbox_err == "spam_risk_too_many_pending_share" or "spam_risk" in inbox_msg:
+                            user_hint = (
+                                " [ACTION REQUIRED: TikTok Inbox rate limit reached. "
+                                "Open the TikTok app on your phone -> tap Inbox (System notifications) and Post or Discard pending drafts. "
+                                "Alternatively, toggle your TikTok account to 'Private' in TikTok Settings -> Privacy to enable direct automatic posting.]"
+                            )
+                        return PlatformResult(
+                            platform="tiktok",
+                            status="failed",
+                            mode="live",
+                            error_code="UNAUDITED_PUBLIC_ACCOUNT_RESTRICTION",
+                            error_message=(
+                                f"TikTok rejected direct post (unaudited_client_can_only_post_to_private_accounts) "
+                                f"and Inbox draft fallback failed ({inbox_err}).{user_hint}"
+                            ),
+                            attempts=1,
+                            latency_ms=int((time.time() - start_time) * 1000)
+                        )
 
                 return PlatformResult(
                     platform="tiktok",

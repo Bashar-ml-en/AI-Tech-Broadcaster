@@ -530,6 +530,99 @@ def cmd_tiktok_auth(code: Optional[str] = None, redirect_uri: Optional[str] = No
     print(f"   python manage.py tiktok-auth --code <YOUR_CODE> --redirect \"{target_redirect}\"\n")
 
 
+def cmd_tiktok_test(publish: bool = False):
+    """Diagnose TikTok connection and optionally test Reel publication."""
+    from src.publisher_tiktok import diagnose_tiktok_connection, publish_to_tiktok, ensure_tiktok_token, TIKTOK_API_BASE
+    import httpx
+
+    print("\n" + "=" * 65)
+    print("  TIKTOK CONTENT POSTING API v2 — LIVE DIAGNOSTIC & TEST")
+    print("=" * 65)
+    diag = diagnose_tiktok_connection()
+    print(f"  • Configured:        {diag.get('configured')}")
+    print(f"  • Status:            {diag.get('status_badge')}")
+    print(f"  • Account Username:  @{diag.get('username')}")
+    print(f"  • Account Nickname:  {diag.get('nickname')}")
+    print(f"  • Account Private:   {diag.get('account_is_private')}")
+    print(f"  • Sandbox Client:    {diag.get('is_sandbox_key')}")
+    print(f"  • Privacy Options:   {', '.join(diag.get('privacy_level_options', []))}")
+    print(f"  • Token Health:      {diag.get('expiry_description')}")
+    print("-" * 65)
+
+    tok = ensure_tiktok_token()
+    if tok:
+        with httpx.Client(timeout=10.0) as client:
+            headers = {"Authorization": f"Bearer {tok}", "Content-Type": "application/json; charset=UTF-8"}
+
+            # Direct Post probe
+            dir_res = client.post(f"{TIKTOK_API_BASE}/post/publish/video/init/", headers=headers, json={
+                "post_info": {"title": "Probe", "privacy_level": "SELF_ONLY"},
+                "source_info": {"source": "FILE_UPLOAD", "video_size": 10000000, "chunk_size": 10000000, "total_chunk_count": 1}
+            })
+            if dir_res.status_code == 200:
+                print("  [DIRECT POST API]:   AVAILABLE (Ready for direct profile posting)")
+            elif "unaudited_client_can_only_post_to_private_accounts" in dir_res.text:
+                if not diag.get("account_is_private"):
+                    print("  [DIRECT POST API]:   BLOCKED (Account @eraofai8 is PUBLIC; unaudited apps require a PRIVATE account)")
+                else:
+                    print("  [DIRECT POST API]:   BLOCKED by unaudited client policy")
+            else:
+                print(f"  [DIRECT POST API]:   Status {dir_res.status_code} ({dir_res.text[:120]})")
+
+            # Inbox probe
+            inb_res = client.post(f"{TIKTOK_API_BASE}/post/publish/inbox/video/init/", headers=headers, json={
+                "source_info": {"source": "FILE_UPLOAD", "video_size": 10000000, "chunk_size": 10000000, "total_chunk_count": 1}
+            })
+            if inb_res.status_code == 200:
+                print("  [CREATOR INBOX API]: AVAILABLE (Ready for 1-tap FYP inbox drafts)")
+            elif "spam_risk_too_many_pending_share" in inb_res.text:
+                print("  [CREATOR INBOX API]: BLOCKED (Pending drafts waiting in TikTok App -> Inbox; clear them to unlock)")
+            else:
+                print(f"  [CREATOR INBOX API]: Status {inb_res.status_code} ({inb_res.text[:120]})")
+
+    print("=" * 65)
+
+    if not publish:
+        print("\n💡 HOW TO MAKE POSTS REACH TIKTOK:")
+        if not diag.get("account_is_private"):
+            print("  👉 OPTION 1 (Direct Profile Post - Recommended):")
+            print("     Open TikTok on phone -> Profile -> Settings and privacy -> Privacy -> turn 'Private account' ON.")
+            print("     Then all videos will publish directly to your TikTok profile grid!")
+            print("  👉 OPTION 2 (Inbox Draft on Public Account):")
+            print("     Open TikTok on phone -> tap Inbox -> System Notifications -> post or discard pending drafts.")
+        print("\nTo test publishing an actual video right now, run:")
+        print("  python manage.py tiktok-test --publish\n")
+        return
+
+    import glob
+    staging_videos = sorted(glob.glob("storage/staging/reel_clip_*.mp4"), key=os.path.getmtime, reverse=True)
+    if not staging_videos:
+        print("❌ No rendered reel MP4 found in storage/staging/. Run './run_autonomous.sh trigger reel' first.")
+        return
+
+    video_path = staging_videos[0]
+    print(f"\n🚀 Publishing reel to TikTok: {video_path} ({os.path.getsize(video_path)} bytes)...")
+    post_rec = {
+        "id": 99999,
+        "format_type": "reel",
+        "headline": "AI Tech Broadcaster Test Reel",
+        "captions_json": json.dumps({"short_form": "AI Tech Broadcaster Live TikTok Test #AI #Technology #EraOfAI"}),
+        "video_path": video_path
+    }
+    result = publish_to_tiktok(post_record=post_rec)
+    print("\n" + "-" * 65)
+    print(f"Outcome Status:  {result.status.upper()}")
+    print(f"Remote ID:       {result.remote_id}")
+    print(f"Permalink:       {result.permalink}")
+    if result.error_code:
+        print(f"Error Code:      {result.error_code}")
+    if result.error_message:
+        print(f"Error Message:   {result.error_message}")
+    if result.note:
+        print(f"Note:            {result.note}")
+    print("-" * 65 + "\n")
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="AutoProdcaster Management CLI")
     subparsers = parser.add_subparsers(dest="command", help="Available management commands")
@@ -569,6 +662,9 @@ if __name__ == "__main__":
     tk_parser.add_argument("--redirect", type=str, default="https://ai-tech-broadcaster.vercel.app/api/auth/tiktok/callback", help="Redirect URI")
     tk_parser.add_argument("--generate-url", action="store_true", help="Generate authorization URL")
 
+    tk_test_parser = subparsers.add_parser("tiktok-test", help="Test live TikTok API connection and Reel publication")
+    tk_test_parser.add_argument("--publish", action="store_true", help="Publish a live test Reel to TikTok")
+
     studio_parser = subparsers.add_parser("studio", help="Start Web Management Studio")
     studio_parser.add_argument("--port", type=int, default=8080, help="Port for Studio Web Server")
 
@@ -594,6 +690,8 @@ if __name__ == "__main__":
         run_scheduled_sidecar(getattr(args, "interval", 1))
     elif args.command == "tiktok-auth":
         cmd_tiktok_auth(code=getattr(args, "code", None), redirect_uri=getattr(args, "redirect", None), generate_url=getattr(args, "generate_url", False))
+    elif args.command == "tiktok-test":
+        cmd_tiktok_test(publish=getattr(args, "publish", False))
     elif args.command == "studio":
         cmd_studio(args.port)
     elif args.command == "telegram-id":
