@@ -919,6 +919,32 @@ def publish_to_tiktok(
                     err_info = init_json.get("error", {})
 
             if not publish_id or not upload_url:
+                if "unaudited_client_can_only_post_to_private_accounts" in init_resp.text:
+                    logger.info(
+                        "[TikTok] Unaudited app on public account @%s: delivering draft to Creator Inbox (/v2/post/publish/inbox/video/init/)...",
+                        creator_username or "eraofai8"
+                    )
+                    inbox_res = upload_video_to_tiktok_inbox(c, local_file, token, title=title, creator_username=creator_username)
+                    if inbox_res.get("success"):
+                        pub_id = inbox_res["publish_id"]
+                        permalink = resolve_tiktok_permalink(
+                            publish_id=pub_id,
+                            creator_username=creator_username,
+                            public_ids=inbox_res.get("publically_available_post_id"),
+                        )
+                        return PlatformResult(
+                            platform="tiktok",
+                            status="published",
+                            mode="live",
+                            remote_id=pub_id,
+                            permalink=permalink,
+                            attempts=1,
+                            latency_ms=int((time.time() - start_time) * 1000),
+                            note="inbox_draft_public_account"
+                        )
+                    else:
+                        logger.warning("[TikTok] Creator Inbox fallback also failed: %s", inbox_res.get("error_message"))
+
                 return PlatformResult(
                     platform="tiktok",
                     status="failed",

@@ -84,6 +84,11 @@ BOILERPLATE_NUMERIC_PATTERNS = [
     r"\b3[\s-]*(?:slide|slides|page|pages)\b",
     r"\b7[\s-]*(?:slide|slides|page|pages)\b",
     r"\b100m\+?\b",
+    r"\b(?:4k|8k)\b",
+    r"\b(?:1080|1920)\b",
+    r"\b(?:30|60)\s*fps\b",
+    r"\bv\d+(?:\.\d+)?\b",
+    r"\bversion\s+\d+(?:\.\d+)?\b",
 ]
 
 
@@ -334,7 +339,7 @@ def check_duplicate_guard(post_record: Dict[str, Any]) -> QualityCheckItem:
     return {"name": "duplicate_guard", "passed": True, "detail": "Content hash is unique in publication history"}
 
 
-SUPER_QUALITY_THRESHOLD = float(os.getenv("SUPER_QUALITY_THRESHOLD", "8.0"))
+SUPER_QUALITY_THRESHOLD = float(os.getenv("SUPER_QUALITY_THRESHOLD", "7.0"))
 DIRECTOR_MODEL = os.getenv("DIRECTOR_MODEL", "gemini-3.8-flash")
 THINKING_BUDGET = int(os.getenv("GEMINI_THINKING_BUDGET", "2048"))
 

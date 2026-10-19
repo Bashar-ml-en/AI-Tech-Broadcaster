@@ -1073,40 +1073,49 @@ def _evaluate_and_dispatch_asset(
     }
 
     # 1. Automated Pre-publish Quality Gate Evaluation
+    gate_mode = os.getenv("QUALITY_GATE_MODE", "auto").strip().lower()
     gate_res = evaluate_quality_gate(post_record, source_text=source_text, media=media_refs)
     if gate_res["decision"] == "block":
         reason = gate_res.get("reason") or "Quality gate check failed"
-        logger.warning("[Quality Gate] BLOCKED post #%s: %s", post_id, reason)
-        with sqlite3.connect(DATABASE_PATH) as conn:
-            conn.execute(
-                "UPDATE posts SET publish_status = 'blocked', last_error = ? WHERE id = ?",
-                (reason, post_id)
-            )
-            conn.commit()
-
-        # Passive Telegram alert if TELEGRAM_MIRROR is on (admin alert only, never public channel)
-        telegram_mirror = os.getenv("TELEGRAM_MIRROR", "false").lower() in ("true", "1", "yes")
-        admin_chat = os.getenv("TELEGRAM_CHAT_ID", "").strip()
-        channel_id = os.getenv("TELEGRAM_CHANNEL_ID", "").strip()
-        bot_token = os.getenv("TELEGRAM_BOT_TOKEN", "").strip()
-        if telegram_mirror and admin_chat and admin_chat != channel_id and not admin_chat.startswith("@") and bot_token:
-            try:
-                alert_text = f"🛑 *QUALITY GATE BLOCKED BROADCAST*\nPost #{post_id} ({headline})\nReason: `{reason}`"
-                httpx.post(
-                    f"https://api.telegram.org/bot{bot_token}/sendMessage",
-                    json={"chat_id": admin_chat, "text": alert_text, "parse_mode": "Markdown"},
-                    timeout=10.0
+        # Hard invariants: strictly block financial scams, duplicate posts, or missing media
+        is_hard_violation = any(
+            c.get("name") in ("banned_content", "duplicate_guard", "media_validation") and not c.get("passed")
+            for c in gate_res.get("checks", [])
+        )
+        if gate_mode == "strict" or is_hard_violation:
+            logger.warning("[Quality Gate] BLOCKED post #%s: %s", post_id, reason)
+            with sqlite3.connect(DATABASE_PATH) as conn:
+                conn.execute(
+                    "UPDATE posts SET publish_status = 'blocked', last_error = ? WHERE id = ?",
+                    (reason, post_id)
                 )
-            except Exception as tg_err:
-                logger.warning("Failed to send quality gate Telegram alert: %s", tg_err)
+                conn.commit()
 
-        return {
-            "post_id": post_id,
-            "overall": "blocked",
-            "results": [],
-            "timestamp": int(time.time()),
-            "scorecard": gate_res.get("scorecard")
-        }
+            # Passive Telegram alert if TELEGRAM_MIRROR is on (admin alert only, never public channel)
+            telegram_mirror = os.getenv("TELEGRAM_MIRROR", "false").lower() in ("true", "1", "yes")
+            admin_chat = os.getenv("TELEGRAM_CHAT_ID", "").strip()
+            channel_id = os.getenv("TELEGRAM_CHANNEL_ID", "").strip()
+            bot_token = os.getenv("TELEGRAM_BOT_TOKEN", "").strip()
+            if telegram_mirror and admin_chat and admin_chat != channel_id and not admin_chat.startswith("@") and bot_token:
+                try:
+                    alert_text = f"🛑 *QUALITY GATE BLOCKED BROADCAST*\nPost #{post_id} ({headline})\nReason: `{reason}`"
+                    httpx.post(
+                        f"https://api.telegram.org/bot{bot_token}/sendMessage",
+                        json={"chat_id": admin_chat, "text": alert_text, "parse_mode": "Markdown"},
+                        timeout=10.0
+                    )
+                except Exception as tg_err:
+                    logger.warning("Failed to send quality gate Telegram alert: %s", tg_err)
+
+            return {
+                "post_id": post_id,
+                "overall": "blocked",
+                "results": [],
+                "timestamp": int(time.time()),
+                "scorecard": gate_res.get("scorecard")
+            }
+        else:
+            logger.info("[Quality Gate] Soft warning on post #%s: %s. Proceeding to omnichannel broadcast under mode '%s'...", post_id, reason, gate_mode)
 
     # 2. Gate Passed: Autonomous Omnichannel Broadcast
     scorecard = gate_res.get("scorecard")
