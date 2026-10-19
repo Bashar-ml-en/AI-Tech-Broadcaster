@@ -128,7 +128,7 @@ PERSONA_REGISTRY: Dict[str, Dict[str, Any]] = {
         "lab": "NVIDIA",
         "keywords": [
             "nvidia", "jensen", "huang", "blackwell", "hopper", "rubin",
-            "cuda", "gpu", "tensorrt", "nvlink", "dgx", "nemotron", "megatron"
+            "cuda", "tensorrt", "nvlink", "dgx", "nemotron", "megatron", "geforce", "rtx"
         ],
         "intro_greeting": "Hello everyone, Jensen Huang here at NVIDIA.",
         "default_quote": "The entire computing stack is being reinvented from silicon to autonomous AI factories in real time.",
@@ -365,22 +365,45 @@ def detect_persona(text: str, context: str = "") -> Dict[str, Any]:
                 matched = data
                 break
 
-    # 3. Topic-based executive host fallback
+    # 3. Topic-based executive host matching
     if matched is None:
-        if any(_has_word(combined, w) for w in ["gpu", "chip", "hardware", "cuda", "blackwell", "rubin", "npu"]):
+        if any(_has_word(combined, w) for w in ["gpu", "chip", "hardware", "cuda", "blackwell", "rubin", "npu", "semiconductor", "tsmc", "supercomputing", "datacenter", "cluster", "silicon", "accelerator"]):
             matched = PERSONA_REGISTRY["jensen_huang"]
-        elif any(_has_word(combined, w) for w in ["claude", "anthropic", "constitutional"]):
+        elif any(_has_word(combined, w) for w in ["claude", "anthropic", "constitutional", "sonnet", "opus", "haiku", "replit", "coding agent", "alignment", "safety"]):
             matched = PERSONA_REGISTRY["dario_amodei"]
-        elif any(_has_word(combined, w) for w in ["deepseek", "open-weights", "moe"]):
+        elif any(_has_word(combined, w) for w in ["deepseek", "open-weights", "moe", "v3", "r1", "v4", "dualpipe", "latent attention", "qwen", "mistral"]):
             matched = PERSONA_REGISTRY["liang_wenfeng"]
-        elif any(_has_word(combined, w) for w in ["llama", "meta", "pytorch"]):
+        elif any(_has_word(combined, w) for w in ["llama", "meta", "pytorch", "open source model", "orion", "quest", "social ai"]):
             matched = PERSONA_REGISTRY["mark_zuckerberg"]
-        elif any(_has_word(combined, w) for w in ["copilot", "github", "azure", "microsoft"]):
+        elif any(_has_word(combined, w) for w in ["copilot", "github", "azure", "microsoft", "windows", "office", "enterprise ai"]):
             matched = PERSONA_REGISTRY["satya_nadella"]
-        elif any(_has_word(combined, w) for w in ["openai", "gpt", "chatgpt", "sora"]):
+        elif any(_has_word(combined, w) for w in ["openai", "gpt", "chatgpt", "sora", "o1", "o3", "operator", "devday", "reasoning model", "reasoning", "agi"]):
             matched = PERSONA_REGISTRY["sam_altman"]
-        else:
+        elif any(_has_word(combined, w) for w in ["xai", "grok", "musk", "tesla ai", "colossus", "optimus", "truth-seeking", "robotics"]):
+            matched = PERSONA_REGISTRY["elon_musk"]
+        elif any(_has_word(combined, w) for w in ["deepmind", "alphafold", "biology", "protein", "dna", "science ai", "biotech"]):
+            matched = PERSONA_REGISTRY["demis_hassabis"]
+        elif any(_has_word(combined, w) for w in ["google", "gemini", "android", "tpu", "vertex", "search", "youtube", "chrome"]):
             matched = PERSONA_REGISTRY["sundar_pichai"]
+        else:
+            # Dynamic CEO Host Diversification Queue:
+            # Deterministically hash the headline/URL to pick from all tech CEOs,
+            # ensuring a diverse, balanced feed rather than defaulting to one CEO!
+            import hashlib
+            ceo_pool = [
+                "sam_altman",
+                "jensen_huang",
+                "dario_amodei",
+                "mark_zuckerberg",
+                "liang_wenfeng",
+                "elon_musk",
+                "demis_hassabis",
+                "satya_nadella",
+                "sundar_pichai"
+            ]
+            h_val = int(hashlib.md5(combined.encode("utf-8")).hexdigest(), 16)
+            chosen_pid = ceo_pool[h_val % len(ceo_pool)]
+            matched = PERSONA_REGISTRY.get(chosen_pid, PERSONA_REGISTRY["sundar_pichai"])
 
     res = dict(matched)
     res["company"] = res.get("lab", "Google")

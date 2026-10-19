@@ -166,6 +166,22 @@ async def generate_presenter_video(
     """
     output_video_path.parent.mkdir(parents=True, exist_ok=True)
     ceo_id = persona.get("id", "sundar_pichai")
+    headline = brief.get("title") or brief.get("headline") or ""
+
+    # Mix voiceover with trending background music
+    from src.audio_music_engine import mix_voiceover_with_music
+    balanced_audio = audio_path.with_name(f"balanced_{audio_path.stem}.mp3")
+    try:
+        mix_voiceover_with_music(
+            voiceover_path=audio_path,
+            output_path=balanced_audio,
+            persona=persona,
+            headline=headline
+        )
+        if balanced_audio.exists() and balanced_audio.stat().st_size > 1000:
+            audio_path = balanced_audio
+    except Exception as mix_err:
+        logger.warning("Audio mix error: %s; using raw voiceover.", mix_err)
 
     # Tier 1: Check for real archival video loop
     archival_video = VIDEOS_DIR / f"{ceo_id}_keynote_loop.mp4"

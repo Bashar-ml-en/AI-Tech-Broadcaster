@@ -942,7 +942,26 @@ def render_motion_video(
 
         writer.send(np.array(img))
 
+    # Close raw video stream to flush moov atom and release file handle
     writer.close()
+
+    # Mix CEO voiceover with trending background music (if not already balanced)
+    balanced_audio_path = STAGING_DIR / f"balanced_{output_video_path.stem}.aac"
+    if audio_path.stem.startswith("balanced_"):
+        final_audio = audio_path
+    else:
+        from src.audio_music_engine import mix_voiceover_with_music
+        try:
+            mix_voiceover_with_music(
+                voiceover_path=audio_path,
+                output_path=balanced_audio_path,
+                persona=persona,
+                headline=headline
+            )
+            final_audio = balanced_audio_path if balanced_audio_path.exists() and balanced_audio_path.stat().st_size > 1000 else audio_path
+        except Exception as mix_err:
+            print(f"[MusicEngine] Audio mix error ({mix_err}); using voiceover alone.")
+            final_audio = audio_path
 
     # Mux video with synthesized CEO voiceover into Full HD 1080x1920 (9:16) 30fps + 44.1kHz Stereo AAC
     ffmpeg_exe = imageio_ffmpeg.get_ffmpeg_exe()
@@ -954,7 +973,7 @@ def render_motion_video(
         ffmpeg_exe,
         "-y",
         "-i", str(temp_raw_video),
-        "-i", str(audio_path),
+        "-i", str(final_audio),
         "-vf", "scale=1080:1920:flags=lanczos,unsharp=3:3:0.5:3:3:0.0",
         "-r", "30",
         "-c:v", "libx264",
@@ -973,6 +992,8 @@ def render_motion_video(
 
     if temp_raw_video.exists():
         temp_raw_video.unlink()
+    if balanced_audio_path.exists():
+        balanced_audio_path.unlink()
 
     return str(output_video_path)
 

@@ -1,5 +1,5 @@
 {
-  "updated_at": 1792390289,
+  "updated_at": 1792392125,
   "platforms": {
     "tiktok": {
       "configured": true,
@@ -7,12 +7,12 @@
       "status_badge": "LIVE CONNECTED",
       "account": "@eraofai8 (Ai_updats)",
       "publish_method": "auto",
-      "token_ttl_hours": 23.0,
+      "token_ttl_hours": 22.5,
       "privacy_level_options": [
         "FOLLOWER_OF_CREATOR",
         "SELF_ONLY"
       ],
-      "diagnostic": "Connected to @eraofai8 (Ai_updats) [mode=AUTO, Public Ready, TTL: 23.0h]. All formats auto-compile to 1080x1920 Full HD CEO Keynote MP4."
+      "diagnostic": "Connected to @eraofai8 (Ai_updats) [mode=AUTO, Public Ready, TTL: 22.5h]. All formats auto-compile to 1080x1920 Full HD CEO Keynote MP4."
     },
     "telegram": {
       "configured": true,

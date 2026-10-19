@@ -16,6 +16,7 @@ from PIL import Image, ImageDraw, ImageFilter, ImageEnhance
 from pathlib import Path
 
 ROOT_DIR = Path(__file__).resolve().parent.parent
+FULLBODY_DIR = ROOT_DIR / "storage" / "assets" / "personas" / "fullbody"
 
 
 class FullBodyKeynotePresenter:
@@ -97,9 +98,12 @@ class FullBodyKeynotePresenter:
             self.fullbody_dir / f"{pid}_stage_{pose_type}.png",
             self.fullbody_dir / f"{pid}_{pose_type}.jpg",
             self.fullbody_dir / f"{pid}_{pose_type}.png",
-            self.fullbody_dir / f"sundar_pichai_stage_{pose_type}.jpg",
-            self.fullbody_dir / f"sundar_pichai_{pose_type}.jpg",
         ]
+        if pid == "sundar_pichai":
+            candidates.extend([
+                self.fullbody_dir / f"sundar_pichai_stage_{pose_type}.jpg",
+                self.fullbody_dir / f"sundar_pichai_{pose_type}.jpg",
+            ])
         for c in candidates:
             if c.exists():
                 try:
