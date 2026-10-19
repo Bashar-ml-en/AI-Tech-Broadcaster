@@ -1,0 +1,66 @@
+{
+  "sundar_pichai": {
+    "name": "Sundar Pichai",
+    "lab": "Google",
+    "wav_file": "sundar_pichai_ref.wav",
+    "wav_path": "/Users/donation/.gemini/antigravity/scratch/AI-Tech-Broadcaster/storage/assets/personas/voices/sundar_pichai_ref.wav",
+    "ref_text": "Good morning everyone and welcome to Google I/O. It is an incredible time for technology, and we are thrilled to share our latest breakthroughs with you today.",
+    "edge_voice": "en-IN-PrabhatNeural"
+  },
+  "sam_altman": {
+    "name": "Sam Altman",
+    "lab": "OpenAI",
+    "wav_file": "sam_altman_ref.wav",
+    "wav_path": "/Users/donation/.gemini/antigravity/scratch/AI-Tech-Broadcaster/storage/assets/personas/voices/sam_altman_ref.wav",
+    "ref_text": "Welcome to OpenAI DevDay. Today we are launching new capabilities that will allow developers to build incredible AI applications.",
+    "edge_voice": "en-US-RogerNeural"
+  },
+  "jensen_huang": {
+    "name": "Jensen Huang",
+    "lab": "NVIDIA",
+    "wav_file": "jensen_huang_ref.wav",
+    "wav_path": "/Users/donation/.gemini/antigravity/scratch/AI-Tech-Broadcaster/storage/assets/personas/voices/jensen_huang_ref.wav",
+    "ref_text": "Welcome to GTC. The computer graphics industry and artificial intelligence have reached an extraordinary inflection point.",
+    "edge_voice": "en-US-GuyNeural"
+  },
+  "demis_hassabis": {
+    "name": "Demis Hassabis",
+    "lab": "Google DeepMind",
+    "wav_file": "demis_hassabis_ref.wav",
+    "wav_path": "/Users/donation/.gemini/antigravity/scratch/AI-Tech-Broadcaster/storage/assets/personas/voices/demis_hassabis_ref.wav",
+    "ref_text": "At Google DeepMind, our mission is to build artificial general intelligence responsibly to benefit humanity and solve the hardest scientific challenges.",
+    "edge_voice": "en-GB-RyanNeural"
+  },
+  "mark_zuckerberg": {
+    "name": "Mark Zuckerberg",
+    "lab": "Meta",
+    "wav_file": "mark_zuckerberg_ref.wav",
+    "wav_path": "/Users/donation/.gemini/antigravity/scratch/AI-Tech-Broadcaster/storage/assets/personas/voices/mark_zuckerberg_ref.wav",
+    "ref_text": "Welcome to Meta Connect. We believe that open source AI is the right path forward for the entire industry and ecosystem.",
+    "edge_voice": "en-US-EricNeural"
+  },
+  "elon_musk": {
+    "name": "Elon Musk",
+    "lab": "xAI",
+    "wav_file": "elon_musk_ref.wav",
+    "wav_path": "/Users/donation/.gemini/antigravity/scratch/AI-Tech-Broadcaster/storage/assets/personas/voices/elon_musk_ref.wav",
+    "ref_text": "At xAI, our fundamental goal is to understand the true nature of the universe and build AI that accelerates human scientific discovery.",
+    "edge_voice": "en-ZA-LukeNeural"
+  },
+  "satya_nadella": {
+    "name": "Satya Nadella",
+    "lab": "Microsoft",
+    "wav_file": "satya_nadella_ref.wav",
+    "wav_path": "/Users/donation/.gemini/antigravity/scratch/AI-Tech-Broadcaster/storage/assets/personas/voices/satya_nadella_ref.wav",
+    "ref_text": "Welcome to Microsoft Ignite. We are seeing a profound shift in how software and compute empower every organization on the planet.",
+    "edge_voice": "en-IN-PrabhatNeural"
+  },
+  "dario_amodei": {
+    "name": "Dario Amodei",
+    "lab": "Anthropic",
+    "wav_file": "dario_amodei_ref.wav",
+    "wav_path": "/Users/donation/.gemini/antigravity/scratch/AI-Tech-Broadcaster/storage/assets/personas/voices/dario_amodei_ref.wav",
+    "ref_text": "At Anthropic, we focus on building reliable, interpretable, and steerable AI systems with constitutional AI principles.",
+    "edge_voice": "en-US-ChristopherNeural"
+  }
+}

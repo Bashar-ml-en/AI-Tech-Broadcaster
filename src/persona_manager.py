@@ -492,3 +492,8 @@ def get_persona_stage_background(persona: Dict[str, Any], target_size: Tuple[int
     fallback = Image.new("RGB", target_size, (10, 16, 30))
     return fallback
 
+
+def get_persona_by_id(persona_id: str) -> Dict[str, Any]:
+    """Retrieve persona definition by unique ID or fallback to default titan."""
+    return PERSONA_REGISTRY.get(persona_id, PERSONA_REGISTRY["default_titan"])
+

@@ -282,7 +282,22 @@ async def synthesize_audio(
         except Exception as gem_err:
             print(f"[CEOVoiceEngine] Gemini 3.8 TTS fallback: {gem_err}")
 
-    # Tier 2: Edge-TTS Neural Voiceover
+    # Tier 2: SOTA Zero-Shot Voice Cloning (F5-TTS / ElevenLabs / Fish Audio)
+    if persona:
+        try:
+            from src.voice_cloner import synthesize_ceo_voice
+            await synthesize_ceo_voice(
+                narration_text=narration_text,
+                output_path=output_path,
+                persona=persona,
+                prefer_zero_shot=True
+            )
+            if output_path.exists() and output_path.stat().st_size > 2000:
+                return
+        except Exception as clone_err:
+            print(f"[CEOVoiceEngine] Zero-shot voice clone fallback ({clone_err}); engaging calibrated Edge-TTS.")
+
+    # Tier 3: Edge-TTS Neural Voiceover
     raw_tts_path = output_path.with_name(f"raw_tts_{output_path.stem}.mp3")
     try:
         communicate = edge_tts.Communicate(narration_text, edge_voice, rate="+4%")
@@ -1005,14 +1020,25 @@ async def synthesize_broadcast_video(
             print(f"[CEOVideoEngine] Cloud Veo/Omni skipped ({e}); rendering via 30fps CEO Character Animator.")
 
     # Step 3: Render 9:16 Full HD 1080x1920 30fps animated CEO presenter video
-    render_motion_video(
-        directive,
-        audio_path,
-        video_path,
-        fps=30,
-        persona=persona,
-        spoken_script=narration,
-    )
+    try:
+        from src.ai_video_engine import generate_presenter_video
+        await generate_presenter_video(
+            persona=persona,
+            audio_path=audio_path,
+            output_video_path=video_path,
+            brief=directive,
+            prefer_ai_diffusion=True
+        )
+    except Exception as e:
+        print(f"[CEOVideoEngine] AI video engine error ({e}); falling back to local motion renderer.")
+        render_motion_video(
+            directive,
+            audio_path,
+            video_path,
+            fps=30,
+            persona=persona,
+            spoken_script=narration,
+        )
 
     return str(video_path)
 
