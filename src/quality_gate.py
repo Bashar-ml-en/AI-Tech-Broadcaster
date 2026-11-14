@@ -260,6 +260,16 @@ def check_media_validation(media_refs: List[MediaRef], format_type: str) -> Qual
                 for issue in v_res.get("violations", []):
                     violations.append(f"Media #{idx}: {issue}")
 
+            # Multimodal Visual Frame Quality Inspection
+            if kind == "video":
+                try:
+                    from src.vision_qa_gate import audit_rendered_video_visuals
+                    vqa = audit_rendered_video_visuals(Path(loc))
+                    if not vqa.get("passed", True) and vqa.get("critical_errors"):
+                        violations.append(f"Visual QA: {'; '.join(vqa['critical_errors'][:2])}")
+                except Exception as vqa_err:
+                    logger.debug("Visual QA check bypassed: %s", vqa_err)
+
     if violations:
         return {
             "name": "media_validation",

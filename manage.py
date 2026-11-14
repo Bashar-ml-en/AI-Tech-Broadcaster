@@ -623,6 +623,27 @@ def cmd_tiktok_test(publish: bool = False):
     print("-" * 65 + "\n")
 
 
+def cmd_purge_staging(hours: int = 48, dry_run: bool = False):
+    """Purge intermediate staging files older than TTL to conserve disk space."""
+    from src.storage_manager import purge_staging_directory, get_staging_metrics
+    print("\n" + "=" * 65)
+    print("  STAGING STORAGE & CACHE LIFECYCLE MANAGER")
+    print("=" * 65)
+    metrics = get_staging_metrics()
+    print(f"  • Current Staging Files:   {metrics['total_files']}")
+    print(f"  • Current Disk Footprint:  {metrics['total_mb']} MB")
+    print(f"  • Oldest Asset Age:        {metrics['oldest_age_hours']} hours")
+    print(f"  • Purge Cutoff:            {hours} hours")
+    print(f"  • Mode:                    {'[DRY-RUN (Simulated)]' if dry_run else '[LIVE PURGE]'}")
+    print("-" * 65)
+
+    res = purge_staging_directory(max_age_hours=hours, dry_run=dry_run)
+    print(f"  * Deleted Assets:          {res['deleted_count']}")
+    print(f"  * Disk Space Freed:        {res['freed_mb']} MB")
+    print(f"  * Retained Assets:         {res['retained_count']}")
+    print("=" * 65 + "\n")
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="AutoProdcaster Management CLI")
     subparsers = parser.add_subparsers(dest="command", help="Available management commands")
@@ -665,6 +686,10 @@ if __name__ == "__main__":
     tk_test_parser = subparsers.add_parser("tiktok-test", help="Test live TikTok API connection and Reel publication")
     tk_test_parser.add_argument("--publish", action="store_true", help="Publish a live test Reel to TikTok")
 
+    purge_parser = subparsers.add_parser("purge-staging", help="Purge intermediate staging files older than TTL")
+    purge_parser.add_argument("--hours", type=int, default=48, help="Max file age in hours (default: 48)")
+    purge_parser.add_argument("--dry-run", action="store_true", help="Simulate deletion without unlinking files")
+
     studio_parser = subparsers.add_parser("studio", help="Start Web Management Studio")
     studio_parser.add_argument("--port", type=int, default=8080, help="Port for Studio Web Server")
 
@@ -692,6 +717,8 @@ if __name__ == "__main__":
         cmd_tiktok_auth(code=getattr(args, "code", None), redirect_uri=getattr(args, "redirect", None), generate_url=getattr(args, "generate_url", False))
     elif args.command == "tiktok-test":
         cmd_tiktok_test(publish=getattr(args, "publish", False))
+    elif args.command == "purge-staging":
+        cmd_purge_staging(hours=getattr(args, "hours", 48), dry_run=getattr(args, "dry_run", False))
     elif args.command == "studio":
         cmd_studio(args.port)
     elif args.command == "telegram-id":

@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>ai.tech.broadcaster</string>
+
+    <key>ProgramArguments</key>
+    <array>
+        <string>/Users/bashar/Projects/AI-Tech-Broadcaster/.venv/bin/python</string>
+        <string>/Users/bashar/Projects/AI-Tech-Broadcaster/src/pipeline.py</string>
+        <string>--sidecar</string>
+    </array>
+
+    <key>WorkingDirectory</key>
+    <string>/Users/bashar/Projects/AI-Tech-Broadcaster</string>
+
+    <key>RunAtLoad</key>
+    <true/>
+
+    <key>KeepAlive</key>
+    <dict>
+        <key>SuccessfulExit</key>
+        <false/>
+        <key>Crashed</key>
+        <true/>
+    </dict>
+
+    <key>StandardOutPath</key>
+    <string>/Users/bashar/Projects/AI-Tech-Broadcaster/storage/logs/launchd_stdout.log</string>
+
+    <key>StandardErrorPath</key>
+    <string>/Users/bashar/Projects/AI-Tech-Broadcaster/storage/logs/launchd_stderr.log</string>
+
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>PATH</key>
+        <string>/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:/opt/homebrew/bin</string>
+        <key>PYTHONUNBUFFERED</key>
+        <string>1</string>
+    </dict>
+
+    <key>ThrottleInterval</key>
+    <integer>30</integer>
+</dict>
+</plist>

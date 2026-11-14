@@ -184,6 +184,24 @@ def is_already_covered(source_url: str, headline_candidate: str = "") -> bool:
                         logger.info("Deduplication Hit: Story overlap (%.0f%%) with ID %s (%s)", similarity * 100, post["id"], p_headline)
                         return True
 
+        # Semantic Vector Collision Check
+        if headline_candidate:
+            try:
+                from src.semantic_memory import SemanticMemoryEngine
+                semantic_engine = SemanticMemoryEngine()
+                collided, match = semantic_engine.check_semantic_collision(
+                    candidate_headline=headline_candidate,
+                    threshold=0.75
+                )
+                if collided and match:
+                    logger.info(
+                        "Deduplication Hit: Semantic memory collision (score=%.2f) with Post #%s ('%s')",
+                        match["similarity_score"], match["matched_post_id"], match["matched_headline"]
+                    )
+                    return True
+            except Exception as sem_err:
+                logger.debug("Semantic deduplication check skipped: %s", sem_err)
+
     return False
 
 
@@ -1622,6 +1640,12 @@ def execute_broadcast_cycle(target_format: Optional[str] = None) -> Optional[Dic
         }
 
     finally:
+        try:
+            from src.storage_manager import purge_staging_directory
+            purge_staging_directory(max_age_hours=48)
+        except Exception as purge_err:
+            logger.debug("Automatic staging purge error: %s", purge_err)
+
         try:
             fcntl.flock(lock_file, fcntl.LOCK_UN)
         except Exception:

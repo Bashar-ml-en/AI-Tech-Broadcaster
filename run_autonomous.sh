@@ -31,8 +31,11 @@ is_running() {
             return 0
         fi
     fi
-    # Also check by process name
+    # Check by process name: uvicorn or pipeline sidecar
     if pgrep -f "uvicorn src.webhook_server:app" > /dev/null 2>&1; then
+        return 0
+    fi
+    if pgrep -f "pipeline.py --sidecar" > /dev/null 2>&1; then
         return 0
     fi
     return 1
@@ -46,7 +49,13 @@ get_pid() {
             return
         fi
     fi
-    pgrep -f "uvicorn src.webhook_server:app" | head -n 1 || true
+    local UV_PID
+    UV_PID=$(pgrep -f "uvicorn src.webhook_server:app" | head -n 1 || true)
+    if [ -n "$UV_PID" ]; then
+        echo "$UV_PID"
+        return
+    fi
+    pgrep -f "pipeline.py --sidecar" | head -n 1 || true
 }
 
 start() {
@@ -97,9 +106,18 @@ stop() {
 status() {
     if is_running; then
         PID=$(get_pid)
-        echo "🟢 AutoBroadcaster is RUNNING (PID: $PID)"
-        echo "   • Port: 8000 (http://localhost:8000/dashboard)"
-        echo "   • Uptime / Process details:"
+        local PROC_CMD
+        PROC_CMD=$(ps -p "$PID" -o command= 2>/dev/null || true)
+        if [[ "$PROC_CMD" == *"uvicorn"* ]]; then
+            echo "🟢 AutoBroadcaster (Full Stack Server) is RUNNING (PID: $PID)"
+            echo "   • Web Dashboard: http://localhost:8000/dashboard"
+            echo "   • Mode: Multi-Cadence (Stories, Reels, Posts)"
+        else
+            echo "🟢 AutoBroadcaster (Background Sidecar Daemon) is RUNNING (PID: $PID)"
+            echo "   • Mode: Hourly Autonomous Sidecar Loop"
+            echo "   • Tip: Start full web console with: ./run_autonomous.sh start"
+        fi
+        echo "   • Process Details:"
         ps -p "$PID" -o pid,etime,pcpu,pmem,command
         echo ""
         echo "📋 Latest Activity from Database:"
@@ -154,8 +172,12 @@ case "$1" in
             "$PYTHON_BIN" manage.py tiktok-test
         fi
         ;;
+    purge)
+        shift
+        "$PYTHON_BIN" manage.py purge-staging "$@"
+        ;;
     *)
-        echo "Usage: ./run_autonomous.sh {start|stop|restart|status|logs|trigger [reel|post|story]|test-tiktok [--publish]}"
+        echo "Usage: ./run_autonomous.sh {start|stop|restart|status|logs|trigger [reel|post|story]|test-tiktok [--publish]|purge [--dry-run]}"
         exit 1
         ;;
 esac
