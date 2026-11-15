@@ -150,6 +150,99 @@ def _render_archival_loop_video(
     return False
 
 
+def _render_multi_scene_reel(
+    persona: Dict[str, Any],
+    audio_path: Path,
+    output_video_path: Path,
+    brief: Dict[str, Any]
+) -> bool:
+    """
+    Renders a dynamic, multi-scene vertical reel obeying the 3-Second Retention Rule:
+    - Scene 1 (0.0s - 3.5s): Dramatic Hook Scene with Keynote Presenter & Push-In.
+    - Scene 2 (3.5s - 9.5s): Real High-Def B-Roll Cutaway (Pexels / Tech Procedural).
+    - Scene 3 (9.5s - End): Technical Architecture & Call-to-Action Return.
+    """
+    ffmpeg_exe = imageio_ffmpeg.get_ffmpeg_exe()
+    duration = _get_audio_duration(audio_path)
+    if duration < 8.0:
+        return False  # Video too short for multi-scene cutaways
+
+    staging_dir = output_video_path.parent
+    timestamp = int(time.time())
+    style = brief.get("style", "keynote")
+    headline = brief.get("title") or brief.get("headline") or ""
+    body = brief.get("body_narration", "")
+
+    from src.stock_video_client import extract_broll_keywords, get_or_create_broll_clip
+    from src.video_synthesizer import render_motion_video
+
+    # 1. Render the base presenter track for the full duration
+    base_presenter_path = staging_dir / f"temp_base_presenter_{timestamp}.mp4"
+    try:
+        render_motion_video(
+            directive=brief,
+            audio_path=audio_path,
+            output_video_path=base_presenter_path,
+            fps=30,
+            persona=persona,
+            spoken_script=brief.get("hook_narration", "") + " " + body
+        )
+        if not base_presenter_path.exists() or base_presenter_path.stat().st_size < 10000:
+            return False
+
+        # 2. Extract B-roll clip for Scene 2 (6.0s duration)
+        broll_clip_path = staging_dir / f"temp_broll_scene2_{timestamp}.mp4"
+        keywords = extract_broll_keywords(f"{headline} {body}")
+        get_or_create_broll_clip(theme=style, keywords=keywords, output_path=broll_clip_path, duration=6.0)
+
+        if not broll_clip_path.exists() or broll_clip_path.stat().st_size < 1000:
+            return False
+
+        # 3. Stitch Scenes: Scene 1 (0-3.5s) -> Scene 2 B-Roll (6.0s) -> Scene 3 (9.5s to End)
+        scene1_dur = 3.5
+        scene2_dur = 6.0
+        scene3_start = scene1_dur + scene2_dur
+
+        concat_filter = (
+            f"[0:v]trim=start=0:end={scene1_dur},setpts=PTS-STARTPTS[v1];"
+            f"[1:v]trim=start=0:end={scene2_dur},setpts=PTS-STARTPTS[v2];"
+            f"[0:v]trim=start={scene3_start},setpts=PTS-STARTPTS[v3];"
+            "[v1][v2][v3]concat=n=3:v=1:a=0[vout]"
+        )
+
+        cmd = [
+            ffmpeg_exe, "-y",
+            "-i", str(base_presenter_path),
+            "-i", str(broll_clip_path),
+            "-i", str(audio_path),
+            "-filter_complex", concat_filter,
+            "-map", "[vout]",
+            "-map", "2:a",
+            "-c:v", "libx264",
+            "-pix_fmt", "yuv420p",
+            "-preset", "veryfast",
+            "-b:v", "4000k",
+            "-c:a", "aac",
+            "-b:a", "192k",
+            "-shortest",
+            str(output_video_path)
+        ]
+
+        p = subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        if p.returncode == 0 and output_video_path.exists() and output_video_path.stat().st_size > 10000:
+            logger.info("Multi-scene dynamic storyboard successfully rendered: %s (Style: %s)", output_video_path.name, style.upper())
+            return True
+    except Exception as e:
+        logger.warning("Multi-scene reel rendering failed: %s", e)
+    finally:
+        if base_presenter_path.exists():
+            base_presenter_path.unlink(missing_ok=True)
+        if 'broll_clip_path' in locals() and broll_clip_path.exists():
+            broll_clip_path.unlink(missing_ok=True)
+
+    return False
+
+
 async def generate_presenter_video(
     persona: Dict[str, Any],
     audio_path: Path,
@@ -161,8 +254,9 @@ async def generate_presenter_video(
     Main entry point for generating the CEO Presenter Reel.
     Cascades through:
     1. Tier 1: Real Archival Keynote Video Footage (if available in storage/assets/personas/videos/)
-    2. Tier 2: EchoMimic Audio-Driven Neural Video Diffusion
-    3. Tier 3: Local FullBodyKeynotePresenter Fallback
+    2. Tier 2: SOTA Multi-Scene Dynamic Storyboard with Real B-Roll & Visual Themes
+    3. Tier 3: Audio-Driven Neural Video Diffusion via EchoMimic
+    4. Tier 4: Local FullBodyKeynotePresenter Classic Fallback
     """
     output_video_path.parent.mkdir(parents=True, exist_ok=True)
     ceo_id = persona.get("id", "sundar_pichai")
@@ -190,9 +284,17 @@ async def generate_presenter_video(
         if success and output_video_path.exists() and output_video_path.stat().st_size > 10000:
             return output_video_path
 
-    # Tier 2: Audio-Driven Neural Video Diffusion via EchoMimic
+    # Tier 2: Multi-Scene Dynamic Storyboard (The 3-Second Retention Rule)
+    try:
+        logger.info("Assembling dynamic multi-scene reel for %s (Theme: %s)...", ceo_id, brief.get("style", "keynote"))
+        success = _render_multi_scene_reel(persona, audio_path, output_video_path, brief)
+        if success and output_video_path.exists() and output_video_path.stat().st_size > 10000:
+            return output_video_path
+    except Exception as multi_err:
+        logger.warning("Multi-scene reel rendering failed: %s; proceeding down cascade.", multi_err)
+
+    # Tier 3: Audio-Driven Neural Video Diffusion via EchoMimic
     if prefer_ai_diffusion:
-        # Prefer full-body stage plate or clear front-facing portrait
         candidate_images = [
             FULLBODY_DIR / f"{ceo_id}_stage_center.png",
             FULLBODY_DIR / f"{ceo_id}_stage_center.jpg",
@@ -210,7 +312,7 @@ async def generate_presenter_video(
             if success and output_video_path.exists() and output_video_path.stat().st_size > 10000:
                 return output_video_path
 
-    # Tier 3: High-Fidelity Local FullBodyKeynotePresenter Fallback
+    # Tier 4: Classic FullBodyKeynotePresenter Fallback
     logger.info("Falling back to local FullBodyKeynotePresenter engine for %s...", ceo_id)
     from src.video_synthesizer import render_motion_video
     render_motion_video(

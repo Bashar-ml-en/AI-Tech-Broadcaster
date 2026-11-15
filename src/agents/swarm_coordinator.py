@@ -67,12 +67,28 @@ class EditorialAgent(BaseAgent):
         content = fetch_story_content(selected)
         script = generate_canonical_script(selected, content, format_target=target_format)
         briefs = route_format_briefs(script, selected, format_target=target_format)
+        brief = briefs.get(target_format) or briefs.get("reel")
+
+        # Assign rotating aesthetic theme style
+        hl_lower = (selected.get("headline") or "").lower()
+        if any(k in hl_lower for k in ("weights", "open source", "github", "release", "model", "llama", "deepseek", "qwen", "code")):
+            style = "cyberpunk"
+        elif any(k in hl_lower for k in ("benchmark", "paper", "arxiv", "evaluation", "score", "reasoning", "swe-bench")):
+            style = "minimalist"
+        elif any(k in hl_lower for k in ("antitrust", "lawsuit", "regulation", "acquisition", "billion", "revenue", "policy", "scandal")):
+            style = "news_desk"
+        else:
+            style = "keynote"
+
+        if brief and isinstance(brief, dict):
+            brief["style"] = style
 
         return {
             "selected_story": selected,
             "script": script,
-            "brief": briefs.get(target_format) or briefs.get("reel"),
+            "brief": brief,
             "content": content,
+            "style": style,
         }
 
 

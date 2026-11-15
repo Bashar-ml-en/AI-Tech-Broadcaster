@@ -1331,7 +1331,18 @@ def execute_broadcast_cycle(target_format: Optional[str] = None) -> Optional[Dic
             briefs = route_format_briefs(reel_script, selected, format_target="reel")
             reel_brief = briefs["reel"]
 
-            logger.info("Synthesizing 9:16 Vertical Motion Video for **REELS**...")
+            # Dynamic Aesthetic Theme Assignment
+            hl_lower = (selected.get("headline") or "").lower()
+            if any(k in hl_lower for k in ("weights", "open source", "github", "release", "model", "llama", "deepseek", "qwen", "code")):
+                reel_brief["style"] = "cyberpunk"
+            elif any(k in hl_lower for k in ("benchmark", "paper", "arxiv", "evaluation", "score", "reasoning", "swe-bench")):
+                reel_brief["style"] = "minimalist"
+            elif any(k in hl_lower for k in ("antitrust", "lawsuit", "regulation", "acquisition", "billion", "revenue", "policy", "scandal")):
+                reel_brief["style"] = "news_desk"
+            else:
+                reel_brief["style"] = "keynote"
+
+            logger.info("Synthesizing 9:16 Vertical Motion Video for **REELS** (Style Theme: %s)...", reel_brief["style"].upper())
             reel_video_path = ""
             try:
                 reel_video_path = asyncio.run(synthesize_broadcast_video(reel_brief, f"reel_clip_{timestamp}"))
