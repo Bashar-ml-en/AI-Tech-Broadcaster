@@ -91,14 +91,21 @@ start() {
 
 stop() {
     echo "🛑 Stopping AutoBroadcaster..."
+    # Unload launchd background services to prevent automatic KeepAlive restarts
+    for plist in "$HOME/Library/LaunchAgents/com.eraofai.broadcaster.plist" "$HOME/Library/LaunchAgents/ai.tech.broadcaster.plist"; do
+        if [ -f "$plist" ]; then
+            launchctl unload -w "$plist" 2>/dev/null || true
+        fi
+    done
+
     PID=$(get_pid)
     if [ -n "$PID" ]; then
         kill "$PID" 2>/dev/null || true
         sleep 1
         kill -9 "$PID" 2>/dev/null || true
     fi
-    pkill -f "uvicorn src.webhook_server:app" 2>/dev/null || true
-    pkill -f "pipeline.py --sidecar" 2>/dev/null || true
+    pkill -9 -f "uvicorn src.webhook_server:app" 2>/dev/null || true
+    pkill -9 -f "pipeline.py --sidecar" 2>/dev/null || true
     rm -f "$PID_FILE" "$PROJECT_DIR/storage/.cycle.lock"
     echo "✅ Broadcaster stopped cleanly."
 }
